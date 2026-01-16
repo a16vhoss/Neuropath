@@ -5,8 +5,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { getClassFlashcards, getStudySetFlashcards, updateFlashcardProgress, supabase } from '../services/supabaseClient';
 import { generateStudyFlashcards, getTutorResponse, generateQuizQuestions } from '../services/geminiService';
 import SocraticChat from '../components/SocraticChat';
+import NeuroPodcast from '../components/NeuroPodcast';
 
-type StudyMode = 'flashcards' | 'quiz' | 'exam' | 'cramming';
+type StudyMode = 'flashcards' | 'quiz' | 'exam' | 'cramming' | 'podcast';
 
 interface Flashcard {
   id: string;
@@ -484,7 +485,8 @@ const StudySession: React.FC = () => {
             { id: 'flashcards', label: 'Flashcards', icon: 'style' },
             { id: 'quiz', label: 'Quiz', icon: 'quiz' },
             { id: 'exam', label: 'Examen', icon: 'assignment' },
-            { id: 'cramming', label: 'Cramming', icon: 'bolt' }
+            { id: 'cramming', label: 'Cramming', icon: 'bolt' },
+            { id: 'podcast', label: 'Podcast', icon: 'headphones' }
           ].map((m) => (
             <button
               key={m.id}
@@ -749,6 +751,14 @@ const StudySession: React.FC = () => {
               </button>
             </div>
           </>
+        )}
+        {mode === 'podcast' && (
+          <div className="max-w-4xl mx-auto">
+            <NeuroPodcast
+              context={flashcards.map(f => `Q: ${f.question} A: ${f.answer}`).join('\n\n')}
+              topicTitle={className || "Sesión de Estudio"}
+            />
+          </div>
         )}
       </main>
 

@@ -140,3 +140,41 @@ export const generateQuizQuestions = async (context: string) => {
     return [];
   }
 };
+
+export const generatePodcastScript = async (context: string) => {
+  if (!API_KEY || API_KEY === 'PLACEHOLDER_API_KEY') {
+    return [];
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: `Convert the following study notes into an engaging podcast script between two hosts, Alex (enthusiastic, asks questions) and Sam (expert, explains concepts with analogies). 
+      Make it feel like a real conversation with banter. Keep it under 5 minutes reading time.
+      
+      Context: ${context.substring(0, 20000)} ...
+      
+      Return JSON format.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              speaker: { type: Type.STRING, enum: ["Alex", "Sam"] },
+              text: { type: Type.STRING }
+            },
+            required: ["speaker", "text"]
+          }
+        }
+      }
+    });
+
+    return JSON.parse(response.text || "[]");
+  } catch (e) {
+    console.error("Failed to generate podcast", e);
+    return [];
+  }
+};
