@@ -41,12 +41,13 @@ const AuthPage: React.FC = () => {
         try {
             if (isLogin) {
                 await signIn(email, password);
-                navigate(role === 'teacher' ? '/teacher' : '/student');
+                // Navigation is handled by useEffect when user/profile changes
             } else {
                 await signUp(email, password, fullName, role);
-                setSuccess('¡Cuenta creada! Revisa tu correo para verificar tu cuenta.');
+                setSuccess('¡Cuenta creada! Ya puedes iniciar sesión.');
             }
         } catch (err: any) {
+            console.error('Auth error:', err);
             setError(err.message || 'Error al procesar la solicitud');
         }
     };
