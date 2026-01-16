@@ -56,6 +56,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (session?.user) {
                 getProfile(session.user.id).then(setProfile).catch(console.error);
             }
+        }).catch((error) => {
+            console.error('Error getting session:', error);
+        }).finally(() => {
             setLoading(false);
         });
 

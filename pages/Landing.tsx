@@ -13,12 +13,13 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const handleDemo = (role: UserRole) => {
-    onLogin(role);
-    navigate(role === UserRole.TEACHER ? '/demo/teacher' : '/demo/student');
+    // onLogin(role); // Disabled demo login
+    navigate('/auth');
   };
 
   return (
     <div className="min-h-screen">
+      {/* ... existing code ... */}
       {/* Navigation */}
       <nav className="fixed w-full z-50 glass border-b border-gray-200 py-4">
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
@@ -35,15 +36,9 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/auth')}
-              className="text-slate-600 font-semibold px-4 py-2 hover:text-primary"
+              className="px-6 py-2.5 rounded-lg font-semibold hover:bg-slate-100 transition-all text-slate-600"
             >
               Iniciar Sesión
-            </button>
-            <button
-              onClick={() => navigate('/auth')}
-              className="bg-primary text-white font-bold px-6 py-2.5 rounded-lg shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center"
-            >
-              Comenzar Gratis
             </button>
           </div>
         </div>
@@ -65,14 +60,10 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
               <button
-                onClick={() => handleDemo(UserRole.STUDENT)}
+                onClick={() => navigate('/auth')}
                 className="bg-white text-blue-600 text-lg font-bold px-10 py-4 rounded-xl shadow-2xl hover:scale-105 hover:bg-blue-50 transition-all"
               >
-                Comenzar Gratis
-              </button>
-              <button className="bg-white/10 border border-white/30 backdrop-blur-sm text-lg font-bold px-8 py-4 rounded-xl hover:bg-white/20 transition-all flex items-center justify-center gap-2">
-                <span className="material-symbols-outlined">play_circle</span>
-                Ver Demo
+                Crear Cuenta
               </button>
             </div>
             <div className="mt-8 flex items-center justify-center lg:justify-start gap-4">
@@ -472,8 +463,10 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
                     </li>
                   ))}
                 </ul>
-                <button className={`w-full py-3 rounded-xl font-bold transition-all ${plan.premium ? 'bg-primary text-white shadow-lg shadow-blue-200 hover:bg-blue-700' : 'bg-slate-100 text-slate-900 hover:bg-slate-200'
-                  }`}>
+                <button
+                  onClick={() => navigate('/auth')}
+                  className={`w-full py-3 rounded-xl font-bold transition-all ${plan.premium ? 'bg-primary text-white shadow-lg shadow-blue-200 hover:bg-blue-700' : 'bg-slate-100 text-slate-900 hover:bg-slate-200'
+                    }`}>
                   {plan.cta}
                 </button>
               </div>
@@ -588,11 +581,8 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
           <h2 className="text-4xl font-black mb-6">¿Listo para transformar tu aprendizaje?</h2>
           <p className="text-slate-400 mb-10 text-lg">Únete a miles de mentes brillantes hoy mismo.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button onClick={() => handleDemo(UserRole.STUDENT)} className="bg-primary px-10 py-4 rounded-xl font-bold text-lg hover:bg-blue-600 shadow-xl shadow-blue-900">
+            <button onClick={() => navigate('/auth')} className="bg-primary px-10 py-4 rounded-xl font-bold text-lg hover:bg-blue-600 shadow-xl shadow-blue-900">
               Crear Cuenta Gratis
-            </button>
-            <button onClick={() => handleDemo(UserRole.TEACHER)} className="bg-white/10 px-10 py-4 rounded-xl font-bold text-lg hover:bg-white/20">
-              Soy Profesor
             </button>
           </div>
         </div>
