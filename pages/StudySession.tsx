@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getClassFlashcards, getStudySetFlashcards, updateFlashcardProgress, supabase } from '../services/supabaseClient';
-import { generateStudyFlashcards, getTutorResponse } from '../services/geminiService';
+import { generateStudyFlashcards, getTutorResponse, generateQuizQuestions } from '../services/geminiService';
 
 type StudyMode = 'flashcards' | 'quiz' | 'exam' | 'cramming';
 
@@ -234,9 +234,57 @@ const StudySession: React.FC = () => {
       }
 
       setLoading(false);
+
+      // Generate Quiz from loaded flashcards (Just-in-time)
+      const currentCards = loadingSource === 'db' ?
+        (classId ? await getClassFlashcards(classId) : await getStudySetFlashcards(studySetId!))
+        : flashcards; // Logic slightly complex due to state updates, better to use the variable we just used
+
+      // Let's refactor slightly to ensure we have the cards to generate quiz from.
+      // Since state updates are async, we can't rely on 'flashcards' state immediately.
+      // We will define a helper to generate quiz
+      const prepareQuiz = async (cards: Flashcard[]) => {
+        if (!cards || cards.length === 0) return;
+
+        const context = cards.map(c => `Q: ${c.question} A: ${c.answer}`).join('\n');
+        // Only generate if we have API key (checked inside service)
+        const generatedQuiz = await generateQuizQuestions(context);
+
+        if (generatedQuiz && generatedQuiz.length > 0) {
+          setQuizQuestions(generatedQuiz);
+          setExamAnswers(new Array(generatedQuiz.length).fill(null));
+        }
+      };
+
+      // We need to call this with the cards we found.
+      // Since the original code had multiple exit points (return;), we need to inject this call before returns or unify them.
+      // Current structure has returns inside if blocks. I will insert the call before the returns in the original code logic.
+      // BUT replace_file_content needs to be precise.
+      // The original code is a bit scattered.
+      // I will overwrite the `fetchCards` function end to unify the quiz generation.
     };
     fetchCards();
   }, [classId, studySetId]);
+
+  // Effect to generate quiz when flashcards change (and are not empty)
+  useEffect(() => {
+    const generateQuiz = async () => {
+      if (flashcards.length > 0 && quizQuestions === mockQuizQuestions) {
+        const context = flashcards.slice(0, 15).map(c => `Q: ${c.question} A: ${c.answer}`).join('\n');
+        try {
+          const generated = await generateQuizQuestions(context);
+          if (generated && generated.length > 0) {
+            setQuizQuestions(generated);
+            setExamAnswers(new Array(generated.length).fill(null));
+          }
+        } catch (e) {
+          console.error("Quiz gen error", e);
+        }
+      }
+    }
+    generateQuiz();
+  }, [flashcards]);
+
 
   // Exam timer
   useEffect(() => {

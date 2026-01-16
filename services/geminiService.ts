@@ -99,3 +99,44 @@ export const generateStudySetFromContext = async (content: string, type: 'text' 
     throw e;
   }
 };
+
+export const generateQuizQuestions = async (context: string) => {
+  if (!API_KEY || API_KEY === 'PLACEHOLDER_API_KEY') {
+    return [];
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: `Generate 5 multiple-choice quiz questions based on the following context.
+      Context: ${context.substring(0, 20000)} ...
+      
+      Return JSON format.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              question: { type: Type.STRING },
+              options: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              },
+              correctIndex: { type: Type.NUMBER, description: "Index of the correct option (0-3)" },
+              explanation: { type: Type.STRING }
+            },
+            required: ["question", "options", "correctIndex", "explanation"]
+          }
+        }
+      }
+    });
+
+    return JSON.parse(response.text || "[]");
+  } catch (e) {
+    console.error("Failed to generate quiz", e);
+    return [];
+  }
+};
