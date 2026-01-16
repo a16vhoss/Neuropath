@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { extractTextFromPDF } from '../services/pdfProcessingService';
 import { generateStudySetFromContext } from '../services/geminiService';
 import { useAuth } from '../contexts/AuthContext';
-import { createStudySet, addFlashcardToStudySet } from '../services/supabaseClient';
+import { createStudySet, addFlashcardsBatch } from '../services/supabaseClient';
 
 interface MagicImportModalProps {
     onClose: () => void;
@@ -62,34 +62,50 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
                 throw new Error("No se pudieron generar flashcards. Intenta con otro contenido.");
             }
 
-            // 3. Save to Supabase
-            setStatus('Guardando set de estudio...');
-            // Create the set first
-            const newSet = await createStudySet(user.id, {
-                name: name,
-                description: `Generado con IA desde ${activeTab.toUpperCase()}`,
-                topics: ['IA', activeTab],
-                icon: activeTab === 'youtube' ? 'play_circle' : (activeTab === 'pdf' ? 'picture_as_pdf' : 'description')
-            });
+            // 3. Save to Supabase - with timeout to prevent hanging
+            const saveTimeout = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Tiempo de espera agotado al guardar. Verifica tu conexión.")), 15000)
+            );
 
-            // Add flashcards one by one
-            setStatus(`Guardando ${cardData.length} flashcards...`);
+            const saveContent = async () => {
+                setStatus('Guardando set de estudio...');
+                // Create the set first
+                const newSet = await createStudySet(user.id, {
+                    name: name,
+                    description: `Generado con IA desde ${activeTab.toUpperCase()}`,
+                    topics: ['IA', activeTab],
+                    icon: activeTab === 'youtube' ? 'play_circle' : (activeTab === 'pdf' ? 'picture_as_pdf' : 'description')
+                });
 
-            await Promise.all(cardData.map((card: any) =>
-                addFlashcardToStudySet(newSet.id, {
+                if (!newSet?.id) throw new Error("Error al crear el set de estudio (ID no retornado).");
+
+                // Add flashcards in batch
+                setStatus(`Guardando ${cardData.length} flashcards...`);
+
+                const flashcardsToInsert = cardData.map((card: any) => ({
+                    study_set_id: newSet.id,
                     question: card.question,
                     answer: card.answer,
                     category: card.category || 'General'
-                })
-            ));
+                }));
 
+                await addFlashcardsBatch(flashcardsToInsert);
+
+                return newSet;
+            };
+
+            const newSet = await Promise.race([saveContent(), saveTimeout]) as any;
+
+            setStatus('¡Listo!');
             onSuccess(newSet);
             onClose();
 
         } catch (error) {
             console.error('Magic Import Failed:', error);
-            setStatus('Error: ' + (error as Error).message);
-            setLoading(false);
+            setStatus('Error: ' + ((error as any).message || 'Ocurrió un error inesperado.'));
+            // Keep loading false but allow user to try again or close
+            // Don't close automatically so user can see error
+            setTimeout(() => setLoading(false), 2000);
         }
     };
 

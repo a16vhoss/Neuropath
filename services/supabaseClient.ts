@@ -470,6 +470,21 @@ export const deleteFlashcard = async (flashcardId: string) => {
     if (error) throw error;
 };
 
+export const addFlashcardsBatch = async (flashcards: {
+    study_set_id: string;
+    question: string;
+    answer: string;
+    category?: string;
+}[]) => {
+    const { data, error } = await supabase
+        .from('flashcards')
+        .insert(flashcards)
+        .select();
+
+    if (error) throw error;
+    return data;
+};
+
 // Analytics helpers (for teachers)
 export const getClassAnalytics = async (classId: string) => {
     const { data: enrollments, error: enrollError } = await supabase
