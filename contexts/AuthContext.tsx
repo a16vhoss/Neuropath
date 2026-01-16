@@ -52,11 +52,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useEffect(() => {
         let mounted = true;
 
+        // Safety timeout to prevent infinite loading screen
+        const safetyTimeout = setTimeout(() => {
+            if (mounted && loading) {
+                console.warn("Auth check timed out, forcing app load");
+                setLoading(false);
+            }
+        }, 3000);
+
         // Listen for auth changes - this fires immediately with INITIAL_SESSION
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log('Auth state change:', event);
+            console.log('Auth state change:', event, session?.user?.email);
 
             if (!mounted) return;
+
+            // Clear timeout since we got a response
+            clearTimeout(safetyTimeout);
 
             setUser(session?.user ?? null);
 
@@ -71,12 +82,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setProfile(null);
             }
 
-            // Set loading to false after the first auth state check
+            // Set loading to false after the auth state check
             if (mounted) setLoading(false);
         });
 
         return () => {
             mounted = false;
+            clearTimeout(safetyTimeout);
             subscription.unsubscribe();
         };
     }, []);
