@@ -1,6 +1,6 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const badges = [
     { id: '1', name: 'Primera Racha', desc: '7 días seguidos estudiando', icon: 'local_fire_department', earned: true, date: '2026-01-08' },
@@ -24,28 +24,44 @@ const leaderboard = [
 
 const StudentAchievements: React.FC = () => {
     const navigate = useNavigate();
+    const { signOut } = useAuth();
     const [activeTab, setActiveTab] = useState<'badges' | 'leaderboard' | 'stats'>('badges');
 
     return (
-        <div className="min-h-screen bg-[#F9FAFB] flex flex-col">
-            {/* Mobile Bottom Nav */}
-            <nav className="fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 py-3 px-6 flex justify-around md:hidden z-50">
-                <button onClick={() => navigate('/student')} className="flex flex-col items-center text-slate-400">
-                    <span className="material-symbols-outlined">dashboard</span>
-                    <span className="text-[10px]">Inicio</span>
-                </button>
-                <button className="flex flex-col items-center text-slate-400">
-                    <span className="material-symbols-outlined">school</span>
-                    <span className="text-[10px]">Cursos</span>
-                </button>
-                <button className="flex flex-col items-center text-primary font-bold">
-                    <span className="material-symbols-outlined">emoji_events</span>
-                    <span className="text-[10px]">Logros</span>
-                </button>
-                <button className="flex flex-col items-center text-slate-400">
-                    <span className="material-symbols-outlined">person</span>
-                    <span className="text-[10px]">Perfil</span>
-                </button>
+        <div className="min-h-screen bg-[#F9FAFB] flex flex-col pb-24">
+            {/* Bottom Navigation Bar */}
+            <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50 pb-safe">
+                <div className="max-w-lg mx-auto px-4">
+                    <div className="flex justify-around items-center py-2">
+                        <button
+                            onClick={() => navigate('/student')}
+                            className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors text-slate-500 hover:text-primary"
+                        >
+                            <span className="material-symbols-outlined text-2xl">home</span>
+                            <span className="text-xs font-medium">Inicio</span>
+                        </button>
+                        <button
+                            onClick={() => navigate('/student')}
+                            className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors text-slate-500 hover:text-primary"
+                        >
+                            <span className="material-symbols-outlined text-2xl">auto_stories</span>
+                            <span className="text-xs font-medium">Mis Sets</span>
+                        </button>
+                        <button
+                            className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors text-primary bg-primary/10"
+                        >
+                            <span className="material-symbols-outlined text-2xl">emoji_events</span>
+                            <span className="text-xs font-medium">Logros</span>
+                        </button>
+                        <button
+                            onClick={() => signOut()}
+                            className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors text-slate-500 hover:text-rose-500"
+                        >
+                            <span className="material-symbols-outlined text-2xl">logout</span>
+                            <span className="text-xs font-medium">Salir</span>
+                        </button>
+                    </div>
+                </div>
             </nav>
 
             <main className="flex-1 p-6 md:p-12 max-w-5xl mx-auto w-full space-y-8 pb-24 md:pb-12">
@@ -70,9 +86,9 @@ const StudentAchievements: React.FC = () => {
                     ].map((stat, i) => (
                         <div key={i} className={`bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center`}>
                             <div className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center mb-2 ${stat.color === 'amber' ? 'bg-amber-100 text-amber-600' :
-                                    stat.color === 'violet' ? 'bg-violet-100 text-violet-600' :
-                                        stat.color === 'blue' ? 'bg-blue-100 text-blue-600' :
-                                            'bg-emerald-100 text-emerald-600'
+                                stat.color === 'violet' ? 'bg-violet-100 text-violet-600' :
+                                    stat.color === 'blue' ? 'bg-blue-100 text-blue-600' :
+                                        'bg-emerald-100 text-emerald-600'
                                 }`}>
                                 <span className="material-symbols-outlined">{stat.icon}</span>
                             </div>
@@ -154,9 +170,9 @@ const StudentAchievements: React.FC = () => {
                                     className={`p-4 flex items-center gap-4 ${user.isUser ? 'bg-primary/5' : 'hover:bg-slate-50'} transition-colors`}
                                 >
                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm ${user.rank === 1 ? 'bg-amber-100 text-amber-600' :
-                                            user.rank === 2 ? 'bg-slate-200 text-slate-600' :
-                                                user.rank === 3 ? 'bg-orange-100 text-orange-600' :
-                                                    'bg-slate-100 text-slate-500'
+                                        user.rank === 2 ? 'bg-slate-200 text-slate-600' :
+                                            user.rank === 3 ? 'bg-orange-100 text-orange-600' :
+                                                'bg-slate-100 text-slate-500'
                                         }`}>
                                         {user.rank <= 3 ? ['🥇', '🥈', '🥉'][user.rank - 1] : user.rank}
                                     </div>
