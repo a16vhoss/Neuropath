@@ -22,33 +22,45 @@ const AuthPage: React.FC = () => {
     const [role, setRole] = useState<'student' | 'teacher'>('student');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [submitting, setSubmitting] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setSuccess('');
+        setSubmitting(true);
 
         if (!isLogin && password !== confirmPassword) {
             setError('Las contraseñas no coinciden');
+            setSubmitting(false);
             return;
         }
 
         if (!isLogin && password.length < 6) {
             setError('La contraseña debe tener al menos 6 caracteres');
+            setSubmitting(false);
             return;
         }
 
         try {
+            // Add timeout to prevent infinite loading
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('La solicitud tardó demasiado. Verifica tu conexión e inténtalo de nuevo.')), 15000)
+            );
+
             if (isLogin) {
-                await signIn(email, password);
+                await Promise.race([signIn(email, password), timeoutPromise]);
                 // Navigation is handled by useEffect when user/profile changes
             } else {
-                await signUp(email, password, fullName, role);
+                await Promise.race([signUp(email, password, fullName, role), timeoutPromise]);
                 setSuccess('¡Cuenta creada! Ya puedes iniciar sesión.');
+                setIsLogin(true);
             }
         } catch (err: any) {
             console.error('Auth error:', err);
             setError(err.message || 'Error al procesar la solicitud');
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -204,10 +216,10 @@ const AuthPage: React.FC = () => {
 
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={submitting}
                             className="w-full bg-primary text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
-                            {loading ? (
+                            {submitting ? (
                                 <>
                                     <span className="animate-spin material-symbols-outlined">progress_activity</span>
                                     Procesando...
