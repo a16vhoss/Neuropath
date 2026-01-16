@@ -185,7 +185,15 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
                                 <input
                                     type="file"
                                     accept=".pdf"
-                                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0] || null;
+                                        setSelectedFile(file);
+                                        if (file && !name) {
+                                            // Remove extension for auto-name
+                                            const simpleName = file.name.split('.').slice(0, -1).join('.');
+                                            setName(simpleName);
+                                        }
+                                    }}
                                     className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-all"
                                 />
                             </div>
