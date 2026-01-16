@@ -53,3 +53,49 @@ export const getTutorResponse = async (question: string, context: string) => {
 
   return response.text;
 };
+
+// Unified function for Magic Import
+export const generateStudySetFromContext = async (content: string, type: 'text' | 'pdf' | 'youtube') => {
+  if (!API_KEY || API_KEY === 'PLACEHOLDER_API_KEY') {
+    console.warn('No valid Gemini API key provided, using fallback flashcards');
+    return [];
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey: API_KEY });
+
+    let prompt = `Analyze the following content and generate 10 high-quality educational flashcards in Spanish.
+    Content Type: ${type}
+    Content: ${content.substring(0, 30000)} ... (truncated for token limit)`;
+
+    if (type === 'youtube') {
+      prompt = `Analyze the following YouTube video transcript/description and generate 10 key concept flashcards in Spanish.
+      Content: ${content.substring(0, 30000)}`;
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              question: { type: Type.STRING },
+              answer: { type: Type.STRING },
+              category: { type: Type.STRING }
+            },
+            required: ["question", "answer", "category"]
+          }
+        }
+      }
+    });
+
+    return JSON.parse(response.text || "[]");
+  } catch (e) {
+    console.error("Failed to generate study set from context", e);
+    throw e;
+  }
+};

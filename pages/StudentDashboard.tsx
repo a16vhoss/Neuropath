@@ -4,7 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getStudentClasses, joinClass, getStudentAchievements, getStudentStudySets, createStudySet, supabase, deleteStudySet } from '../services/supabaseClient';
 import { generateFlashcardsFromText, extractTextFromPDF } from '../services/pdfProcessingService';
+
 import StudySetManager from '../components/StudySetManager';
+import MagicImportModal from '../components/MagicImportModal';
 
 interface ClassData {
   id: string;
@@ -42,6 +44,9 @@ const StudentDashboard: React.FC = () => {
   const [joinSuccess, setJoinSuccess] = useState(false);
   const [joinError, setJoinError] = useState('');
   const [joiningClass, setJoiningClass] = useState(false);
+
+  // Magic Import Modal
+  const [showMagicModal, setShowMagicModal] = useState(false);
 
   // Create study set modal
   const [showCreateSetModal, setShowCreateSetModal] = useState(false);
@@ -473,6 +478,12 @@ const StudentDashboard: React.FC = () => {
                     >
                       <span className="material-symbols-outlined">add</span> Crear Nuevo Set
                     </button>
+                    <button
+                      onClick={() => setShowMagicModal(true)}
+                      className="mt-3 bg-white/20 backdrop-blur-md border border-white/40 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:bg-white/30 transition-all flex items-center gap-2 text-sm"
+                    >
+                      <span className="material-symbols-outlined">auto_awesome</span> Importar Mágico (IA)
+                    </button>
                   </div>
                 </div>
 
@@ -617,6 +628,14 @@ const StudentDashboard: React.FC = () => {
                   <span className="material-symbols-outlined">emoji_events</span>
                   <span className="text-xs font-bold">Logros ({badges})</span>
                 </button>
+
+                <button
+                  onClick={() => setShowMagicModal(true)}
+                  className="p-4 rounded-xl bg-indigo-50 text-indigo-600 flex flex-col items-center gap-2 hover:bg-indigo-100 transition-colors"
+                >
+                  <span className="material-symbols-outlined">auto_awesome</span>
+                  <span className="text-xs font-bold">Magic Import</span>
+                </button>
               </div>
             </div>
           </div>
@@ -624,212 +643,218 @@ const StudentDashboard: React.FC = () => {
       </main>
 
       {/* Join Class Modal */}
-      {showJoinModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
-            <div className="p-8">
-              {joinSuccess ? (
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="material-symbols-outlined text-3xl text-emerald-600">check_circle</span>
+      {
+        showJoinModal && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
+              <div className="p-8">
+                {joinSuccess ? (
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <span className="material-symbols-outlined text-3xl text-emerald-600">check_circle</span>
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-900">¡Te has unido exitosamente!</h3>
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900">¡Te has unido exitosamente!</h3>
-                </div>
-              ) : (
-                <>
-                  <h2 className="text-2xl font-black text-slate-900 mb-2">Unirse a una Clase</h2>
-                  <p className="text-slate-500 mb-6">Ingresa el código de 6 dígitos proporcionado por tu profesor</p>
-                  <input
-                    type="text"
-                    value={joinCode}
-                    onChange={(e) => setJoinCode(e.target.value.toUpperCase().slice(0, 6))}
-                    placeholder="CÓDIGO"
-                    className="w-full text-center text-3xl font-mono font-bold tracking-[0.5em] py-4 border-2 border-slate-200 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none uppercase"
-                    maxLength={6}
-                  />
-                  {joinError && (
-                    <p className="text-rose-500 text-sm mt-3 text-center">{joinError}</p>
-                  )}
-                  <button
-                    onClick={handleJoinClass}
-                    disabled={joinCode.length !== 6 || joiningClass}
-                    className="w-full mt-6 bg-primary text-white font-bold py-4 rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {joiningClass ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Uniéndose...
-                      </>
-                    ) : (
-                      'Unirse a la Clase'
+                ) : (
+                  <>
+                    <h2 className="text-2xl font-black text-slate-900 mb-2">Unirse a una Clase</h2>
+                    <p className="text-slate-500 mb-6">Ingresa el código de 6 dígitos proporcionado por tu profesor</p>
+                    <input
+                      type="text"
+                      value={joinCode}
+                      onChange={(e) => setJoinCode(e.target.value.toUpperCase().slice(0, 6))}
+                      placeholder="CÓDIGO"
+                      className="w-full text-center text-3xl font-mono font-bold tracking-[0.5em] py-4 border-2 border-slate-200 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none uppercase"
+                      maxLength={6}
+                    />
+                    {joinError && (
+                      <p className="text-rose-500 text-sm mt-3 text-center">{joinError}</p>
                     )}
+                    <button
+                      onClick={handleJoinClass}
+                      disabled={joinCode.length !== 6 || joiningClass}
+                      className="w-full mt-6 bg-primary text-white font-bold py-4 rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {joiningClass ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Uniéndose...
+                        </>
+                      ) : (
+                        'Unirse a la Clase'
+                      )}
+                    </button>
+                  </>
+                )}
+              </div>
+              {!joinSuccess && (
+                <div className="bg-slate-50 p-4 flex justify-end">
+                  <button onClick={() => { setShowJoinModal(false); setJoinCode(''); setJoinError(''); }} className="text-slate-600 font-medium hover:text-slate-800">
+                    Cancelar
                   </button>
-                </>
+                </div>
               )}
             </div>
-            {!joinSuccess && (
-              <div className="bg-slate-50 p-4 flex justify-end">
-                <button onClick={() => { setShowJoinModal(false); setJoinCode(''); setJoinError(''); }} className="text-slate-600 font-medium hover:text-slate-800">
-                  Cancelar
-                </button>
-              </div>
-            )}
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Create Study Set Modal */}
-      {showCreateSetModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
-            <div className="p-8">
-              {/* Step indicator */}
-              <div className="flex items-center gap-2 mb-6">
-                {[1, 2, 3].map((step) => (
-                  <div key={step} className={`flex-1 h-1 rounded-full ${createStep >= step ? 'bg-violet-500' : 'bg-slate-200'}`}></div>
-                ))}
-              </div>
+      {
+        showCreateSetModal && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+              <div className="p-8">
+                {/* Step indicator */}
+                <div className="flex items-center gap-2 mb-6">
+                  {[1, 2, 3].map((step) => (
+                    <div key={step} className={`flex-1 h-1 rounded-full ${createStep >= step ? 'bg-violet-500' : 'bg-slate-200'}`}></div>
+                  ))}
+                </div>
 
-              {createStep === 1 && (
-                <>
-                  <h2 className="text-2xl font-black text-slate-900 mb-2">Crear Set de Estudio</h2>
-                  <p className="text-slate-500 mb-6">Dale un nombre y describe lo que vas a estudiar</p>
+                {createStep === 1 && (
+                  <>
+                    <h2 className="text-2xl font-black text-slate-900 mb-2">Crear Set de Estudio</h2>
+                    <p className="text-slate-500 mb-6">Dale un nombre y describe lo que vas a estudiar</p>
 
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-2">Nombre del Set *</label>
-                      <input
-                        type="text"
-                        value={newSetName}
-                        onChange={(e) => setNewSetName(e.target.value)}
-                        placeholder="Ej: Anatomía - Sistema Nervioso"
-                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none"
-                      />
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Nombre del Set *</label>
+                        <input
+                          type="text"
+                          value={newSetName}
+                          onChange={(e) => setNewSetName(e.target.value)}
+                          placeholder="Ej: Anatomía - Sistema Nervioso"
+                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Descripción</label>
+                        <textarea
+                          value={newSetDescription}
+                          onChange={(e) => setNewSetDescription(e.target.value)}
+                          placeholder="¿De qué trata este set de estudio?"
+                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none resize-none h-20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-2">Temas (separados por comas)</label>
+                        <input
+                          type="text"
+                          value={newSetTopics}
+                          onChange={(e) => setNewSetTopics(e.target.value)}
+                          placeholder="Ej: Neurociencia, Cerebro, Sinapsis"
+                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-2">Descripción</label>
-                      <textarea
-                        value={newSetDescription}
-                        onChange={(e) => setNewSetDescription(e.target.value)}
-                        placeholder="¿De qué trata este set de estudio?"
-                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none resize-none h-20"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-2">Temas (separados por comas)</label>
-                      <input
-                        type="text"
-                        value={newSetTopics}
-                        onChange={(e) => setNewSetTopics(e.target.value)}
-                        placeholder="Ej: Neurociencia, Cerebro, Sinapsis"
-                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none"
-                      />
-                    </div>
-                  </div>
 
-                  <button
-                    onClick={handleCreateStudySet}
-                    disabled={!newSetName.trim() || creatingSet}
-                    className="w-full mt-6 bg-violet-600 text-white font-bold py-4 rounded-2xl hover:bg-violet-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {creatingSet ? (
+                    <button
+                      onClick={handleCreateStudySet}
+                      disabled={!newSetName.trim() || creatingSet}
+                      className="w-full mt-6 bg-violet-600 text-white font-bold py-4 rounded-2xl hover:bg-violet-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {creatingSet ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Creando...
+                        </>
+                      ) : (
+                        <>
+                          Continuar <span className="material-symbols-outlined">arrow_forward</span>
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
+
+                {createStep === 2 && (
+                  <>
+                    <h2 className="text-2xl font-black text-slate-900 mb-2">Agregar Contenido</h2>
+                    <p className="text-slate-500 mb-6">Sube un PDF para generar flashcards automáticamente con IA</p>
+
+                    {!uploadingPdf ? (
                       <>
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Creando...
+                        <label className="block border-2 border-dashed border-violet-200 rounded-2xl p-12 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50 transition-all">
+                          <span className="material-symbols-outlined text-4xl text-violet-400 mb-4">cloud_upload</span>
+                          <p className="font-bold text-slate-700">Arrastra un PDF o haz clic</p>
+                          <p className="text-sm text-slate-500 mt-2">La IA generará flashcards automáticamente</p>
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept=".pdf"
+                            onChange={(e) => handleStudySetPdfUpload(e.target.files)}
+                          />
+                        </label>
+
+                        <div className="text-center mt-6">
+                          <button
+                            onClick={() => setCreateStep(3)}
+                            className="text-violet-600 font-medium hover:underline"
+                          >
+                            Omitir y crear set vacío
+                          </button>
+                        </div>
                       </>
                     ) : (
-                      <>
-                        Continuar <span className="material-symbols-outlined">arrow_forward</span>
-                      </>
+                      <div className="text-center py-8">
+                        <div className="w-16 h-16 mx-auto mb-4">
+                          <div className="w-full h-full border-4 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                        <p className="font-bold text-slate-900 mb-2">🤖 IA procesando PDF...</p>
+                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
+                          <div className="bg-violet-500 h-full rounded-full transition-all" style={{ width: `${pdfProgress}%` }}></div>
+                        </div>
+                        <p className="text-sm text-slate-500">Generando flashcards automáticamente</p>
+                      </div>
                     )}
-                  </button>
-                </>
-              )}
+                  </>
+                )}
 
-              {createStep === 2 && (
-                <>
-                  <h2 className="text-2xl font-black text-slate-900 mb-2">Agregar Contenido</h2>
-                  <p className="text-slate-500 mb-6">Sube un PDF para generar flashcards automáticamente con IA</p>
-
-                  {!uploadingPdf ? (
-                    <>
-                      <label className="block border-2 border-dashed border-violet-200 rounded-2xl p-12 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50 transition-all">
-                        <span className="material-symbols-outlined text-4xl text-violet-400 mb-4">cloud_upload</span>
-                        <p className="font-bold text-slate-700">Arrastra un PDF o haz clic</p>
-                        <p className="text-sm text-slate-500 mt-2">La IA generará flashcards automáticamente</p>
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept=".pdf"
-                          onChange={(e) => handleStudySetPdfUpload(e.target.files)}
-                        />
-                      </label>
-
-                      <div className="text-center mt-6">
-                        <button
-                          onClick={() => setCreateStep(3)}
-                          className="text-violet-600 font-medium hover:underline"
-                        >
-                          Omitir y crear set vacío
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 mx-auto mb-4">
-                        <div className="w-full h-full border-4 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
-                      </div>
-                      <p className="font-bold text-slate-900 mb-2">🤖 IA procesando PDF...</p>
-                      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
-                        <div className="bg-violet-500 h-full rounded-full transition-all" style={{ width: `${pdfProgress}%` }}></div>
-                      </div>
-                      <p className="text-sm text-slate-500">Generando flashcards automáticamente</p>
+                {createStep === 3 && (
+                  <div className="text-center py-8">
+                    <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <span className="material-symbols-outlined text-4xl text-emerald-600">check_circle</span>
                     </div>
-                  )}
-                </>
-              )}
-
-              {createStep === 3 && (
-                <div className="text-center py-8">
-                  <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="material-symbols-outlined text-4xl text-emerald-600">check_circle</span>
+                    <h3 className="text-2xl font-bold text-slate-900 mb-2">¡Set Creado!</h3>
+                    <p className="text-slate-500 mb-6">Tu set de estudio "{newSetName}" está listo</p>
+                    <button
+                      onClick={() => {
+                        closeCreateModal();
+                        if (createdSetId) navigate(`/student/study-set/${createdSetId}`);
+                      }}
+                      className="bg-violet-600 text-white font-bold px-8 py-3 rounded-xl hover:bg-violet-700"
+                    >
+                      Comenzar a Estudiar
+                    </button>
                   </div>
-                  <h3 className="text-2xl font-bold text-slate-900 mb-2">¡Set Creado!</h3>
-                  <p className="text-slate-500 mb-6">Tu set de estudio "{newSetName}" está listo</p>
-                  <button
-                    onClick={() => {
-                      closeCreateModal();
-                      if (createdSetId) navigate(`/student/study-set/${createdSetId}`);
-                    }}
-                    className="bg-violet-600 text-white font-bold px-8 py-3 rounded-xl hover:bg-violet-700"
-                  >
-                    Comenzar a Estudiar
+                )}
+              </div>
+
+              {createStep < 3 && (
+                <div className="bg-slate-50 p-4 flex justify-between">
+                  <button onClick={() => createStep > 1 ? setCreateStep(createStep - 1) : closeCreateModal()} className="text-slate-600 font-medium hover:text-slate-800">
+                    {createStep > 1 ? 'Atrás' : 'Cancelar'}
                   </button>
                 </div>
               )}
             </div>
-
-            {createStep < 3 && (
-              <div className="bg-slate-50 p-4 flex justify-between">
-                <button onClick={() => createStep > 1 ? setCreateStep(createStep - 1) : closeCreateModal()} className="text-slate-600 font-medium hover:text-slate-800">
-                  {createStep > 1 ? 'Atrás' : 'Cancelar'}
-                </button>
-              </div>
-            )}
           </div>
-        </div>
-      )}
+        )
+      }
 
-      {editingStudySet && (
-        <StudySetManager
-          studySet={editingStudySet}
-          onClose={() => setEditingStudySet(null)}
-          onUpdate={() => {
-            loadStudySets();
-            setEditingStudySet(null);
-          }}
-        />
-      )}
+      {
+        editingStudySet && (
+          <StudySetManager
+            studySet={editingStudySet}
+            onClose={() => setEditingStudySet(null)}
+            onUpdate={() => {
+              loadStudySets();
+              setEditingStudySet(null);
+            }}
+          />
+        )
+      }
 
       {/* Bottom Navigation Bar */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50 pb-safe">
@@ -869,7 +894,21 @@ const StudentDashboard: React.FC = () => {
 
       {/* Bottom padding to account for navbar */}
       <div className="h-20"></div>
-    </div>
+      {/* Magic Import Modal */}
+      {
+        showMagicModal && (
+          <MagicImportModal
+            onClose={() => setShowMagicModal(false)}
+            onSuccess={(newSet) => {
+              setShowMagicModal(false);
+              loadStudySets(); // Refresh list
+              // Optionally navigate to the new set
+              // navigate(`/student/study-set/${newSet.id}`);
+            }}
+          />
+        )
+      }
+    </div >
   );
 };
 
