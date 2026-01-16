@@ -1,11 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabaseClient';
 
 const AuthPage: React.FC = () => {
     const navigate = useNavigate();
-    const { signIn, signUp, loading } = useAuth();
+    const { signIn, signUp, loading, user, profile } = useAuth();
+
+    // Redirect if already logged in
+    useEffect(() => {
+        if (user && profile) {
+            navigate(profile.role === 'teacher' ? '/teacher' : '/student', { replace: true });
+        }
+    }, [user, profile, navigate]);
+
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');

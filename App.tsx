@@ -76,11 +76,7 @@ const AppRoutes: React.FC = () => {
     <Routes>
       {/* Public Routes */}
       <Route path="/" element={<Landing onLogin={handleDemoLogin} />} />
-      <Route path="/auth" element={
-        <PublicRoute>
-          <AuthPage />
-        </PublicRoute>
-      } />
+      <Route path="/auth" element={<AuthPage />} />
 
       {/* Student Routes */}
       <Route path="/student" element={
