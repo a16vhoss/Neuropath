@@ -14,7 +14,7 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
 
   const handleDemo = (role: UserRole) => {
     onLogin(role);
-    navigate(role === UserRole.TEACHER ? '/teacher' : '/student');
+    navigate(role === UserRole.TEACHER ? '/demo/teacher' : '/demo/student');
   };
 
   return (
@@ -34,13 +34,13 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
           </div>
           <div className="flex items-center gap-4">
             <button
-              onClick={() => handleDemo(UserRole.STUDENT)}
+              onClick={() => navigate('/auth')}
               className="text-slate-600 font-semibold px-4 py-2 hover:text-primary"
             >
-              Login
+              Iniciar Sesión
             </button>
             <button
-              onClick={() => handleDemo(UserRole.STUDENT)}
+              onClick={() => navigate('/auth')}
               className="bg-primary text-white font-bold px-6 py-2.5 rounded-lg shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center"
             >
               Comenzar Gratis
