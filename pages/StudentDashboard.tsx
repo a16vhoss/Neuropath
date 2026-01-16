@@ -830,6 +830,45 @@ const StudentDashboard: React.FC = () => {
           }}
         />
       )}
+
+      {/* Bottom Navigation Bar */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50 pb-safe">
+        <div className="max-w-lg mx-auto px-4">
+          <div className="flex justify-around items-center py-2">
+            <button
+              onClick={() => setActiveTab('classes')}
+              className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors ${activeTab === 'classes' ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-primary'}`}
+            >
+              <span className="material-symbols-outlined text-2xl">home</span>
+              <span className="text-xs font-medium">Inicio</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('personal')}
+              className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors ${activeTab === 'personal' ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-primary'}`}
+            >
+              <span className="material-symbols-outlined text-2xl">auto_stories</span>
+              <span className="text-xs font-medium">Mis Sets</span>
+            </button>
+            <button
+              onClick={() => navigate('/student/achievements')}
+              className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors text-slate-500 hover:text-primary"
+            >
+              <span className="material-symbols-outlined text-2xl">emoji_events</span>
+              <span className="text-xs font-medium">Logros</span>
+            </button>
+            <button
+              onClick={() => signOut()}
+              className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors text-slate-500 hover:text-rose-500"
+            >
+              <span className="material-symbols-outlined text-2xl">logout</span>
+              <span className="text-xs font-medium">Salir</span>
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Bottom padding to account for navbar */}
+      <div className="h-20"></div>
     </div>
   );
 };
