@@ -366,6 +366,85 @@ export const getClassMaterials = async (classId: string) => {
     return data;
 };
 
+// Study Sets helpers (for student self-study)
+export const createStudySet = async (studentId: string, studySetData: {
+    name: string;
+    description?: string;
+    topics?: string[];
+    icon?: string;
+    color?: string;
+}) => {
+    const { data, error } = await supabase
+        .from('study_sets')
+        .insert({ student_id: studentId, ...studySetData })
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+};
+
+export const getStudentStudySets = async (studentId: string) => {
+    const { data, error } = await supabase
+        .from('study_sets')
+        .select('*')
+        .eq('student_id', studentId)
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+};
+
+export const getStudySetFlashcards = async (studySetId: string) => {
+    const { data, error } = await supabase
+        .from('flashcards')
+        .select('*')
+        .eq('study_set_id', studySetId);
+
+    if (error) throw error;
+    return data;
+};
+
+export const updateStudySet = async (studySetId: string, updates: {
+    name?: string;
+    description?: string;
+    topics?: string[];
+}) => {
+    const { data, error } = await supabase
+        .from('study_sets')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', studySetId)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+};
+
+export const deleteStudySet = async (studySetId: string) => {
+    const { error } = await supabase
+        .from('study_sets')
+        .delete()
+        .eq('id', studySetId);
+
+    if (error) throw error;
+};
+
+export const addFlashcardToStudySet = async (studySetId: string, flashcard: {
+    question: string;
+    answer: string;
+    category?: string;
+}) => {
+    const { data, error } = await supabase
+        .from('flashcards')
+        .insert({ study_set_id: studySetId, ...flashcard })
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+};
+
 // Analytics helpers (for teachers)
 export const getClassAnalytics = async (classId: string) => {
     const { data: enrollments, error: enrollError } = await supabase

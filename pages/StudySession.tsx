@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getClassFlashcards, updateFlashcardProgress, supabase } from '../services/supabaseClient';
+import { getClassFlashcards, getStudySetFlashcards, updateFlashcardProgress, supabase } from '../services/supabaseClient';
 import { generateStudyFlashcards, getTutorResponse } from '../services/geminiService';
 
 type StudyMode = 'flashcards' | 'quiz' | 'exam' | 'cramming';
@@ -40,7 +40,7 @@ const mockQuizQuestions: QuizQuestion[] = [
 ];
 
 const StudySession: React.FC = () => {
-  const { classId } = useParams();
+  const { classId, studySetId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const modeParam = searchParams.get('mode') as StudyMode || 'flashcards';
@@ -147,6 +147,71 @@ const StudySession: React.FC = () => {
         }
       }
 
+      // Handle personal study set
+      if (studySetId) {
+        try {
+          // Get study set name
+          const { data: setData } = await supabase
+            .from('study_sets')
+            .select('name, topics')
+            .eq('id', studySetId)
+            .single();
+
+          if (setData) {
+            setClassName(setData.name);
+          }
+
+          // Get flashcards from study set
+          setLoadingSource('db');
+          const dbFlashcards = await getStudySetFlashcards(studySetId);
+
+          if (dbFlashcards && dbFlashcards.length > 0) {
+            setFlashcards(dbFlashcards.map((c: any) => ({
+              id: c.id,
+              question: c.question,
+              answer: c.answer,
+              category: c.category || 'General',
+              difficulty: c.difficulty || 1
+            })));
+            setLoading(false);
+            return;
+          }
+
+          // If no flashcards, generate with AI based on study set topics
+          if (setData?.topics && setData.topics.length > 0) {
+            setLoadingSource('ai');
+            const topicString = setData.topics.join(', ');
+            const aiCards = await generateStudyFlashcards(topicString);
+
+            if (aiCards && aiCards.length > 0) {
+              const formattedCards = aiCards.map((c: { question: string; answer: string; category: string }, i: number) => ({
+                id: String(i),
+                question: c.question,
+                answer: c.answer,
+                category: c.category
+              }));
+              setFlashcards(formattedCards);
+
+              // Save to study set
+              for (const card of formattedCards) {
+                await supabase.from('flashcards').insert({
+                  study_set_id: studySetId,
+                  question: card.question,
+                  answer: card.answer,
+                  category: card.category,
+                  difficulty: 1
+                });
+              }
+
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('Error loading study set flashcards:', error);
+        }
+      }
+
       // Fallback: generate with AI for general topic or use mock
       try {
         setLoadingSource('ai');
@@ -171,7 +236,7 @@ const StudySession: React.FC = () => {
       setLoading(false);
     };
     fetchCards();
-  }, [classId]);
+  }, [classId, studySetId]);
 
   // Exam timer
   useEffect(() => {

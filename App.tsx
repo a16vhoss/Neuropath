@@ -98,6 +98,11 @@ const AppRoutes: React.FC = () => {
           <StudySession />
         </ProtectedRoute>
       } />
+      <Route path="/student/study-set/:studySetId" element={
+        <ProtectedRoute allowedRole="student">
+          <StudySession />
+        </ProtectedRoute>
+      } />
 
       {/* Teacher Routes */}
       <Route path="/teacher" element={
@@ -119,6 +124,7 @@ const AppRoutes: React.FC = () => {
       {/* Demo Routes (bypass auth for demo purposes) */}
       <Route path="/demo/student" element={<StudentDashboard />} />
       <Route path="/demo/student/study/:classId" element={<StudySession />} />
+      <Route path="/demo/student/study-set/:studySetId" element={<StudySession />} />
       <Route path="/demo/teacher" element={<TeacherDashboard />} />
     </Routes>
   );

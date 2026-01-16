@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getStudentClasses, joinClass, getAchievements, getStudentAchievements } from '../services/supabaseClient';
+import { getStudentClasses, joinClass, getStudentAchievements, getStudentStudySets, createStudySet, supabase } from '../services/supabaseClient';
+import { generateFlashcardsFromText, extractTextFromPDF } from '../services/pdfProcessingService';
 
 interface ClassData {
   id: string;
@@ -14,38 +15,60 @@ interface ClassData {
   topics?: string[];
 }
 
-interface ExamData {
+interface StudySet {
   id: string;
   name: string;
-  class_name: string;
-  date: Date;
-  preparation: number;
+  description?: string;
+  topics: string[];
+  icon: string;
+  color: string;
+  flashcard_count?: number;
+  created_at: string;
 }
+
+type ActiveTab = 'classes' | 'personal';
 
 const StudentDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user, profile, signOut, loading: authLoading } = useAuth();
+  const { user, profile, signOut } = useAuth();
 
+  // Tab state
+  const [activeTab, setActiveTab] = useState<ActiveTab>('classes');
+
+  // Join class modal
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [joinSuccess, setJoinSuccess] = useState(false);
   const [joinError, setJoinError] = useState('');
   const [joiningClass, setJoiningClass] = useState(false);
 
+  // Create study set modal
+  const [showCreateSetModal, setShowCreateSetModal] = useState(false);
+  const [newSetName, setNewSetName] = useState('');
+  const [newSetDescription, setNewSetDescription] = useState('');
+  const [newSetTopics, setNewSetTopics] = useState('');
+  const [creatingSet, setCreatingSet] = useState(false);
+  const [createStep, setCreateStep] = useState(1); // 1: basic info, 2: upload content, 3: done
+
+  // PDF upload for study set
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState(0);
+  const [createdSetId, setCreatedSetId] = useState<string | null>(null);
+
+  // Data
   const [classes, setClasses] = useState<ClassData[]>([]);
+  const [studySets, setStudySets] = useState<StudySet[]>([]);
   const [loadingClasses, setLoadingClasses] = useState(true);
+  const [loadingSets, setLoadingSets] = useState(true);
   const [badges, setBadges] = useState<number>(0);
 
   // Load student's classes
   useEffect(() => {
-    const loadData = async () => {
+    const loadClasses = async () => {
       if (!user) return;
-
       try {
         setLoadingClasses(true);
         const enrollments = await getStudentClasses(user.id);
-
-        // Transform enrollment data to class data
         const classData: ClassData[] = enrollments?.map((e: any) => ({
           id: e.classes.id,
           name: e.classes.name,
@@ -55,10 +78,8 @@ const StudentDashboard: React.FC = () => {
           teacher_name: e.classes.teacher_name || 'Profesor',
           topics: e.classes.topics || []
         })) || [];
-
         setClasses(classData);
 
-        // Load achievements count
         const achievements = await getStudentAchievements(user.id);
         setBadges(achievements?.length || 0);
       } catch (error) {
@@ -67,22 +88,48 @@ const StudentDashboard: React.FC = () => {
         setLoadingClasses(false);
       }
     };
+    loadClasses();
+  }, [user]);
 
-    loadData();
+  // Load student's study sets
+  useEffect(() => {
+    const loadStudySets = async () => {
+      if (!user) return;
+      try {
+        setLoadingSets(true);
+        const sets = await getStudentStudySets(user.id);
+
+        // Get flashcard counts for each set
+        const setsWithCounts = await Promise.all((sets || []).map(async (set: any) => {
+          const { count } = await supabase
+            .from('flashcards')
+            .select('*', { count: 'exact', head: true })
+            .eq('study_set_id', set.id);
+          return {
+            ...set,
+            flashcard_count: count || 0
+          };
+        }));
+
+        setStudySets(setsWithCounts);
+      } catch (error) {
+        console.error('Error loading study sets:', error);
+      } finally {
+        setLoadingSets(false);
+      }
+    };
+    loadStudySets();
   }, [user]);
 
   // Join class handler
   const handleJoinClass = async () => {
     if (joinCode.length !== 6 || !user) return;
-
     setJoiningClass(true);
     setJoinError('');
 
     try {
       await joinClass(user.id, joinCode.toUpperCase());
       setJoinSuccess(true);
-
-      // Reload classes
       const enrollments = await getStudentClasses(user.id);
       const classData: ClassData[] = enrollments?.map((e: any) => ({
         id: e.classes.id,
@@ -92,7 +139,6 @@ const StudentDashboard: React.FC = () => {
         teacher_name: e.classes.teacher_name || 'Profesor',
       })) || [];
       setClasses(classData);
-
       setTimeout(() => {
         setShowJoinModal(false);
         setJoinSuccess(false);
@@ -105,42 +151,124 @@ const StudentDashboard: React.FC = () => {
     }
   };
 
-  // Mock upcoming exams (would come from quizzes table)
-  const upcomingExams: ExamData[] = classes.length > 0 ? [
-    { id: '1', name: `Quiz - ${classes[0]?.name || 'Clase'}`, class_name: classes[0]?.name || 'Clase', date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), preparation: 67 },
-  ] : [];
+  // Create study set handler
+  const handleCreateStudySet = async () => {
+    if (!newSetName.trim() || !user) return;
+    setCreatingSet(true);
 
-  const getDaysRemaining = (date: Date) => {
-    const diff = date.getTime() - Date.now();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    try {
+      const topics = newSetTopics.split(',').map(t => t.trim()).filter(t => t);
+      const newSet = await createStudySet(user.id, {
+        name: newSetName,
+        description: newSetDescription,
+        topics,
+        icon: 'menu_book',
+        color: ['blue', 'violet', 'emerald', 'amber', 'rose'][Math.floor(Math.random() * 5)]
+      });
+
+      setCreatedSetId(newSet.id);
+      setCreateStep(2);
+    } catch (error) {
+      console.error('Error creating study set:', error);
+    } finally {
+      setCreatingSet(false);
+    }
   };
 
-  // Get display name
+  // Handle PDF upload for study set
+  const handleStudySetPdfUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !createdSetId) return;
+    const file = files[0];
+    setUploadingPdf(true);
+    setPdfProgress(20);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = (e.target?.result as string)?.split(',')[1];
+        if (!base64) return;
+
+        setPdfProgress(40);
+        const extractedText = await extractTextFromPDF(base64);
+        setPdfProgress(60);
+
+        if (extractedText) {
+          const flashcards = await generateFlashcardsFromText(
+            extractedText,
+            newSetTopics || newSetName,
+            15
+          );
+          setPdfProgress(80);
+
+          if (flashcards) {
+            for (const card of flashcards) {
+              await supabase.from('flashcards').insert({
+                study_set_id: createdSetId,
+                question: card.question,
+                answer: card.answer,
+                category: card.category
+              });
+            }
+          }
+        }
+
+        setPdfProgress(100);
+        setCreateStep(3);
+
+        // Refresh study sets
+        const sets = await getStudentStudySets(user!.id);
+        const setsWithCounts = await Promise.all((sets || []).map(async (set: any) => {
+          const { count } = await supabase
+            .from('flashcards')
+            .select('*', { count: 'exact', head: true })
+            .eq('study_set_id', set.id);
+          return { ...set, flashcard_count: count || 0 };
+        }));
+        setStudySets(setsWithCounts);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Error processing PDF:', error);
+    } finally {
+      setTimeout(() => {
+        setUploadingPdf(false);
+        setPdfProgress(0);
+      }, 1000);
+    }
+  };
+
+  const closeCreateModal = () => {
+    setShowCreateSetModal(false);
+    setCreateStep(1);
+    setNewSetName('');
+    setNewSetDescription('');
+    setNewSetTopics('');
+    setCreatedSetId(null);
+  };
+
+  // Display values
   const displayName = profile?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Estudiante';
   const xp = profile?.xp || 0;
   const level = profile?.level || 1;
   const streakDays = profile?.streak_days || 0;
-
-  // Calculate XP for next level (simple formula: level * 500)
   const xpForNextLevel = level * 500;
   const xpProgress = Math.min((xp / xpForNextLevel) * 100, 100);
   const xpRemaining = xpForNextLevel - xp;
 
-  // Course colors
   const courseColors = ['blue', 'violet', 'emerald', 'amber', 'rose'];
   const courseIcons = ['neurology', 'smart_toy', 'science', 'calculate', 'history_edu'];
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex flex-col">
-      {/* Mobile-first Bottom Nav */}
+      {/* Mobile Bottom Nav */}
       <nav className="fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 py-3 px-6 flex justify-around md:hidden z-50">
         <button className="flex flex-col items-center text-primary font-bold">
           <span className="material-symbols-outlined">dashboard</span>
           <span className="text-[10px]">Inicio</span>
         </button>
-        <button className="flex flex-col items-center text-slate-400">
-          <span className="material-symbols-outlined">school</span>
-          <span className="text-[10px]">Cursos</span>
+        <button onClick={() => setActiveTab(activeTab === 'classes' ? 'personal' : 'classes')} className="flex flex-col items-center text-slate-400">
+          <span className="material-symbols-outlined">{activeTab === 'classes' ? 'auto_stories' : 'school'}</span>
+          <span className="text-[10px]">{activeTab === 'classes' ? 'Personal' : 'Clases'}</span>
         </button>
         <button onClick={() => navigate('/student/achievements')} className="flex flex-col items-center text-slate-400">
           <span className="material-symbols-outlined">emoji_events</span>
@@ -153,6 +281,7 @@ const StudentDashboard: React.FC = () => {
       </nav>
 
       <main className="flex-1 p-6 md:p-12 max-w-7xl mx-auto w-full space-y-8 pb-24 md:pb-12">
+        {/* Header */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div>
             <h1 className="text-3xl font-black text-slate-900 tracking-tight">¡Hola, {displayName}! 👋</h1>
@@ -170,177 +299,257 @@ const StudentDashboard: React.FC = () => {
           </div>
         </header>
 
+        {/* Mode Toggle Tabs */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-1.5 inline-flex shadow-sm">
+          <button
+            onClick={() => setActiveTab('classes')}
+            className={`px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'classes'
+                ? 'bg-primary text-white shadow-md'
+                : 'text-slate-500 hover:text-slate-700'
+              }`}
+          >
+            <span className="material-symbols-outlined text-lg">school</span>
+            Mis Clases
+          </button>
+          <button
+            onClick={() => setActiveTab('personal')}
+            className={`px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'personal'
+                ? 'bg-primary text-white shadow-md'
+                : 'text-slate-500 hover:text-slate-700'
+              }`}
+          >
+            <span className="material-symbols-outlined text-lg">auto_stories</span>
+            Estudio Personal
+          </button>
+        </div>
+
         <div className="grid lg:grid-cols-12 gap-8">
-          {/* Main Action Area */}
+          {/* Main Content Area */}
           <div className="lg:col-span-8 space-y-8">
-            {/* Session Suggestion */}
-            {classes.length > 0 ? (
-              <div className="relative overflow-hidden rounded-3xl bg-white border border-slate-100 shadow-xl group">
-                <div className="absolute top-0 right-0 p-8 opacity-5">
-                  <span className="material-symbols-outlined text-[120px]">psychology</span>
-                </div>
-                <div className="flex flex-col md:flex-row">
-                  <div className="md:w-2/5 h-48 md:h-auto overflow-hidden">
-                    <img src="https://picsum.photos/seed/bio/600/600" className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="Study" />
+
+            {/* CLASSES TAB */}
+            {activeTab === 'classes' && (
+              <>
+                {/* Today's Session */}
+                {classes.length > 0 ? (
+                  <div className="relative overflow-hidden rounded-3xl bg-white border border-slate-100 shadow-xl group">
+                    <div className="absolute top-0 right-0 p-8 opacity-5">
+                      <span className="material-symbols-outlined text-[120px]">psychology</span>
+                    </div>
+                    <div className="flex flex-col md:flex-row">
+                      <div className="md:w-2/5 h-48 md:h-auto overflow-hidden">
+                        <img src="https://picsum.photos/seed/bio/600/600" className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="Study" />
+                      </div>
+                      <div className="p-8 flex-1">
+                        <span className="bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4 inline-block">Recomendado</span>
+                        <h2 className="text-2xl font-black text-slate-900 mb-2">Tu sesión de hoy</h2>
+                        <p className="text-slate-500 mb-6 leading-relaxed">
+                          Continúa estudiando <strong>{classes[0]?.name}</strong>. ¡Llevas {classes[0]?.progress || 0}% de progreso!
+                        </p>
+                        <button
+                          onClick={() => navigate(`/student/study/${classes[0]?.id}`)}
+                          className="w-full md:w-auto bg-primary text-white font-bold px-8 py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                        >
+                          Comenzar Ahora <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="p-8 flex-1">
-                    <span className="bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4 inline-block">Recomendado</span>
-                    <h2 className="text-2xl font-black text-slate-900 mb-2">Tu sesión de hoy</h2>
-                    <p className="text-slate-500 mb-6 leading-relaxed">
-                      Continúa estudiando <strong>{classes[0]?.name}</strong>. ¡Llevas {classes[0]?.progress || 0}% de progreso!
+                ) : (
+                  <div className="relative overflow-hidden rounded-3xl bg-white border border-slate-100 shadow-xl p-12 text-center">
+                    <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                      <span className="material-symbols-outlined text-4xl text-primary">school</span>
+                    </div>
+                    <h2 className="text-2xl font-black text-slate-900 mb-2">¡Bienvenido a NEUROPATH!</h2>
+                    <p className="text-slate-500 mb-6 max-w-md mx-auto">
+                      Únete a tu primera clase con el código de tu profesor, o crea tu propio set de estudio personal.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                      <button
+                        onClick={() => setShowJoinModal(true)}
+                        className="bg-primary text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                      >
+                        <span className="material-symbols-outlined">add</span> Unirse a Clase
+                      </button>
+                      <button
+                        onClick={() => { setActiveTab('personal'); setShowCreateSetModal(true); }}
+                        className="bg-violet-600 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:bg-violet-700 transition-all flex items-center justify-center gap-2"
+                      >
+                        <span className="material-symbols-outlined">auto_stories</span> Crear Set Personal
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Classes Grid */}
+                <section>
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                      <span className="w-1.5 h-6 bg-primary rounded-full"></span> Mis Clases
+                    </h2>
+                    <button onClick={() => setShowJoinModal(true)} className="text-sm font-bold text-primary flex items-center gap-1 hover:underline">
+                      <span className="material-symbols-outlined text-lg">add</span> Unirse a Clase
+                    </button>
+                  </div>
+
+                  {loadingClasses ? (
+                    <div className="grid md:grid-cols-2 gap-6">
+                      {[1, 2].map((i) => (
+                        <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm animate-pulse">
+                          <div className="flex items-center gap-4 mb-4">
+                            <div className="w-12 h-12 rounded-xl bg-slate-200"></div>
+                            <div className="flex-1">
+                              <div className="h-5 bg-slate-200 rounded w-3/4 mb-2"></div>
+                              <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : classes.length > 0 ? (
+                    <div className="grid md:grid-cols-2 gap-6">
+                      {classes.map((course, i) => {
+                        const color = courseColors[i % courseColors.length];
+                        const icon = courseIcons[i % courseIcons.length];
+                        return (
+                          <div
+                            key={course.id}
+                            onClick={() => navigate(`/student/study/${course.id}`)}
+                            className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                          >
+                            <div className="flex items-center gap-4 mb-4">
+                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color === 'blue' ? 'text-blue-600 bg-blue-50' :
+                                  color === 'violet' ? 'text-violet-600 bg-violet-50' :
+                                    color === 'emerald' ? 'text-emerald-600 bg-emerald-50' :
+                                      color === 'amber' ? 'text-amber-600 bg-amber-50' :
+                                        'text-rose-600 bg-rose-50'
+                                }`}>
+                                <span className="material-symbols-outlined text-2xl">{icon}</span>
+                              </div>
+                              <div>
+                                <h3 className="font-bold text-lg">{course.name}</h3>
+                                <p className="text-xs text-slate-500">Código: {course.code}</p>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center text-xs font-bold text-slate-400 mb-2">
+                              <span>Progreso</span>
+                              <span className="text-primary">{course.progress}%</span>
+                            </div>
+                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div className="bg-primary h-full rounded-full transition-all" style={{ width: `${course.progress}%` }}></div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="bg-white p-8 rounded-2xl border border-slate-100 text-center">
+                      <span className="material-symbols-outlined text-4xl text-slate-300 mb-4">folder_open</span>
+                      <p className="text-slate-500">No estás inscrito en ninguna clase aún</p>
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
+
+            {/* PERSONAL STUDY TAB */}
+            {activeTab === 'personal' && (
+              <>
+                {/* Create Set CTA */}
+                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-violet-600 to-purple-600 p-8 text-white shadow-xl">
+                  <div className="absolute top-0 right-0 p-8 opacity-10">
+                    <span className="material-symbols-outlined text-[120px]">auto_stories</span>
+                  </div>
+                  <div className="relative z-10">
+                    <h2 className="text-2xl font-black mb-2">📚 Estudio Personal</h2>
+                    <p className="text-violet-100 mb-6 max-w-lg">
+                      Crea tus propios sets de estudio. Sube un PDF y la IA generará flashcards automáticamente para ti.
                     </p>
                     <button
-                      onClick={() => navigate(`/student/study/${classes[0]?.id}`)}
-                      className="w-full md:w-auto bg-primary text-white font-bold px-8 py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                      onClick={() => setShowCreateSetModal(true)}
+                      className="bg-white text-violet-600 font-bold px-6 py-3 rounded-xl shadow-lg hover:bg-violet-50 transition-all flex items-center gap-2"
                     >
-                      Comenzar Ahora <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                      <span className="material-symbols-outlined">add</span> Crear Nuevo Set
                     </button>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="relative overflow-hidden rounded-3xl bg-white border border-slate-100 shadow-xl p-12 text-center">
-                <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                  <span className="material-symbols-outlined text-4xl text-primary">school</span>
-                </div>
-                <h2 className="text-2xl font-black text-slate-900 mb-2">¡Bienvenido a NEUROPATH!</h2>
-                <p className="text-slate-500 mb-6 max-w-md mx-auto">
-                  Únete a tu primera clase con el código proporcionado por tu profesor para comenzar a estudiar.
-                </p>
-                <button
-                  onClick={() => setShowJoinModal(true)}
-                  className="bg-primary text-white font-bold px-8 py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2 mx-auto"
-                >
-                  <span className="material-symbols-outlined">add</span> Unirse a una Clase
-                </button>
-              </div>
-            )}
 
-            {/* Upcoming Exams */}
-            {upcomingExams.length > 0 && (
-              <section>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                    <span className="w-1.5 h-6 bg-rose-500 rounded-full"></span> Próximos Exámenes
-                  </h2>
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {upcomingExams.map((exam) => {
-                    const daysLeft = getDaysRemaining(exam.date);
-                    const isUrgent = daysLeft <= 3;
-                    return (
-                      <div key={exam.id} className={`p-6 rounded-2xl border ${isUrgent ? 'border-rose-200 bg-rose-50' : 'border-slate-100 bg-white'} shadow-sm`}>
-                        <div className="flex items-start justify-between mb-4">
-                          <div>
-                            <h3 className="font-bold text-slate-900">{exam.name}</h3>
-                            <p className="text-sm text-slate-500">{exam.class_name}</p>
-                          </div>
-                          <div className={`px-3 py-1 rounded-full text-xs font-bold ${isUrgent ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                            {daysLeft} días
+                {/* Study Sets Grid */}
+                <section>
+                  <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                      <span className="w-1.5 h-6 bg-violet-500 rounded-full"></span> Mis Sets de Estudio
+                    </h2>
+                  </div>
+
+                  {loadingSets ? (
+                    <div className="grid md:grid-cols-2 gap-6">
+                      {[1, 2].map((i) => (
+                        <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm animate-pulse">
+                          <div className="flex items-center gap-4 mb-4">
+                            <div className="w-12 h-12 rounded-xl bg-slate-200"></div>
+                            <div className="flex-1">
+                              <div className="h-5 bg-slate-200 rounded w-3/4 mb-2"></div>
+                              <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+                            </div>
                           </div>
                         </div>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-slate-500">Tu preparación</span>
-                            <span className={`font-bold ${exam.preparation >= 70 ? 'text-emerald-600' : exam.preparation >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>
-                              {exam.preparation}%
-                            </span>
-                          </div>
-                          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all ${exam.preparation >= 70 ? 'bg-emerald-500' : exam.preparation >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`}
-                              style={{ width: `${exam.preparation}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => navigate(`/student/study/${exam.id}?mode=cramming`)}
-                          className={`mt-4 w-full py-2 rounded-xl font-bold text-sm transition-all ${isUrgent ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-primary text-white hover:bg-blue-700'}`}
-                        >
-                          {isUrgent ? '🔥 Modo Cramming' : 'Estudiar Ahora'}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-
-            {/* Courses Grid */}
-            <section>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                  <span className="w-1.5 h-6 bg-primary rounded-full"></span> Mis Cursos
-                </h2>
-                <button
-                  onClick={() => setShowJoinModal(true)}
-                  className="text-sm font-bold text-primary flex items-center gap-1 hover:underline"
-                >
-                  <span className="material-symbols-outlined text-lg">add</span> Unirse a Clase
-                </button>
-              </div>
-
-              {loadingClasses ? (
-                <div className="grid md:grid-cols-2 gap-6">
-                  {[1, 2].map((i) => (
-                    <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm animate-pulse">
-                      <div className="flex items-center gap-4 mb-4">
-                        <div className="w-12 h-12 rounded-xl bg-slate-200"></div>
-                        <div className="flex-1">
-                          <div className="h-5 bg-slate-200 rounded w-3/4 mb-2"></div>
-                          <div className="h-3 bg-slate-100 rounded w-1/2"></div>
-                        </div>
-                      </div>
-                      <div className="h-2 bg-slate-100 rounded-full"></div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              ) : classes.length > 0 ? (
-                <div className="grid md:grid-cols-2 gap-6">
-                  {classes.map((course, i) => {
-                    const color = courseColors[i % courseColors.length];
-                    const icon = courseIcons[i % courseIcons.length];
-                    return (
-                      <div
-                        key={course.id}
-                        onClick={() => navigate(`/student/study/${course.id}`)}
-                        className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                      >
-                        <div className="flex items-center gap-4 mb-4">
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color === 'blue' ? 'text-blue-600 bg-blue-50' :
-                              color === 'violet' ? 'text-violet-600 bg-violet-50' :
-                                color === 'emerald' ? 'text-emerald-600 bg-emerald-50' :
-                                  color === 'amber' ? 'text-amber-600 bg-amber-50' :
-                                    'text-rose-600 bg-rose-50'
-                            }`}>
-                            <span className="material-symbols-outlined text-2xl">{icon}</span>
+                  ) : studySets.length > 0 ? (
+                    <div className="grid md:grid-cols-2 gap-6">
+                      {studySets.map((set) => (
+                        <div
+                          key={set.id}
+                          onClick={() => navigate(`/student/study-set/${set.id}`)}
+                          className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-4 mb-4">
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${set.color === 'blue' ? 'text-blue-600 bg-blue-50' :
+                                set.color === 'violet' ? 'text-violet-600 bg-violet-50' :
+                                  set.color === 'emerald' ? 'text-emerald-600 bg-emerald-50' :
+                                    set.color === 'amber' ? 'text-amber-600 bg-amber-50' :
+                                      'text-rose-600 bg-rose-50'
+                              }`}>
+                              <span className="material-symbols-outlined text-2xl">{set.icon}</span>
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-bold text-lg group-hover:text-primary transition-colors">{set.name}</h3>
+                              <p className="text-xs text-slate-500">{set.flashcard_count || 0} flashcards</p>
+                            </div>
+                            <span className="material-symbols-outlined text-slate-300 group-hover:text-primary transition-colors">arrow_forward</span>
                           </div>
-                          <div>
-                            <h3 className="font-bold text-lg">{course.name}</h3>
-                            <p className="text-xs text-slate-500">Código: {course.code}</p>
-                          </div>
+                          {set.topics && set.topics.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {set.topics.slice(0, 3).map((topic, i) => (
+                                <span key={i} className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{topic}</span>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        <div className="flex justify-between items-center text-xs font-bold text-slate-400 mb-2">
-                          <span>Progreso</span>
-                          <span className="text-primary">{course.progress}%</span>
-                        </div>
-                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                          <div className={`bg-primary h-full rounded-full transition-all`} style={{ width: `${course.progress}%` }}></div>
-                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-white p-12 rounded-2xl border border-slate-100 text-center">
+                      <div className="w-16 h-16 bg-violet-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <span className="material-symbols-outlined text-3xl text-violet-600">library_books</span>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="bg-white p-8 rounded-2xl border border-slate-100 text-center">
-                  <span className="material-symbols-outlined text-4xl text-slate-300 mb-4">folder_open</span>
-                  <p className="text-slate-500">No estás inscrito en ninguna clase aún</p>
-                </div>
-              )}
-            </section>
+                      <h3 className="font-bold text-lg text-slate-900 mb-2">No tienes sets de estudio aún</h3>
+                      <p className="text-slate-500 mb-6">Crea tu primer set y comienza a estudiar por tu cuenta</p>
+                      <button
+                        onClick={() => setShowCreateSetModal(true)}
+                        className="bg-violet-600 text-white font-bold px-6 py-2 rounded-xl hover:bg-violet-700"
+                      >
+                        Crear Primer Set
+                      </button>
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
           </div>
 
-          {/* Gamification Sidebar */}
+          {/* Sidebar */}
           <div className="lg:col-span-4 space-y-6">
             {/* XP Widget */}
             <div className="bg-gradient-to-br from-violet-600 to-primary p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
@@ -365,8 +574,10 @@ const StudentDashboard: React.FC = () => {
               <h3 className="font-bold text-slate-900 mb-4">Acciones Rápidas</h3>
               <div className="grid grid-cols-2 gap-3">
                 <button
-                  onClick={() => classes.length > 0 && navigate(`/student/study/${classes[0]?.id}?mode=flashcards`)}
-                  disabled={classes.length === 0}
+                  onClick={() => (classes.length > 0 || studySets.length > 0) && navigate(
+                    classes.length > 0 ? `/student/study/${classes[0]?.id}?mode=flashcards` : `/student/study-set/${studySets[0]?.id}`
+                  )}
+                  disabled={classes.length === 0 && studySets.length === 0}
                   className="p-4 rounded-xl bg-blue-50 text-blue-600 flex flex-col items-center gap-2 hover:bg-blue-100 transition-colors disabled:opacity-50"
                 >
                   <span className="material-symbols-outlined">style</span>
@@ -381,12 +592,11 @@ const StudentDashboard: React.FC = () => {
                   <span className="text-xs font-bold">Quiz</span>
                 </button>
                 <button
-                  onClick={() => classes.length > 0 && navigate(`/student/study/${classes[0]?.id}?mode=exam`)}
-                  disabled={classes.length === 0}
-                  className="p-4 rounded-xl bg-amber-50 text-amber-600 flex flex-col items-center gap-2 hover:bg-amber-100 transition-colors disabled:opacity-50"
+                  onClick={() => setShowCreateSetModal(true)}
+                  className="p-4 rounded-xl bg-amber-50 text-amber-600 flex flex-col items-center gap-2 hover:bg-amber-100 transition-colors"
                 >
-                  <span className="material-symbols-outlined">assignment</span>
-                  <span className="text-xs font-bold">Examen</span>
+                  <span className="material-symbols-outlined">add_circle</span>
+                  <span className="text-xs font-bold">Nuevo Set</span>
                 </button>
                 <button
                   onClick={() => navigate('/student/achievements')}
@@ -397,29 +607,6 @@ const StudentDashboard: React.FC = () => {
                 </button>
               </div>
             </div>
-
-            {/* Daily Goals */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-              <h3 className="font-bold text-slate-900 mb-4">Metas Diarias</h3>
-              <div className="space-y-4">
-                {[
-                  { label: 'Completa 1 sesión de estudio', done: false },
-                  { label: 'Mantén tu racha activa', done: streakDays > 0 },
-                  { label: 'Repasa 15 flashcards', done: false },
-                  { label: `Únete a ${classes.length > 0 ? 'otra' : 'una'} clase`, done: classes.length > 0 }
-                ].map((goal, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${goal.done ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 text-transparent'
-                      }`}>
-                      <span className="material-symbols-outlined text-xs">check</span>
-                    </div>
-                    <span className={`text-sm font-medium ${goal.done ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
-                      {goal.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       </main>
@@ -427,72 +614,194 @@ const StudentDashboard: React.FC = () => {
       {/* Join Class Modal */}
       {showJoinModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-fade-in">
-            {!joinSuccess ? (
-              <>
-                <div className="p-8 text-center">
-                  <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                    <span className="material-symbols-outlined text-3xl text-primary">group_add</span>
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
+            <div className="p-8">
+              {joinSuccess ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="material-symbols-outlined text-3xl text-emerald-600">check_circle</span>
                   </div>
+                  <h3 className="text-xl font-bold text-slate-900">¡Te has unido exitosamente!</h3>
+                </div>
+              ) : (
+                <>
                   <h2 className="text-2xl font-black text-slate-900 mb-2">Unirse a una Clase</h2>
-                  <p className="text-slate-500 mb-8">Ingresa el código de 6 dígitos proporcionado por tu profesor</p>
-
-                  <div className="flex justify-center gap-2 mb-4">
-                    {[0, 1, 2, 3, 4, 5].map((i) => (
-                      <input
-                        key={i}
-                        type="text"
-                        maxLength={1}
-                        value={joinCode[i] || ''}
-                        onChange={(e) => {
-                          const newCode = joinCode.split('');
-                          newCode[i] = e.target.value.toUpperCase();
-                          setJoinCode(newCode.join(''));
-                          setJoinError('');
-                          if (e.target.value && e.target.nextElementSibling) {
-                            (e.target.nextElementSibling as HTMLInputElement).focus();
-                          }
-                        }}
-                        className="w-12 h-14 text-center text-2xl font-bold border-2 border-slate-200 rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                      />
-                    ))}
-                  </div>
-
+                  <p className="text-slate-500 mb-6">Ingresa el código de 6 dígitos proporcionado por tu profesor</p>
+                  <input
+                    type="text"
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value.toUpperCase().slice(0, 6))}
+                    placeholder="CÓDIGO"
+                    className="w-full text-center text-3xl font-mono font-bold tracking-[0.5em] py-4 border-2 border-slate-200 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none uppercase"
+                    maxLength={6}
+                  />
                   {joinError && (
-                    <div className="mb-4 text-rose-600 text-sm flex items-center justify-center gap-1">
-                      <span className="material-symbols-outlined text-sm">error</span>
-                      {joinError}
-                    </div>
+                    <p className="text-rose-500 text-sm mt-3 text-center">{joinError}</p>
                   )}
-
                   <button
                     onClick={handleJoinClass}
                     disabled={joinCode.length !== 6 || joiningClass}
-                    className="w-full bg-primary text-white font-bold py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                    className="w-full mt-6 bg-primary text-white font-bold py-4 rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {joiningClass ? (
                       <>
-                        <span className="animate-spin material-symbols-outlined">progress_activity</span>
-                        Verificando...
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Uniéndose...
                       </>
                     ) : (
-                      'Unirme a la Clase'
+                      'Unirse a la Clase'
                     )}
                   </button>
-                </div>
-                <div className="bg-slate-50 p-4 flex justify-center">
-                  <button onClick={() => { setShowJoinModal(false); setJoinError(''); setJoinCode(''); }} className="text-slate-500 font-medium hover:text-slate-700">
-                    Cancelar
+                </>
+              )}
+            </div>
+            {!joinSuccess && (
+              <div className="bg-slate-50 p-4 flex justify-end">
+                <button onClick={() => { setShowJoinModal(false); setJoinCode(''); setJoinError(''); }} className="text-slate-600 font-medium hover:text-slate-800">
+                  Cancelar
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Create Study Set Modal */}
+      {showCreateSetModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+            <div className="p-8">
+              {/* Step indicator */}
+              <div className="flex items-center gap-2 mb-6">
+                {[1, 2, 3].map((step) => (
+                  <div key={step} className={`flex-1 h-1 rounded-full ${createStep >= step ? 'bg-violet-500' : 'bg-slate-200'}`}></div>
+                ))}
+              </div>
+
+              {createStep === 1 && (
+                <>
+                  <h2 className="text-2xl font-black text-slate-900 mb-2">Crear Set de Estudio</h2>
+                  <p className="text-slate-500 mb-6">Dale un nombre y describe lo que vas a estudiar</p>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Nombre del Set *</label>
+                      <input
+                        type="text"
+                        value={newSetName}
+                        onChange={(e) => setNewSetName(e.target.value)}
+                        placeholder="Ej: Anatomía - Sistema Nervioso"
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Descripción</label>
+                      <textarea
+                        value={newSetDescription}
+                        onChange={(e) => setNewSetDescription(e.target.value)}
+                        placeholder="¿De qué trata este set de estudio?"
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none resize-none h-20"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Temas (separados por comas)</label>
+                      <input
+                        type="text"
+                        value={newSetTopics}
+                        onChange={(e) => setNewSetTopics(e.target.value)}
+                        placeholder="Ej: Neurociencia, Cerebro, Sinapsis"
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleCreateStudySet}
+                    disabled={!newSetName.trim() || creatingSet}
+                    className="w-full mt-6 bg-violet-600 text-white font-bold py-4 rounded-2xl hover:bg-violet-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {creatingSet ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Creando...
+                      </>
+                    ) : (
+                      <>
+                        Continuar <span className="material-symbols-outlined">arrow_forward</span>
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+
+              {createStep === 2 && (
+                <>
+                  <h2 className="text-2xl font-black text-slate-900 mb-2">Agregar Contenido</h2>
+                  <p className="text-slate-500 mb-6">Sube un PDF para generar flashcards automáticamente con IA</p>
+
+                  {!uploadingPdf ? (
+                    <>
+                      <label className="block border-2 border-dashed border-violet-200 rounded-2xl p-12 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50 transition-all">
+                        <span className="material-symbols-outlined text-4xl text-violet-400 mb-4">cloud_upload</span>
+                        <p className="font-bold text-slate-700">Arrastra un PDF o haz clic</p>
+                        <p className="text-sm text-slate-500 mt-2">La IA generará flashcards automáticamente</p>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept=".pdf"
+                          onChange={(e) => handleStudySetPdfUpload(e.target.files)}
+                        />
+                      </label>
+
+                      <div className="text-center mt-6">
+                        <button
+                          onClick={() => setCreateStep(3)}
+                          className="text-violet-600 font-medium hover:underline"
+                        >
+                          Omitir y crear set vacío
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 mx-auto mb-4">
+                        <div className="w-full h-full border-4 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                      <p className="font-bold text-slate-900 mb-2">🤖 IA procesando PDF...</p>
+                      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
+                        <div className="bg-violet-500 h-full rounded-full transition-all" style={{ width: `${pdfProgress}%` }}></div>
+                      </div>
+                      <p className="text-sm text-slate-500">Generando flashcards automáticamente</p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {createStep === 3 && (
+                <div className="text-center py-8">
+                  <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="material-symbols-outlined text-4xl text-emerald-600">check_circle</span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-2">¡Set Creado!</h3>
+                  <p className="text-slate-500 mb-6">Tu set de estudio "{newSetName}" está listo</p>
+                  <button
+                    onClick={() => {
+                      closeCreateModal();
+                      if (createdSetId) navigate(`/student/study-set/${createdSetId}`);
+                    }}
+                    className="bg-violet-600 text-white font-bold px-8 py-3 rounded-xl hover:bg-violet-700"
+                  >
+                    Comenzar a Estudiar
                   </button>
                 </div>
-              </>
-            ) : (
-              <div className="p-12 text-center">
-                <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
-                  <span className="material-symbols-outlined text-4xl text-emerald-600">check_circle</span>
-                </div>
-                <h2 className="text-2xl font-black text-slate-900 mb-2">¡Bienvenido!</h2>
-                <p className="text-slate-500">Te has unido exitosamente a la clase</p>
+              )}
+            </div>
+
+            {createStep < 3 && (
+              <div className="bg-slate-50 p-4 flex justify-between">
+                <button onClick={() => createStep > 1 ? setCreateStep(createStep - 1) : closeCreateModal()} className="text-slate-600 font-medium hover:text-slate-800">
+                  {createStep > 1 ? 'Atrás' : 'Cancelar'}
+                </button>
               </div>
             )}
           </div>
