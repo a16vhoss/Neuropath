@@ -138,6 +138,27 @@ export const joinClass = async (studentId: string, classCode: string) => {
     return data;
 };
 
+export const getClassEnrollments = async (classId: string) => {
+    const { data, error } = await supabase
+        .from('enrollments')
+        .select(`
+            *,
+            profiles!enrollments_student_id_fkey (
+                id,
+                full_name,
+                email,
+                avatar_url,
+                xp,
+                level,
+                updated_at
+            )
+        `)
+        .eq('class_id', classId);
+
+    if (error) throw error;
+    return data;
+};
+
 // Flashcards helpers
 export const getClassFlashcards = async (classId: string) => {
     const { data, error } = await supabase

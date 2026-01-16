@@ -1,6 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { getClassFlashcards, updateFlashcardProgress, supabase } from '../services/supabaseClient';
 import { generateStudyFlashcards, getTutorResponse } from '../services/geminiService';
 
 type StudyMode = 'flashcards' | 'quiz' | 'exam' | 'cramming';
@@ -10,6 +12,7 @@ interface Flashcard {
   question: string;
   answer: string;
   category: string;
+  difficulty?: number;
 }
 
 interface QuizQuestion {
@@ -41,18 +44,22 @@ const StudySession: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const modeParam = searchParams.get('mode') as StudyMode || 'flashcards';
+  const { user, profile } = useAuth();
 
+  const [className, setClassName] = useState('');
   const [mode, setMode] = useState<StudyMode>(modeParam);
   const [loading, setLoading] = useState(true);
+  const [loadingSource, setLoadingSource] = useState<'db' | 'ai' | 'mock'>('db');
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [streak, setStreak] = useState(12);
+  const [streak, setStreak] = useState(profile?.streak_days || 0);
   const [showTutor, setShowTutor] = useState(false);
   const [tutorQuestion, setTutorQuestion] = useState('');
   const [tutorResponse, setTutorResponse] = useState('');
   const [tutorLoading, setTutorLoading] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [xpEarned, setXpEarned] = useState(0);
 
   // Quiz state
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(mockQuizQuestions);
@@ -70,24 +77,101 @@ const StudySession: React.FC = () => {
   // Cramming state
   const [crammingIntensity, setCrammingIntensity] = useState<'low' | 'medium' | 'high'>('high');
 
+  // Load flashcards from Supabase or generate with AI
   useEffect(() => {
     const fetchCards = async () => {
       setLoading(true);
-      const cards = await generateStudyFlashcards("Neurobiología básica y sinapsis");
-      if (cards && cards.length > 0) {
-        setFlashcards(cards.map((c: { question: string; answer: string; category: string }, i: number) => ({
-          id: String(i),
-          question: c.question,
-          answer: c.answer,
-          category: c.category
-        })));
-      } else {
+
+      // First, try to get class info and flashcards from Supabase
+      if (classId) {
+        try {
+          // Get class name
+          const { data: classData } = await supabase
+            .from('classes')
+            .select('name, topics')
+            .eq('id', classId)
+            .single();
+
+          if (classData) {
+            setClassName(classData.name);
+          }
+
+          // Get flashcards from database
+          setLoadingSource('db');
+          const dbFlashcards = await getClassFlashcards(classId);
+
+          if (dbFlashcards && dbFlashcards.length > 0) {
+            setFlashcards(dbFlashcards.map((c: any) => ({
+              id: c.id,
+              question: c.question,
+              answer: c.answer,
+              category: c.category || 'General',
+              difficulty: c.difficulty || 1
+            })));
+            setLoading(false);
+            return;
+          }
+
+          // If no flashcards in DB, generate with AI based on class topics
+          if (classData?.topics && classData.topics.length > 0) {
+            setLoadingSource('ai');
+            const topicString = classData.topics.join(', ');
+            const aiCards = await generateStudyFlashcards(topicString);
+
+            if (aiCards && aiCards.length > 0) {
+              const formattedCards = aiCards.map((c: { question: string; answer: string; category: string }, i: number) => ({
+                id: String(i),
+                question: c.question,
+                answer: c.answer,
+                category: c.category
+              }));
+              setFlashcards(formattedCards);
+
+              // Save AI-generated flashcards to database for future use
+              for (const card of formattedCards) {
+                await supabase.from('flashcards').insert({
+                  class_id: classId,
+                  question: card.question,
+                  answer: card.answer,
+                  category: card.category,
+                  difficulty: 1
+                });
+              }
+
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('Error loading flashcards:', error);
+        }
+      }
+
+      // Fallback: generate with AI for general topic or use mock
+      try {
+        setLoadingSource('ai');
+        const cards = await generateStudyFlashcards("Neurobiología básica y sinapsis");
+        if (cards && cards.length > 0) {
+          setFlashcards(cards.map((c: { question: string; answer: string; category: string }, i: number) => ({
+            id: String(i),
+            question: c.question,
+            answer: c.answer,
+            category: c.category
+          })));
+        } else {
+          setLoadingSource('mock');
+          setFlashcards(mockFlashcards);
+        }
+      } catch (error) {
+        console.error('Error generating flashcards:', error);
+        setLoadingSource('mock');
         setFlashcards(mockFlashcards);
       }
+
       setLoading(false);
     };
     fetchCards();
-  }, []);
+  }, [classId]);
 
   // Exam timer
   useEffect(() => {
@@ -110,13 +194,31 @@ const StudySession: React.FC = () => {
     setTutorLoading(false);
   };
 
-  const handleKnow = () => {
+  const handleKnow = async () => {
+    // Update flashcard progress in Supabase
+    if (user && flashcards[currentIndex]?.id) {
+      try {
+        await updateFlashcardProgress(user.id, flashcards[currentIndex].id, true); // Correct answer
+        setXpEarned(prev => prev + 10);
+      } catch (error) {
+        console.error('Error updating progress:', error);
+      }
+    }
+
     setStreak(s => s + 1);
     triggerConfetti();
     nextCard();
   };
 
-  const handleDontKnow = () => {
+  const handleDontKnow = async () => {
+    // Update flashcard progress with low quality
+    if (user && flashcards[currentIndex]?.id) {
+      try {
+        await updateFlashcardProgress(user.id, flashcards[currentIndex].id, false); // Incorrect answer
+      } catch (error) {
+        console.error('Error updating progress:', error);
+      }
+    }
     nextCard();
   };
 
@@ -138,6 +240,7 @@ const StudySession: React.FC = () => {
     setShowResult(true);
     if (optionIndex === quizQuestions[currentQuizIndex].correctIndex) {
       setScore(score + 1);
+      setXpEarned(prev => prev + 20);
       triggerConfetti();
     }
   };
@@ -152,7 +255,7 @@ const StudySession: React.FC = () => {
     }
   };
 
-  const handleExamSubmit = () => {
+  const handleExamSubmit = async () => {
     let examScore = 0;
     examAnswers.forEach((answer, i) => {
       if (answer === quizQuestions[i].correctIndex) {
@@ -160,7 +263,32 @@ const StudySession: React.FC = () => {
       }
     });
     setScore(examScore);
+    setXpEarned(examScore * 25);
     setExamSubmitted(true);
+
+    // Log study session
+    if (user && classId) {
+      try {
+        await supabase.from('study_sessions').insert({
+          student_id: user.id,
+          class_id: classId,
+          mode: 'exam',
+          duration_minutes: Math.floor((15 * 60 - examTime) / 60),
+          cards_reviewed: quizQuestions.length,
+          correct_count: examScore,
+          xp_earned: examScore * 25
+        });
+
+        // Update user XP
+        if (profile) {
+          await supabase.from('profiles').update({
+            xp: (profile.xp || 0) + (examScore * 25)
+          }).eq('id', user.id);
+        }
+      } catch (error) {
+        console.error('Error logging session:', error);
+      }
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -173,7 +301,12 @@ const StudySession: React.FC = () => {
     return (
       <div className="min-h-screen gradient-hero flex flex-col items-center justify-center text-white gap-6 p-8">
         <div className="w-16 h-16 border-4 border-white/40 border-t-white rounded-full animate-spin"></div>
-        <p className="text-xl font-bold">IA generando tu sesión personalizada...</p>
+        <p className="text-xl font-bold">
+          {loadingSource === 'db' && 'Cargando flashcards...'}
+          {loadingSource === 'ai' && 'IA generando tu sesión personalizada...'}
+          {loadingSource === 'mock' && 'Preparando sesión de estudio...'}
+        </p>
+        {className && <p className="text-blue-100">{className}</p>}
       </div>
     );
   }
@@ -205,13 +338,13 @@ const StudySession: React.FC = () => {
 
       {/* Header */}
       <header className={`p-4 md:p-6 flex items-center justify-between ${mode === 'exam' ? 'text-slate-900' : 'text-white'}`}>
-        <button onClick={() => navigate('/student')} className="flex items-center gap-2 font-medium hover:opacity-80">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 font-medium hover:opacity-80">
           <span className="material-symbols-outlined">close</span>
           <span className="hidden md:inline">Finalizar Sesión</span>
         </button>
         <div className="flex-1 max-w-md mx-8">
           <div className="flex justify-between text-xs font-bold uppercase tracking-wider mb-1 opacity-80">
-            <span>Progreso</span>
+            <span>{className || 'Sesión de Estudio'}</span>
             <span>{mode === 'quiz' ? `${currentQuizIndex + 1}/${quizQuestions.length}` : `${currentIndex + 1}/${flashcards.length}`}</span>
           </div>
           <div className={`w-full h-2 rounded-full overflow-hidden ${mode === 'exam' ? 'bg-slate-200' : 'bg-white/20'}`}>
@@ -230,7 +363,7 @@ const StudySession: React.FC = () => {
           ) : (
             <>
               <span className="material-symbols-outlined text-amber-400 fill-1">local_fire_department</span>
-              <span className="font-black">Racha x{streak}</span>
+              <span className="font-black">+{xpEarned} XP</span>
             </>
           )}
         </div>
@@ -257,8 +390,8 @@ const StudySession: React.FC = () => {
                 setScore(0);
               }}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold text-sm transition-all ${mode === m.id
-                  ? (mode === 'exam' ? 'bg-white text-slate-900 shadow-sm' : 'bg-white text-primary shadow-sm')
-                  : (mode === 'exam' ? 'text-slate-500' : 'text-white/80')
+                ? (mode === 'exam' ? 'bg-white text-slate-900 shadow-sm' : 'bg-white text-primary shadow-sm')
+                : (mode === 'exam' ? 'text-slate-500' : 'text-white/80')
                 }`}
             >
               <span className="material-symbols-outlined text-lg">{m.icon}</span>
@@ -327,19 +460,19 @@ const StudySession: React.FC = () => {
                     onClick={() => handleQuizAnswer(i)}
                     disabled={showResult}
                     className={`w-full p-4 rounded-xl text-left font-medium transition-all flex items-center gap-3 ${showResult
-                        ? i === quizQuestions[currentQuizIndex].correctIndex
-                          ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500'
-                          : selectedAnswer === i
-                            ? 'bg-rose-100 text-rose-700 border-2 border-rose-500'
-                            : 'bg-slate-100 text-slate-500'
+                      ? i === quizQuestions[currentQuizIndex].correctIndex
+                        ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500'
                         : selectedAnswer === i
-                          ? 'bg-primary text-white'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          ? 'bg-rose-100 text-rose-700 border-2 border-rose-500'
+                          : 'bg-slate-100 text-slate-500'
+                      : selectedAnswer === i
+                        ? 'bg-primary text-white'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                       }`}
                   >
                     <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${showResult && i === quizQuestions[currentQuizIndex].correctIndex ? 'bg-emerald-500 text-white' :
-                        showResult && selectedAnswer === i ? 'bg-rose-500 text-white' :
-                          selectedAnswer === i ? 'bg-white/20 text-white' : 'bg-white text-slate-600'
+                      showResult && selectedAnswer === i ? 'bg-rose-500 text-white' :
+                        selectedAnswer === i ? 'bg-white/20 text-white' : 'bg-white text-slate-600'
                       }`}>
                       {String.fromCharCode(65 + i)}
                     </span>
@@ -377,18 +510,18 @@ const StudySession: React.FC = () => {
                 <span className="material-symbols-outlined text-5xl text-white">emoji_events</span>
               </div>
               <h2 className="text-3xl font-black text-slate-900 mb-2">¡Quiz Completado!</h2>
-              <p className="text-slate-500 mb-6">Has terminado el quiz</p>
+              <p className="text-slate-500 mb-6">Has ganado <strong className="text-primary">+{xpEarned} XP</strong></p>
               <div className="text-6xl font-black text-primary mb-2">{score}/{quizQuestions.length}</div>
               <p className="text-slate-600 mb-8">respuestas correctas ({Math.round((score / quizQuestions.length) * 100)}%)</p>
               <div className="flex gap-4">
                 <button
-                  onClick={() => { setQuizComplete(false); setCurrentQuizIndex(0); setScore(0); }}
+                  onClick={() => { setQuizComplete(false); setCurrentQuizIndex(0); setScore(0); setXpEarned(0); }}
                   className="flex-1 bg-slate-100 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-200"
                 >
                   Reintentar
                 </button>
                 <button
-                  onClick={() => navigate('/student')}
+                  onClick={() => navigate(-1)}
                   className="flex-1 bg-primary text-white font-bold py-3 rounded-xl hover:bg-blue-700"
                 >
                   Finalizar
@@ -423,8 +556,8 @@ const StudySession: React.FC = () => {
                             setExamAnswers(newAnswers);
                           }}
                           className={`p-3 rounded-lg text-left text-sm font-medium transition-all ${examAnswers[i] === j
-                              ? 'bg-primary text-white'
-                              : 'bg-white border border-slate-200 hover:border-primary'
+                            ? 'bg-primary text-white'
+                            : 'bg-white border border-slate-200 hover:border-primary'
                             }`}
                         >
                           {String.fromCharCode(65 + j)}. {opt}
@@ -454,11 +587,12 @@ const StudySession: React.FC = () => {
                 </span>
               </div>
               <h2 className="text-3xl font-black text-slate-900 mb-2">Examen Enviado</h2>
-              <p className="text-slate-500 mb-6">{score >= 4 ? '¡Excelente trabajo!' : 'Sigue practicando'}</p>
+              <p className="text-slate-500 mb-2">{score >= 4 ? '¡Excelente trabajo!' : 'Sigue practicando'}</p>
+              <p className="text-primary font-bold mb-6">+{xpEarned} XP ganados</p>
               <div className={`text-6xl font-black mb-2 ${score >= 4 ? 'text-emerald-600' : 'text-rose-600'}`}>{score}/{quizQuestions.length}</div>
               <p className="text-slate-600 mb-8">{Math.round((score / quizQuestions.length) * 100)}%</p>
               <button
-                onClick={() => navigate('/student')}
+                onClick={() => navigate(-1)}
                 className="w-full bg-primary text-white font-bold py-3 rounded-xl hover:bg-blue-700"
               >
                 Volver al Dashboard
@@ -584,7 +718,8 @@ const StudySession: React.FC = () => {
           to { transform: translateY(100vh) rotate(720deg); opacity: 0; }
         }
         .animate-fall { animation: fall 1s linear forwards; }
-      `}</style>
+      `}
+      </style>
     </div>
   );
 };
