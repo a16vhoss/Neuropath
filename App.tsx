@@ -12,14 +12,24 @@ import StudentAchievements from './pages/StudentAchievements';
 import StudySession from './pages/StudySession';
 import { UserRole } from './types';
 
-// Protected Route component
+// Protected Route component with timeout
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'student' | 'teacher' }> = ({
   children,
   allowedRole
 }) => {
   const { user, profile, loading } = useAuth();
+  const [timedOut, setTimedOut] = React.useState(false);
 
-  if (loading) {
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (loading) {
+        setTimedOut(true);
+      }
+    }, 5000); // 5 second timeout
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  if (loading && !timedOut) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
@@ -30,7 +40,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'stude
     );
   }
 
-  if (!user) {
+  if (!user || timedOut) {
     return <Navigate to="/auth" replace />;
   }
 
