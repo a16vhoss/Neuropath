@@ -4,6 +4,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getClassFlashcards, getStudySetFlashcards, updateFlashcardProgress, supabase } from '../services/supabaseClient';
 import { generateStudyFlashcards, getTutorResponse, generateQuizQuestions } from '../services/geminiService';
+import SocraticChat from '../components/SocraticChat';
 
 type StudyMode = 'flashcards' | 'quiz' | 'exam' | 'cramming';
 
@@ -299,13 +300,7 @@ const StudySession: React.FC = () => {
     }
   }, [mode, examTime, examSubmitted]);
 
-  const handleAskTutor = async () => {
-    if (!tutorQuestion.trim()) return;
-    setTutorLoading(true);
-    const response = await getTutorResponse(tutorQuestion, flashcards[currentIndex]?.question || "Neurobiología");
-    setTutorResponse(response || "Lo siento, no pude procesar tu pregunta.");
-    setTutorLoading(false);
-  };
+
 
   const handleKnow = async () => {
     // Update flashcard progress in Supabase
@@ -757,68 +752,12 @@ const StudySession: React.FC = () => {
         )}
       </main>
 
-      {/* AI Tutor Button */}
+      {/* Socratic Chat */}
       {(mode === 'flashcards' || mode === 'quiz') && (
-        <button
-          onClick={() => setShowTutor(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-violet-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-violet-700 transition-all hover:scale-110"
-        >
-          <span className="material-symbols-outlined">smart_toy</span>
-        </button>
-      )}
-
-      {/* AI Tutor Modal */}
-      {showTutor && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-t-3xl md:rounded-3xl shadow-2xl max-h-[80vh] flex flex-col">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-violet-600">smart_toy</span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900">Tutor IA Socrático</h3>
-                  <p className="text-xs text-slate-500">Te guío con preguntas, no respuestas</p>
-                </div>
-              </div>
-              <button onClick={() => setShowTutor(false)} className="p-2 hover:bg-slate-100 rounded-full">
-                <span className="material-symbols-outlined text-slate-400">close</span>
-              </button>
-            </div>
-            <div className="flex-1 p-6 overflow-y-auto">
-              {tutorResponse && (
-                <div className="bg-violet-50 p-4 rounded-2xl mb-4">
-                  <p className="text-slate-700 leading-relaxed">{tutorResponse}</p>
-                </div>
-              )}
-              {tutorLoading && (
-                <div className="flex items-center gap-2 text-violet-600">
-                  <div className="w-4 h-4 border-2 border-violet-600 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-sm">Pensando...</span>
-                </div>
-              )}
-            </div>
-            <div className="p-4 border-t border-slate-100">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={tutorQuestion}
-                  onChange={(e) => setTutorQuestion(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAskTutor()}
-                  placeholder="¿Qué no entiendes?"
-                  className="flex-1 px-4 py-3 bg-slate-100 rounded-xl focus:ring-2 focus:ring-violet-200 outline-none"
-                />
-                <button
-                  onClick={handleAskTutor}
-                  disabled={tutorLoading}
-                  className="bg-violet-600 text-white px-4 rounded-xl hover:bg-violet-700 disabled:opacity-50"
-                >
-                  <span className="material-symbols-outlined">send</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <SocraticChat
+          context={flashcards[currentIndex]?.question || className || "General"}
+          studentName={profile?.full_name?.split(' ')[0]}
+        />
       )}
 
       {/* CSS for animations */}
