@@ -1,0 +1,59 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEUROPATH - Estudia Inteligente</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#2563EB',
+            secondary: '#7C3AED',
+            accent: '#F59E0B',
+            success: '#10B981',
+            danger: '#EF4444',
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); }
+    .gradient-hero { background: linear-gradient(135deg, #2563EB 0%, #7C3AED 100%); }
+    .gradient-premium { background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%); }
+    @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
+    .card-perspective { perspective: 1000px; }
+    .card-inner { transition: transform 0.6s; transform-style: preserve-3d; }
+    .card-flipped { transform: rotateY(180deg); }
+    .backface-hidden { backface-visibility: hidden; }
+    .rotate-y-180 { transform: rotateY(180deg); }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.12.0",
+    "@google/genai": "https://esm.sh/@google/genai@^1.36.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-[#F9FAFB] text-[#111827]">
+  <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
