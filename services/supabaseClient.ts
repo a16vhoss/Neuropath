@@ -445,6 +445,31 @@ export const addFlashcardToStudySet = async (studySetId: string, flashcard: {
     return data;
 };
 
+export const updateFlashcard = async (flashcardId: string, updates: {
+    question?: string;
+    answer?: string;
+    category?: string;
+}) => {
+    const { data, error } = await supabase
+        .from('flashcards')
+        .update({ ...updates })
+        .eq('id', flashcardId)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+};
+
+export const deleteFlashcard = async (flashcardId: string) => {
+    const { error } = await supabase
+        .from('flashcards')
+        .delete()
+        .eq('id', flashcardId);
+
+    if (error) throw error;
+};
+
 // Analytics helpers (for teachers)
 export const getClassAnalytics = async (classId: string) => {
     const { data: enrollments, error: enrollError } = await supabase

@@ -2,8 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getStudentClasses, joinClass, getStudentAchievements, getStudentStudySets, createStudySet, supabase } from '../services/supabaseClient';
+import { getStudentClasses, joinClass, getStudentAchievements, getStudentStudySets, createStudySet, supabase, deleteStudySet } from '../services/supabaseClient';
 import { generateFlashcardsFromText, extractTextFromPDF } from '../services/pdfProcessingService';
+import StudySetManager from '../components/StudySetManager';
 
 interface ClassData {
   id: string;
@@ -49,6 +50,7 @@ const StudentDashboard: React.FC = () => {
   const [newSetTopics, setNewSetTopics] = useState('');
   const [creatingSet, setCreatingSet] = useState(false);
   const [createStep, setCreateStep] = useState(1); // 1: basic info, 2: upload content, 3: done
+  const [editingStudySet, setEditingStudySet] = useState<StudySet | null>(null);
 
   // PDF upload for study set
   const [uploadingPdf, setUploadingPdf] = useState(false);
@@ -91,33 +93,33 @@ const StudentDashboard: React.FC = () => {
     loadClasses();
   }, [user]);
 
-  // Load student's study sets
+  const loadStudySets = async () => {
+    if (!user) return;
+    try {
+      setLoadingSets(true);
+      const sets = await getStudentStudySets(user.id);
+
+      // Get flashcard counts for each set
+      const setsWithCounts = await Promise.all((sets || []).map(async (set: any) => {
+        const { count } = await supabase
+          .from('flashcards')
+          .select('*', { count: 'exact', head: true })
+          .eq('study_set_id', set.id);
+        return {
+          ...set,
+          flashcard_count: count || 0
+        };
+      }));
+
+      setStudySets(setsWithCounts);
+    } catch (error) {
+      console.error('Error loading study sets:', error);
+    } finally {
+      setLoadingSets(false);
+    }
+  };
+
   useEffect(() => {
-    const loadStudySets = async () => {
-      if (!user) return;
-      try {
-        setLoadingSets(true);
-        const sets = await getStudentStudySets(user.id);
-
-        // Get flashcard counts for each set
-        const setsWithCounts = await Promise.all((sets || []).map(async (set: any) => {
-          const { count } = await supabase
-            .from('flashcards')
-            .select('*', { count: 'exact', head: true })
-            .eq('study_set_id', set.id);
-          return {
-            ...set,
-            flashcard_count: count || 0
-          };
-        }));
-
-        setStudySets(setsWithCounts);
-      } catch (error) {
-        console.error('Error loading study sets:', error);
-      } finally {
-        setLoadingSets(false);
-      }
-    };
     loadStudySets();
   }, [user]);
 
@@ -304,8 +306,8 @@ const StudentDashboard: React.FC = () => {
           <button
             onClick={() => setActiveTab('classes')}
             className={`px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'classes'
-                ? 'bg-primary text-white shadow-md'
-                : 'text-slate-500 hover:text-slate-700'
+              ? 'bg-primary text-white shadow-md'
+              : 'text-slate-500 hover:text-slate-700'
               }`}
           >
             <span className="material-symbols-outlined text-lg">school</span>
@@ -314,8 +316,8 @@ const StudentDashboard: React.FC = () => {
           <button
             onClick={() => setActiveTab('personal')}
             className={`px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'personal'
-                ? 'bg-primary text-white shadow-md'
-                : 'text-slate-500 hover:text-slate-700'
+              ? 'bg-primary text-white shadow-md'
+              : 'text-slate-500 hover:text-slate-700'
               }`}
           >
             <span className="material-symbols-outlined text-lg">auto_stories</span>
@@ -419,10 +421,10 @@ const StudentDashboard: React.FC = () => {
                           >
                             <div className="flex items-center gap-4 mb-4">
                               <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color === 'blue' ? 'text-blue-600 bg-blue-50' :
-                                  color === 'violet' ? 'text-violet-600 bg-violet-50' :
-                                    color === 'emerald' ? 'text-emerald-600 bg-emerald-50' :
-                                      color === 'amber' ? 'text-amber-600 bg-amber-50' :
-                                        'text-rose-600 bg-rose-50'
+                                color === 'violet' ? 'text-violet-600 bg-violet-50' :
+                                  color === 'emerald' ? 'text-emerald-600 bg-emerald-50' :
+                                    color === 'amber' ? 'text-amber-600 bg-amber-50' :
+                                      'text-rose-600 bg-rose-50'
                                 }`}>
                                 <span className="material-symbols-outlined text-2xl">{icon}</span>
                               </div>
@@ -506,10 +508,10 @@ const StudentDashboard: React.FC = () => {
                         >
                           <div className="flex items-center gap-4 mb-4">
                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${set.color === 'blue' ? 'text-blue-600 bg-blue-50' :
-                                set.color === 'violet' ? 'text-violet-600 bg-violet-50' :
-                                  set.color === 'emerald' ? 'text-emerald-600 bg-emerald-50' :
-                                    set.color === 'amber' ? 'text-amber-600 bg-amber-50' :
-                                      'text-rose-600 bg-rose-50'
+                              set.color === 'violet' ? 'text-violet-600 bg-violet-50' :
+                                set.color === 'emerald' ? 'text-emerald-600 bg-emerald-50' :
+                                  set.color === 'amber' ? 'text-amber-600 bg-amber-50' :
+                                    'text-rose-600 bg-rose-50'
                               }`}>
                               <span className="material-symbols-outlined text-2xl">{set.icon}</span>
                             </div>
@@ -517,6 +519,16 @@ const StudentDashboard: React.FC = () => {
                               <h3 className="font-bold text-lg group-hover:text-primary transition-colors">{set.name}</h3>
                               <p className="text-xs text-slate-500">{set.flashcard_count || 0} flashcards</p>
                             </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingStudySet(set);
+                              }}
+                              className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors mr-2"
+                              title="Editar"
+                            >
+                              <span className="material-symbols-outlined text-lg">edit</span>
+                            </button>
                             <span className="material-symbols-outlined text-slate-300 group-hover:text-primary transition-colors">arrow_forward</span>
                           </div>
                           {set.topics && set.topics.length > 0 && (
@@ -806,6 +818,17 @@ const StudentDashboard: React.FC = () => {
             )}
           </div>
         </div>
+      )}
+
+      {editingStudySet && (
+        <StudySetManager
+          studySet={editingStudySet}
+          onClose={() => setEditingStudySet(null)}
+          onUpdate={() => {
+            loadStudySets();
+            setEditingStudySet(null);
+          }}
+        />
       )}
     </div>
   );
