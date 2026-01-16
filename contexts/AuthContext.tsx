@@ -50,34 +50,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     useEffect(() => {
-        // Check current session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setUser(session?.user ?? null);
-            if (session?.user) {
-                getProfile(session.user.id).then(setProfile).catch(console.error);
-            }
-        }).catch((error) => {
-            console.error('Error getting session:', error);
-        }).finally(() => {
-            setLoading(false);
-        });
+        let mounted = true;
 
-        // Listen for auth changes
+        // Listen for auth changes - this fires immediately with INITIAL_SESSION
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('Auth state change:', event);
+
+            if (!mounted) return;
+
             setUser(session?.user ?? null);
+
             if (session?.user) {
                 try {
                     const profileData = await getProfile(session.user.id);
-                    setProfile(profileData);
+                    if (mounted) setProfile(profileData);
                 } catch (error) {
                     console.error('Error fetching profile:', error);
                 }
             } else {
                 setProfile(null);
             }
+
+            // Set loading to false after the first auth state check
+            if (mounted) setLoading(false);
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            mounted = false;
+            subscription.unsubscribe();
+        };
     }, []);
 
     const handleSignIn = async (email: string, password: string) => {
