@@ -770,8 +770,11 @@ const StudySession: React.FC = () => {
 
 
 
-      {/* AI Tutor Chat */}
-      {activeClassId && <AITutorChat classId={activeClassId} />}
+      {/* AI Tutor Chat - Always visible */}
+      <AITutorChat
+        classId={activeClassId || undefined}
+        topic={className || 'General Study'}
+      />
 
       {/* CSS for animations */}
       <style>{`

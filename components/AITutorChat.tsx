@@ -9,13 +9,14 @@ interface Message {
 }
 
 interface AITutorChatProps {
-    classId: string;
+    classId?: string; // Optional now
+    topic?: string;   // Fallback context
 }
 
-const AITutorChat: React.FC<AITutorChatProps> = ({ classId }) => {
+const AITutorChat: React.FC<AITutorChatProps> = ({ classId, topic }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
-        { id: '1', role: 'assistant', content: 'Hola, soy tu tutor de IA. He leído todos los materiales de esta clase. ¿En qué puedo ayudarte?' }
+        { id: '1', role: 'assistant', content: 'Hola, soy tu tutor de IA. ¿En qué puedo ayudarte hoy?' }
     ]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
@@ -37,6 +38,11 @@ const AITutorChat: React.FC<AITutorChatProps> = ({ classId }) => {
     };
 
     const loadClassContext = async () => {
+        if (!classId) {
+            setContext(`Contexto general: ${topic || 'Estudio general'}`);
+            return;
+        }
+
         try {
             // Fetch content_text from all materials in this class
             const { data: materials } = await supabase
@@ -133,8 +139,8 @@ const AITutorChat: React.FC<AITutorChatProps> = ({ classId }) => {
                             >
                                 <div
                                     className={`max-w-[85%] rounded-2xl p-3 text-sm ${msg.role === 'user'
-                                            ? 'bg-violet-600 text-white rounded-tr-none shadow-md'
-                                            : 'bg-white text-slate-700 border border-slate-200 rounded-tl-none shadow-sm'
+                                        ? 'bg-violet-600 text-white rounded-tr-none shadow-md'
+                                        : 'bg-white text-slate-700 border border-slate-200 rounded-tl-none shadow-sm'
                                         }`}
                                 >
                                     {msg.content}
