@@ -128,8 +128,7 @@ export const generateMockExam = async (userId: string, studySetIds: string[] = [
 export const validateExamAnswers = async (questions: ExamQuestion[], userAnswers: Record<string, string>): Promise<Record<string, boolean>> => {
     try {
         if (!API_KEY || API_KEY === 'PLACEHOLDER_API_KEY') {
-            console.error("No API Key for validation");
-            return {};
+            throw new Error("No API Key configurada para validación");
         }
 
         const ai = new GoogleGenAI({ apiKey: API_KEY });
@@ -149,12 +148,13 @@ export const validateExamAnswers = async (questions: ExamQuestion[], userAnswers
              
              Rules:
              1. For Multiple Choice and True/False, strict equality is required (case-insensitive).
-             2. For Short Answer, allow variations in phrasing IF the core meaning is identical.
+             2. For Short Answer, be GENEROUS.
+                - If the student mentions the core keyword (e.g., "digital" in "pagos digitales"), MARK IT CORRECT.
                 - Synonyms are accepted.
                 - Spelling mistakes (if minor) are accepted.
-                - "Tools!" vs "Tools" is accepted.
-                - "Pagos digitales" matches "Pagos online".
-                - "Servicios urgentes" matches "Urgencias".
+                - Partial matches that convey the right meaning are ACCEPTED.
+                
+             Input JSON:
                 
              Input JSON:
              ${JSON.stringify(gradingPayload)}

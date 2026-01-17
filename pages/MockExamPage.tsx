@@ -40,7 +40,7 @@ const MockExamPage: React.FC = () => {
             let correctCount = 0;
             const fallbackResults: Record<string, boolean> = {};
             exam.questions.forEach(q => {
-                const isCorrect = normalizeAnswer(userAnswers[q.id]) === normalizeAnswer(q.correctAnswer);
+                const isCorrect = checkAnswerLocal(q, userAnswers[q.id]);
                 if (isCorrect) correctCount++;
                 fallbackResults[q.id] = isCorrect;
             });
@@ -415,7 +415,7 @@ const MockExamPage: React.FC = () => {
                                 {exam.questions.map((q, i) => {
                                     const userAnswer = userAnswers[q.id];
                                     // Use AI result if available, otherwise fallback to local normalization
-                                    const isCorrect = gradingResults[q.id] ?? (normalizeAnswer(userAnswer) === normalizeAnswer(q.correctAnswer));
+                                    const isCorrect = gradingResults[q.id] ?? checkAnswerLocal(q, userAnswer);
 
                                     return (
                                         <div key={q.id} className={`p-6 rounded-2xl border-l-4 ${isCorrect ? 'bg-green-50 border-green-500' : 'bg-red-50 border-red-500'}`}>
