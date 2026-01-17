@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, getClassMaterials, getClassEnrollments, uploadMaterial } from '../services/supabaseClient';
 import { generateFlashcardsFromText, generateQuizFromText, extractTextFromPDF } from '../services/pdfProcessingService';
+import StudentProgressModal from '../components/StudentProgressModal';
 
 interface Material {
     id: string;
@@ -31,6 +32,14 @@ interface ClassData {
     topics: string[];
 }
 
+interface Exam {
+    id: string;
+    title: string;
+    type: 'exam' | 'quiz' | 'practice';
+    created_at: string;
+    question_count: number;
+}
+
 const TeacherClassDetail: React.FC = () => {
     const { classId } = useParams();
     const navigate = useNavigate();
@@ -49,6 +58,13 @@ const TeacherClassDetail: React.FC = () => {
     const [students, setStudents] = useState<Student[]>([]);
     const [loadingMaterials, setLoadingMaterials] = useState(true);
     const [loadingStudents, setLoadingStudents] = useState(true);
+    const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
+    // Exam state
+    const [exams, setExams] = useState<Exam[]>([]);
+    const [loadingExams, setLoadingExams] = useState(true);
+    const [examForm, setExamForm] = useState({ name: '', date: '', type: 'exam' as 'exam' | 'quiz' | 'practice', topics: [] as string[] });
+    const [creatingExam, setCreatingExam] = useState(false);
 
     // Load class data
     useEffect(() => {
@@ -112,6 +128,79 @@ const TeacherClassDetail: React.FC = () => {
 
         loadClassData();
     }, [classId]);
+
+    // Load exams
+    useEffect(() => {
+        const loadExams = async () => {
+            if (!classId) return;
+            setLoadingExams(true);
+            try {
+                const { data } = await supabase
+                    .from('quizzes')
+                    .select('id, title, material_id, created_at')
+                    .eq('class_id', classId)
+                    .order('created_at', { ascending: false });
+
+                if (data) {
+                    // Get question counts
+                    const examsWithCounts = await Promise.all(data.map(async (exam) => {
+                        const { count } = await supabase
+                            .from('quiz_questions')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('quiz_id', exam.id);
+                        return {
+                            id: exam.id,
+                            title: exam.title,
+                            type: 'exam' as const,
+                            created_at: new Date(exam.created_at).toLocaleDateString(),
+                            question_count: count || 0
+                        };
+                    }));
+                    setExams(examsWithCounts);
+                }
+            } catch (error) {
+                console.error('Error loading exams:', error);
+            } finally {
+                setLoadingExams(false);
+            }
+        };
+        loadExams();
+    }, [classId]);
+
+    // Create exam handler
+    const handleCreateExam = async () => {
+        if (!classId || !examForm.name) return;
+        setCreatingExam(true);
+        try {
+            const { data: newExam, error } = await supabase
+                .from('quizzes')
+                .insert({
+                    class_id: classId,
+                    title: examForm.name,
+                    material_id: null
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            // Refresh exams list
+            setExams(prev => [{
+                id: newExam.id,
+                title: newExam.title,
+                type: 'exam',
+                created_at: new Date().toLocaleDateString(),
+                question_count: 0
+            }, ...prev]);
+
+            setShowExamModal(false);
+            setExamForm({ name: '', date: '', type: 'exam', topics: [] });
+        } catch (error) {
+            console.error('Error creating exam:', error);
+        } finally {
+            setCreatingExam(false);
+        }
+    };
 
     const getTimeAgo = (date: Date): string => {
         const now = new Date();
@@ -543,7 +632,7 @@ const TeacherClassDetail: React.FC = () => {
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
                                         {filteredStudents.map((student) => (
-                                            <tr key={student.id} className="hover:bg-slate-50 transition-colors">
+                                            <tr key={student.id} onClick={() => setSelectedStudent(student)} className="hover:bg-slate-50 transition-colors cursor-pointer">
                                                 <td className="p-4">
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -603,16 +692,52 @@ const TeacherClassDetail: React.FC = () => {
                             </button>
                         </div>
 
-                        <div className="bg-slate-50 p-12 rounded-2xl text-center">
-                            <span className="material-symbols-outlined text-4xl text-slate-300 mb-4">assignment</span>
-                            <p className="text-slate-500 mb-4">Los exámenes se generan automáticamente a partir de los materiales</p>
-                            <button
-                                onClick={() => setShowExamModal(true)}
-                                className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700"
-                            >
-                                Crear Primer Examen
-                            </button>
-                        </div>
+                        {loadingExams ? (
+                            <div className="grid gap-4">
+                                {[1, 2].map((i) => (
+                                    <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm animate-pulse">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-xl bg-slate-200"></div>
+                                            <div className="flex-1">
+                                                <div className="h-5 bg-slate-200 rounded w-3/4 mb-2"></div>
+                                                <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : exams.length > 0 ? (
+                            <div className="grid gap-4">
+                                {exams.map((exam) => (
+                                    <div key={exam.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center">
+                                            <span className="material-symbols-outlined text-2xl">assignment</span>
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="font-bold text-slate-900">{exam.title}</h3>
+                                            <p className="text-sm text-slate-500">Creado: {exam.created_at}</p>
+                                            <p className="text-xs text-violet-600 mt-1">{exam.question_count} preguntas</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="bg-violet-100 text-violet-600 text-xs font-bold px-3 py-1 rounded-full capitalize">
+                                                {exam.type}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="bg-slate-50 p-12 rounded-2xl text-center">
+                                <span className="material-symbols-outlined text-4xl text-slate-300 mb-4">assignment</span>
+                                <p className="text-slate-500 mb-4">No hay exámenes creados aún</p>
+                                <button
+                                    onClick={() => setShowExamModal(true)}
+                                    className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700"
+                                >
+                                    Crear Primer Examen
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
             </main>
@@ -683,15 +808,30 @@ const TeacherClassDetail: React.FC = () => {
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-2">Nombre del Examen</label>
-                                    <input type="text" placeholder="Ej: Parcial 2 - Sistema Nervioso" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" />
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: Parcial 2 - Sistema Nervioso"
+                                        value={examForm.name}
+                                        onChange={(e) => setExamForm(prev => ({ ...prev, name: e.target.value }))}
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-2">Fecha</label>
-                                    <input type="date" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" />
+                                    <input
+                                        type="date"
+                                        value={examForm.date}
+                                        onChange={(e) => setExamForm(prev => ({ ...prev, date: e.target.value }))}
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-2">Tipo</label>
-                                    <select className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none">
+                                    <select
+                                        value={examForm.type}
+                                        onChange={(e) => setExamForm(prev => ({ ...prev, type: e.target.value as 'exam' | 'quiz' | 'practice' }))}
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                    >
                                         <option value="exam">Examen</option>
                                         <option value="quiz">Quiz</option>
                                         <option value="practice">Práctica</option>
@@ -716,12 +856,28 @@ const TeacherClassDetail: React.FC = () => {
                             <button onClick={() => setShowExamModal(false)} className="px-4 py-2 text-slate-600 font-medium hover:text-slate-800">
                                 Cancelar
                             </button>
-                            <button onClick={() => setShowExamModal(false)} className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700">
-                                Crear Examen
+                            <button
+                                onClick={handleCreateExam}
+                                disabled={creatingExam || !examForm.name}
+                                className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            >
+                                {creatingExam && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                                {creatingExam ? 'Creando...' : 'Crear Examen'}
                             </button>
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Student Progress Modal */}
+            {selectedStudent && classId && (
+                <StudentProgressModal
+                    studentId={selectedStudent.id}
+                    classId={classId}
+                    studentName={selectedStudent.name}
+                    studentEmail={selectedStudent.email}
+                    onClose={() => setSelectedStudent(null)}
+                />
             )}
         </div>
     );
