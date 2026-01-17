@@ -73,8 +73,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (session?.user) {
                 try {
-                    const profileData = await getProfile(session.user.id);
-                    if (mounted) setProfile(profileData);
+                    // Race condition: Timeout after 5s if DB is stuck
+                    const profilePromise = getProfile(session.user.id);
+                    const timeoutPromise = new Promise<null>((resolve) =>
+                        setTimeout(() => resolve(null), 5000)
+                    );
+
+                    const profileData = await Promise.race([profilePromise, timeoutPromise]);
+
+                    if (mounted) {
+                        if (profileData) {
+                            setProfile(profileData);
+                        } else {
+                            console.warn("Profile fetch timed out or returned null");
+                        }
+                    }
                 } catch (error) {
                     console.error('Error fetching profile:', error);
                 }

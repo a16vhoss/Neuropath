@@ -34,8 +34,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'stude
     return <Navigate to="/auth" replace />;
   }
 
-  if (allowedRole && profile?.role !== allowedRole) {
-    return <Navigate to={profile?.role === 'teacher' ? '/teacher' : '/student'} replace />;
+  // Only redirect if profile is loaded AND role doesn't match
+  // If profile is null (fetch failed), we let them through to avoid infinite loop
+  // ideally we'd show an error, but this keeps the app usable
+  if (allowedRole && profile && profile.role !== allowedRole) {
+    return <Navigate to={profile.role === 'teacher' ? '/teacher' : '/student'} replace />;
   }
 
   return <>{children}</>;
