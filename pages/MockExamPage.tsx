@@ -285,7 +285,7 @@ const MockExamPage: React.FC = () => {
         );
     }
 
-    if (status === 'loading') {
+    if (status === 'loading' || status === 'grading') {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
                 <div className="text-center">
