@@ -9,6 +9,8 @@ import TeacherAnalytics from './pages/TeacherAnalytics';
 import TeacherClassDetail from './pages/TeacherClassDetail';
 import StudentDashboard from './pages/StudentDashboard';
 import StudentAchievements from './pages/StudentAchievements';
+import StudyBattles from './pages/StudyBattles';
+import BattleArena from './pages/BattleArena';
 import StudySession from './pages/StudySession';
 import MockExamPage from './pages/MockExamPage';
 import { UserRole } from './types';
@@ -106,6 +108,16 @@ const AppRoutes: React.FC = () => {
       <Route path="/student/mock-exam" element={
         <ProtectedRoute allowedRole="student">
           <MockExamPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/student/battles" element={
+        <ProtectedRoute allowedRole="student">
+          <StudyBattles />
+        </ProtectedRoute>
+      } />
+      <Route path="/student/battle/:battleId" element={
+        <ProtectedRoute allowedRole="student">
+          <BattleArena />
         </ProtectedRoute>
       } />
 

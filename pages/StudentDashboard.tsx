@@ -277,6 +277,10 @@ const StudentDashboard: React.FC = () => {
           <span className="material-symbols-outlined">{activeTab === 'classes' ? 'auto_stories' : 'school'}</span>
           <span className="text-[10px]">{activeTab === 'classes' ? 'Personal' : 'Clases'}</span>
         </button>
+        <button onClick={() => navigate('/student/battles')} className="flex flex-col items-center text-slate-400">
+          <span className="material-symbols-outlined">swords</span>
+          <span className="text-[10px]">Batallas</span>
+        </button>
         <button onClick={() => navigate('/student/achievements')} className="flex flex-col items-center text-slate-400">
           <span className="material-symbols-outlined">emoji_events</span>
           <span className="text-[10px]">Logros</span>
