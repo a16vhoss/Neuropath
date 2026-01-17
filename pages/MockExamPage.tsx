@@ -2,23 +2,48 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { generateMockExam, MockExam, ExamQuestion } from '../services/ExamService';
+import { getStudentStudySets } from '../services/supabaseClient';
 
 const MockExamPage: React.FC = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    const [status, setStatus] = useState<'intro' | 'loading' | 'active' | 'results'>('intro');
+    const [status, setStatus] = useState<'intro' | 'selection' | 'loading' | 'active' | 'results'>('intro');
     const [exam, setExam] = useState<MockExam | null>(null);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
     const [score, setScore] = useState(0);
     const [loadingText, setLoadingText] = useState("Analizando tus sets de estudio...");
 
+    // Selection State
+    const [availableSets, setAvailableSets] = useState<any[]>([]);
+    const [selectedSetIds, setSelectedSetIds] = useState<string[]>([]);
+    const [loadingSets, setLoadingSets] = useState(false);
+
+    useEffect(() => {
+        if (user) {
+            loadSets();
+        }
+    }, [user]);
+
+    const loadSets = async () => {
+        if (!user) return;
+        setLoadingSets(true);
+        try {
+            const sets = await getStudentStudySets(user.id);
+            setAvailableSets(sets || []);
+        } catch (e) {
+            console.error("Error loading sets", e);
+        } finally {
+            setLoadingSets(false);
+        }
+    };
+
     useEffect(() => {
         // Fun loading messages
         if (status === 'loading') {
             const msgs = [
-                "Analizando tus sets de estudio...",
+                "Analizando los sets seleccionados...",
                 "Diseñando preguntas desafiantes...",
                 "Calibrando dificultad...",
                 "¡Casi listo!"
@@ -32,22 +57,43 @@ const MockExamPage: React.FC = () => {
         }
     }, [status]);
 
+    const handleSetToggle = (setId: string) => {
+        setSelectedSetIds(prev => {
+            if (prev.includes(setId)) {
+                return prev.filter(id => id !== setId);
+            } else {
+                return [...prev, setId];
+            }
+        });
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedSetIds.length === availableSets.length) {
+            setSelectedSetIds([]);
+        } else {
+            setSelectedSetIds(availableSets.map(s => s.id));
+        }
+    };
+
     const startExam = async () => {
         if (!user) return;
         setStatus('loading');
         try {
-            const generatedExam = await generateMockExam(user.id);
+            // Pass the selectedSetIds to the service
+            // If array is empty (which shouldn't happen due to UI validation), it follows default logic
+            const generatedExam = await generateMockExam(user.id, selectedSetIds);
+
             if (generatedExam) {
                 setExam(generatedExam);
                 setStatus('active');
             } else {
-                alert("No pudimos generar un examen. Asegúrate de tener sets de estudio creados.");
-                setStatus('intro');
+                alert("No pudimos generar un examen con los sets seleccionados. Intenta elegir otros.");
+                setStatus('selection');
             }
         } catch (e) {
             console.error(e);
             alert("Error al generar el examen.");
-            setStatus('intro');
+            setStatus('selection');
         }
     };
 
@@ -94,14 +140,14 @@ const MockExamPage: React.FC = () => {
                     </div>
                     <h1 className="text-3xl font-bold text-slate-900 mb-2">Examen Simulacro</h1>
                     <p className="text-slate-500 mb-8">
-                        La IA generará un examen único basado en todos tus sets de estudio actuales.
-                        ¡Ideal para prepararte antes del examen real!
+                        La IA generará un examen único basado en tus sets de estudio.
+                        Puedes elegir temas específicos o evaluar todo tu conocimiento.
                     </p>
 
                     <div className="space-y-4 text-left bg-slate-50 p-4 rounded-xl mb-8">
                         <div className="flex items-center gap-3">
                             <span className="material-symbols-outlined text-green-500">check_circle</span>
-                            <span className="text-sm text-slate-600">10 Preguntas Variadas</span>
+                            <span className="text-sm text-slate-600">Personaliza tus temas</span>
                         </div>
                         <div className="flex items-center gap-3">
                             <span className="material-symbols-outlined text-green-500">check_circle</span>
@@ -109,7 +155,7 @@ const MockExamPage: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-3">
                             <span className="material-symbols-outlined text-green-500">check_circle</span>
-                            <span className="text-sm text-slate-600">Basado en TU contenido</span>
+                            <span className="text-sm text-slate-600">Mezcla todos tus temas</span>
                         </div>
                     </div>
 
@@ -117,8 +163,88 @@ const MockExamPage: React.FC = () => {
                         <button onClick={() => navigate('/student')} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-100 rounded-xl transition-colors">
                             Volver
                         </button>
-                        <button onClick={startExam} className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 transition-all transform hover:scale-105">
-                            Comenzar
+                        <button onClick={() => setStatus('selection')} className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 transition-all transform hover:scale-105">
+                            Configurar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (status === 'selection') {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                <div className="max-w-2xl w-full bg-white rounded-3xl shadow-xl flex flex-col max-h-[90vh]">
+                    <div className="p-8 border-b">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-2xl font-black text-slate-900">Elige tus temas</h2>
+                            <button
+                                onClick={toggleSelectAll}
+                                className="text-sm font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                                {selectedSetIds.length === availableSets.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                            </button>
+                        </div>
+                        <p className="text-slate-500">Selecciona al menos un set de estudio para generar tu examen simulacro.</p>
+                    </div>
+
+                    <div className="p-4 overflow-y-auto flex-1 bg-slate-50/50">
+                        {loadingSets ? (
+                            <div className="flex justify-center py-12">
+                                <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                            </div>
+                        ) : availableSets.length === 0 ? (
+                            <div className="text-center py-12 text-slate-400">
+                                No tienes sets de estudio creados aún.
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {availableSets.map(set => {
+                                    const isSelected = selectedSetIds.includes(set.id);
+                                    return (
+                                        <div
+                                            key={set.id}
+                                            onClick={() => handleSetToggle(set.id)}
+                                            className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-3
+                                                ${isSelected
+                                                    ? 'border-indigo-600 bg-indigo-50 shadow-sm'
+                                                    : 'border-slate-200 bg-white hover:border-indigo-300'
+                                                }
+                                            `}
+                                        >
+                                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0
+                                                ${isSelected ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300'}
+                                            `}>
+                                                {isSelected && <span className="material-symbols-outlined text-white text-xs font-bold leading-none">check</span>}
+                                            </div>
+                                            <div className="overflow-hidden">
+                                                <h3 className={`font-bold truncate ${isSelected ? 'text-indigo-900' : 'text-slate-700'}`}>{set.name}</h3>
+                                                <p className="text-xs text-slate-400 truncate">{set.flashcard_count || 0} tarjetas</p>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="p-6 border-t bg-white rounded-b-3xl flex justify-between items-center gap-4">
+                        <button
+                            onClick={() => setStatus('intro')}
+                            className="px-6 py-3 font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
+                        >
+                            Atrás
+                        </button>
+                        <div className="text-sm font-bold text-slate-400">
+                            {selectedSetIds.length} seleccionados
+                        </div>
+                        <button
+                            onClick={startExam}
+                            disabled={selectedSetIds.length === 0}
+                            className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:shadow-none transition-all transform active:scale-95"
+                        >
+                            Comenzar Examen
                         </button>
                     </div>
                 </div>
