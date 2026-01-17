@@ -39,15 +39,30 @@ export const generateStudyFlashcards = async (topic: string) => {
 };
 
 
-export const getTutorResponse = async (question: string, context: string) => {
+
+export const getTutorResponse = async (question: string, context: string, subject?: string, mode: 'standard' | 'hint' | 'analogy' = 'standard') => {
   if (!API_KEY) return "Lo siento, la IA no está disponible en este momento.";
 
   const ai = new GoogleGenAI({ apiKey: API_KEY });
+
+  let systemInstruction = "Actúa como un tutor socrático experto.";
+  if (subject) {
+    systemInstruction += ` Tu especialidad es ${subject}. Adapta tus explicaciones, terminología y tono a esta materia.`;
+  }
+
+  if (mode === 'hint') {
+    systemInstruction += " El estudiante pidió una pista. NO des la respuesta completa. Da una pequeña pista progresiva que lo desbloquee sin revelar la solución.";
+  } else if (mode === 'analogy') {
+    systemInstruction += " El estudiante pidió una analogía. Usa una metáfora creativa y cotidiana (vida real, deportes, cultura pop) para explicar el concepto complejo.";
+  } else {
+    systemInstruction += " No des la respuesta directamente. Haz preguntas que guíen al estudiante a descubrir la respuesta por sí mismo.";
+  }
+
   const response = await ai.models.generateContent({
     model: "gemini-2.0-flash",
-    contents: `Actúa como un tutor socrático. El estudiante está estudiando: ${context}. El estudiante pregunta: ${question}`,
+    contents: `Contexto del estudio: ${context}. Pregunta/Comentario del estudiante: ${question}`,
     config: {
-      systemInstruction: "No des la respuesta directamente. Haz preguntas que guíen al estudiante a descubrir la respuesta por sí mismo."
+      systemInstruction: systemInstruction
     }
   });
 

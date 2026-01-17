@@ -67,13 +67,22 @@ const AITutorChat: React.FC<AITutorChatProps> = ({ classId, topic }) => {
         }
     };
 
-    const handleSend = async () => {
-        if (!input.trim() || loading) return;
+    const handleSend = async (text?: string, mode: 'standard' | 'hint' | 'analogy' = 'standard') => {
+        const contentToSend = text || input;
+
+        // If special mode without text, use "CONTEXTO_ANTERIOR" or implied request
+        let finalContent = contentToSend;
+        if (!finalContent && mode !== 'standard') {
+            if (mode === 'hint') finalContent = "No sé la respuesta, dame una pista";
+            if (mode === 'analogy') finalContent = "Explícalo con una metáfora o analogía";
+        }
+
+        if (!finalContent.trim() || loading) return;
 
         const userMessage: Message = {
             id: Date.now().toString(),
             role: 'user',
-            content: input
+            content: finalContent
         };
 
         setMessages(prev => [...prev, userMessage]);
@@ -81,7 +90,7 @@ const AITutorChat: React.FC<AITutorChatProps> = ({ classId, topic }) => {
         setLoading(true);
 
         try {
-            const response = await getTutorResponse(input, context);
+            const response = await getTutorResponse(finalContent, context, topic, mode);
             const aiMessage: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
@@ -161,6 +170,25 @@ const AITutorChat: React.FC<AITutorChatProps> = ({ classId, topic }) => {
                         <div ref={messagesEndRef} />
                     </div>
 
+
+                    {/* Quick Actions */}
+                    <div className="px-4 py-2 flex gap-2 overflow-x-auto">
+                        <button
+                            onClick={() => handleSend(undefined, 'hint')}
+                            disabled={loading || messages.length <= 1}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold hover:bg-yellow-200 transition-colors whitespace-nowrap disabled:opacity-50"
+                        >
+                            <span className="material-symbols-outlined text-sm">lightbulb</span> Pista
+                        </button>
+                        <button
+                            onClick={() => handleSend(undefined, 'analogy')}
+                            disabled={loading || messages.length <= 1}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold hover:bg-blue-200 transition-colors whitespace-nowrap disabled:opacity-50"
+                        >
+                            <span className="material-symbols-outlined text-sm">auto_stories</span> Metáfora
+                        </button>
+                    </div>
+
                     {/* Input */}
                     <div className="p-4 bg-white border-t border-slate-100">
                         <div className="flex gap-2">
@@ -174,7 +202,7 @@ const AITutorChat: React.FC<AITutorChatProps> = ({ classId, topic }) => {
                                 className="flex-1 bg-slate-100 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500"
                             />
                             <button
-                                onClick={handleSend}
+                                onClick={() => handleSend()}
                                 disabled={!input.trim() || loading}
                                 className="bg-violet-600 text-white w-10 h-10 rounded-xl flex items-center justify-center hover:bg-violet-700 transition-colors disabled:opacity-50"
                             >
