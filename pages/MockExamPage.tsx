@@ -65,6 +65,30 @@ const MockExamPage: React.FC = () => {
         return normalized;
     };
 
+    const checkAnswerLocal = (q: ExamQuestion, userAnswer: string | undefined): boolean => {
+        const u = normalizeAnswer(userAnswer);
+        const c = normalizeAnswer(q.correctAnswer);
+
+        if (!u) return false;
+
+        // Strict for MC/TF
+        if (q.type !== 'short_answer') {
+            return u === c;
+        }
+
+        // Fuzzy for Short Answer:
+        // 1. Exact match
+        if (u === c) return true;
+
+        // 2. Containment (if answer is substantial enough to avoid false positives)
+        // e.g. "Digital" in "Pagos digitales"
+        if (c.length > 3 && u.length > 3) {
+            if (c.includes(u) || u.includes(c)) return true;
+        }
+
+        return false;
+    };
+
     // Selection State
     const [availableSets, setAvailableSets] = useState<any[]>([]);
     const [selectedSetIds, setSelectedSetIds] = useState<string[]>([]);
