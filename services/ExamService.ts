@@ -143,7 +143,7 @@ export const validateExamAnswers = async (questions: ExamQuestion[], userAnswers
         }));
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
+            model: "gemini-1.5-flash",
             contents: `You are a strict but fair teacher grading an exam.
              Compare the student's answer with the correct answer for each question.
              
