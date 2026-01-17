@@ -173,13 +173,9 @@ export const validateExamAnswers = async (questions: ExamQuestion[], userAnswers
         return JSON.parse(response.text || "{}");
     } catch (error) {
         console.error("Error validating exam:", error);
-        // Fallback to local strict grading if AI fails
-        const fallback: Record<string, boolean> = {};
-        questions.forEach(q => {
-            const u = (userAnswers[q.id] || "").toLowerCase().trim();
-            const c = q.correctAnswer.toLowerCase().trim();
-            fallback[q.id] = u === c;
-        });
-        return fallback;
+    } catch (error) {
+        console.error("Error validating exam:", error);
+        throw error;
     }
+}
 };

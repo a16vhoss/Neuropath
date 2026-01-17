@@ -23,6 +23,9 @@ const MockExamPage: React.FC = () => {
         setStatus('grading');
         setLoadingText("La IA está corrigiendo tu examen...");
 
+        // Artificial delay to ensure UI updates and user feels the "work" being done
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
         try {
             // Use AI for semantic grading
             const results = await validateExamAnswers(exam.questions, userAnswers);
