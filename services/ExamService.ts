@@ -173,9 +173,6 @@ export const validateExamAnswers = async (questions: ExamQuestion[], userAnswers
         return JSON.parse(response.text || "{}");
     } catch (error) {
         console.error("Error validating exam:", error);
-    } catch (error) {
-        console.error("Error validating exam:", error);
         throw error;
     }
-}
 };
