@@ -1,19 +1,66 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { generateMockExam, MockExam, ExamQuestion } from '../services/ExamService';
+import { generateMockExam, validateExamAnswers, MockExam, ExamQuestion } from '../services/ExamService';
 import { getStudentStudySets } from '../services/supabaseClient';
 
 const MockExamPage: React.FC = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    const [status, setStatus] = useState<'intro' | 'selection' | 'loading' | 'active' | 'results'>('intro');
+    const [status, setStatus] = useState<'intro' | 'selection' | 'loading' | 'grading' | 'active' | 'results'>('intro');
+    const [gradingResults, setGradingResults] = useState<Record<string, boolean>>({});
+
+    // Restored states
     const [exam, setExam] = useState<MockExam | null>(null);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
     const [score, setScore] = useState(0);
     const [loadingText, setLoadingText] = useState("Analizando tus sets de estudio...");
+
+    const submitExam = async () => {
+        if (!exam) return;
+        setStatus('grading');
+        setLoadingText("La IA está corrigiendo tu examen...");
+
+        try {
+            // Use AI for semantic grading
+            const results = await validateExamAnswers(exam.questions, userAnswers);
+            setGradingResults(results);
+
+            // Calculate Score based on AI results
+            const correctCount = Object.values(results).filter(Boolean).length;
+            setScore(correctCount);
+        } catch (e) {
+            console.error("Link grading failed", e);
+            // Fallback local calc
+            let correctCount = 0;
+            const fallbackResults: Record<string, boolean> = {};
+            exam.questions.forEach(q => {
+                const isCorrect = normalizeAnswer(userAnswers[q.id]) === normalizeAnswer(q.correctAnswer);
+                if (isCorrect) correctCount++;
+                fallbackResults[q.id] = isCorrect;
+            });
+            setGradingResults(fallbackResults);
+            setScore(correctCount);
+        }
+
+        setStatus('results');
+    };
+
+    const normalizeAnswer = (text: string | null | undefined): string => {
+        if (!text) return '';
+        let normalized = text.toLowerCase()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+            .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()¡¿"']/g, "") // remove punctuation
+            .trim();
+
+        // Map english boolean strings to spanish standard for robust comparison
+        if (normalized === 'true') return 'verdadero';
+        if (normalized === 'false') return 'falso';
+
+        return normalized;
+    };
 
     // Selection State
     const [availableSets, setAvailableSets] = useState<any[]>([]);
@@ -112,24 +159,7 @@ const MockExamPage: React.FC = () => {
         }
     };
 
-    const submitExam = () => {
-        if (!exam) return;
-        // Calculate Score
-        let correctCount = 0;
-        exam.questions.forEach(q => {
-            const userAnswer = userAnswers[q.id]?.toLowerCase().trim();
-            const correctAnswer = q.correctAnswer.toLowerCase().trim();
 
-            // Fuzzy match for short answer could be improved, strict for now
-            if (userAnswer === correctAnswer) {
-                correctCount++;
-            } else if (q.type === 'multiple_choice' && userAnswer === correctAnswer) {
-                correctCount++;
-            }
-        });
-        setScore(correctCount);
-        setStatus('results');
-    };
 
     if (status === 'intro') {
         return (
@@ -381,7 +411,8 @@ const MockExamPage: React.FC = () => {
                             <div className="space-y-8">
                                 {exam.questions.map((q, i) => {
                                     const userAnswer = userAnswers[q.id];
-                                    const isCorrect = userAnswer?.toLowerCase().trim() === q.correctAnswer.toLowerCase().trim();
+                                    // Use AI result if available, otherwise fallback to local normalization
+                                    const isCorrect = gradingResults[q.id] ?? (normalizeAnswer(userAnswer) === normalizeAnswer(q.correctAnswer));
 
                                     return (
                                         <div key={q.id} className={`p-6 rounded-2xl border-l-4 ${isCorrect ? 'bg-green-50 border-green-500' : 'bg-red-50 border-red-500'}`}>

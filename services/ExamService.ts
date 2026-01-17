@@ -18,7 +18,7 @@ export interface MockExam {
     totalQuestions: number;
 }
 
-export const generateMockExam = async (userId: string): Promise<MockExam | null> => {
+export const generateMockExam = async (userId: string, studySetIds: string[] = []): Promise<MockExam | null> => {
     try {
         // 1. Fetch all study sets for the user
         const studySets = await getStudentStudySets(userId);
@@ -67,6 +67,7 @@ export const generateMockExam = async (userId: string): Promise<MockExam | null>
         - 3 Short Answer (provide the ideal short keyword/phrase as answer)
       - Questions should test understanding, not just rote memorization.
       - Language: Spanish.
+      - For True/False questions, the correctAnswer MUST be exactly "Verdadero" or "Falso".
       
       Study Notes:
       ${allContent.substring(0, 25000)}
@@ -121,5 +122,64 @@ export const generateMockExam = async (userId: string): Promise<MockExam | null>
     } catch (error) {
         console.error("Error generating mock exam:", error);
         return null;
+    }
+};
+
+export const validateExamAnswers = async (questions: ExamQuestion[], userAnswers: Record<string, string>): Promise<Record<string, boolean>> => {
+    try {
+        if (!API_KEY || API_KEY === 'PLACEHOLDER_API_KEY') {
+            console.error("No API Key for validation");
+            return {};
+        }
+
+        const ai = new GoogleGenAI({ apiKey: API_KEY });
+
+        // Prepare payload
+        const gradingPayload = questions.map(q => ({
+            id: q.id,
+            question: q.question,
+            correctAnswer: q.correctAnswer,
+            userAnswer: userAnswers[q.id] || "No answer"
+        }));
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.0-flash",
+            contents: `You are a strict but fair teacher grading an exam.
+             Compare the student's answer with the correct answer for each question.
+             
+             Rules:
+             1. For Multiple Choice and True/False, strict equality is required (case-insensitive).
+             2. For Short Answer, allow variations in phrasing IF the core meaning is identical.
+                - Synonyms are accepted.
+                - Spelling mistakes (if minor) are accepted.
+                - "Tools!" vs "Tools" is accepted.
+                - "Pagos digitales" matches "Pagos online".
+                - "Servicios urgentes" matches "Urgencias".
+                
+             Input JSON:
+             ${JSON.stringify(gradingPayload)}
+             
+             Return a JSON object where keys are question IDs and values are booleans (true for correct, false for incorrect).
+             Example: { "q1": true, "q2": false }`,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    additionalProperties: { type: Type.BOOLEAN }
+                }
+            }
+        });
+
+        return JSON.parse(response.text || "{}");
+    } catch (error) {
+        console.error("Error validating exam:", error);
+        // Fallback to local strict grading if AI fails
+        const fallback: Record<string, boolean> = {};
+        questions.forEach(q => {
+            const u = (userAnswers[q.id] || "").toLowerCase().trim();
+            const c = q.correctAnswer.toLowerCase().trim();
+            fallback[q.id] = u === c;
+        });
+        return fallback;
     }
 };
