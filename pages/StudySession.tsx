@@ -49,6 +49,8 @@ const StudySession: React.FC = () => {
   const { user, profile } = useAuth();
 
   const [className, setClassName] = useState('');
+  const [activeClassId, setActiveClassId] = useState<string | null>(classId || null);
+
   const [mode, setMode] = useState<StudyMode>(modeParam);
   const [loading, setLoading] = useState(true);
   const [loadingSource, setLoadingSource] = useState<'db' | 'ai' | 'mock'>('db');
@@ -155,13 +157,17 @@ const StudySession: React.FC = () => {
           // Get study set name
           const { data: setData } = await supabase
             .from('study_sets')
-            .select('name, topics')
+            .select('name, topics, class_id')
             .eq('id', studySetId)
             .single();
 
           if (setData) {
             setClassName(setData.name);
+            if (setData.class_id) {
+              setActiveClassId(setData.class_id);
+            }
           }
+
 
           // Get flashcards from study set
           setLoadingSource('db');
@@ -765,7 +771,7 @@ const StudySession: React.FC = () => {
 
 
       {/* AI Tutor Chat */}
-      {classId && <AITutorChat classId={classId} />}
+      {activeClassId && <AITutorChat classId={activeClassId} />}
 
       {/* CSS for animations */}
       <style>{`
