@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { generatePodcastScript } from '../services/geminiService';
 
+const ELEVENLABS_API_KEY = import.meta.env.VITE_ELEVENLABS_API_KEY;
+
+// Voice IDs
+const VOICE_IDS = {
+    Alex: 'pNInz6obpgDQGcFmaJgB', // Adam
+    Sam: '21m00Tcm4TlvDq8ikWAM'   // Rachel
+};
+
 interface PodcastLine {
     speaker: string;
     text: string;
@@ -18,8 +26,10 @@ const NeuroPodcast: React.FC<NeuroPodcastProps> = ({ context, topicTitle }) => {
     const [currentLineIndex, setCurrentLineIndex] = useState(0);
     const [playbackSpeed, setPlaybackSpeed] = useState(1);
     const [error, setError] = useState('');
+    const [audioCache, setAudioCache] = useState<Map<number, string>>(new Map());
+    const [isLoadingAudio, setIsLoadingAudio] = useState(false);
 
-    const synth = window.speechSynthesis;
+    const audioRef = useRef<HTMLAudioElement | null>(null);
     const highlightRef = useRef<HTMLDivElement>(null);
 
     // Generate Script on Mount
@@ -41,94 +51,117 @@ const NeuroPodcast: React.FC<NeuroPodcastProps> = ({ context, topicTitle }) => {
         };
         initPodcast();
 
-        // Cleanup speech on unmount
         return () => {
-            synth.cancel();
+            // Cleanup audio URLs
+            audioCache.forEach(url => URL.revokeObjectURL(url));
         };
     }, [context]);
 
-    // Handle Speech Logic
+    // Audio Playback Effects
     useEffect(() => {
-        if (loading || script.length === 0) return;
-
-        if (isPlaying) {
-            if (synth.speaking) {
-                // Already speaking, just ensure not paused
-                synth.resume();
-            } else {
-                // Start speaking current line
-                speakLine(currentLineIndex);
+        if (!isPlaying || currentLineIndex >= script.length) {
+            if (audioRef.current) {
+                audioRef.current.pause();
             }
-        } else {
-            synth.pause();
-        }
-    }, [isPlaying, script, loading]);
-
-
-    const speakLine = (index: number) => {
-        if (index >= script.length) {
-            setIsPlaying(false);
-            setCurrentLineIndex(0);
+            if (currentLineIndex >= script.length) {
+                setIsPlaying(false);
+                setCurrentLineIndex(0);
+            }
             return;
         }
 
-        const line = script[index];
-        const utterance = new SpeechSynthesisUtterance(line.text);
-        utterance.rate = playbackSpeed;
+        playCurrentLine();
+    }, [currentLineIndex, isPlaying, script]);
 
-        // Select Voice based on Speaker
-        const voices = synth.getVoices();
-        // Try to find male/female distinct voices. This is browser dependent.
-        // Mac/Chrome usually has Google US English or system voices. 
-        // We try to pick spanish voices if available given the content is likely spanish? 
-        // Or just distinct voices. Let's assume Spanish for now based on context.
-        const esVoices = voices.filter(v => v.lang.startsWith('es'));
+    useEffect(() => {
+        if (audioRef.current) {
+            audioRef.current.playbackRate = playbackSpeed;
+        }
+    }, [playbackSpeed]);
 
-        if (esVoices.length > 0) {
-            if (line.speaker === 'Alex') {
-                utterance.voice = esVoices[0]; // First voice
-            } else {
-                utterance.voice = esVoices.length > 1 ? esVoices[1] : esVoices[0]; // Second voice or falback
+    const playCurrentLine = async () => {
+        if (isLoadingAudio) return; // Prevent double fetch
+
+        let audioUrl = audioCache.get(currentLineIndex);
+
+        if (!audioUrl) {
+            // Fetch from ElevenLabs
+            setIsLoadingAudio(true);
+            try {
+                const line = script[currentLineIndex];
+                const voiceId = VOICE_IDS[line.speaker as keyof typeof VOICE_IDS] || VOICE_IDS.Alex;
+
+                const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+                    method: 'POST',
+                    headers: {
+                        'xi-api-key': ELEVENLABS_API_KEY,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: line.text,
+                        model_id: "eleven_multilingual_v2",
+                        voice_settings: {
+                            stability: 0.5,
+                            similarity_boost: 0.75
+                        }
+                    })
+                });
+
+                if (!response.ok) throw new Error('ElevenLabs API Error');
+
+                const blob = await response.blob();
+                audioUrl = URL.createObjectURL(blob);
+
+                setAudioCache(prev => new Map(prev).set(currentLineIndex, audioUrl!));
+            } catch (err) {
+                console.error("Audio generation failed:", err);
+                setError("Error generando audio. Verifique su API Key.");
+                setIsPlaying(false);
+                setIsLoadingAudio(false);
+                return;
+            } finally {
+                setIsLoadingAudio(false);
             }
         }
 
-        utterance.onend = () => {
-            setCurrentLineIndex(prev => {
-                const next = prev + 1;
-                if (isPlaying && next < script.length) {
-                    speakLine(next);
-                } else if (next >= script.length) {
-                    setIsPlaying(false);
-                }
-                return next;
-            });
-        };
+        if (audioRef.current) {
+            audioRef.current.src = audioUrl;
+            audioRef.current.playbackRate = playbackSpeed;
+            audioRef.current.play().catch(e => console.error("Play error:", e));
 
-        // Force auto-scroll
-        if (highlightRef.current) {
-            const activeElement = document.getElementById(`line-${index}`);
-            activeElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Auto-scroll
+            if (highlightRef.current) {
+                const activeElement = document.getElementById(`line-${currentLineIndex}`);
+                activeElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
         }
+    };
 
-        synth.speak(utterance);
+    const handleAudioEnded = () => {
+        // Automatically go to next line
+        if (currentLineIndex < script.length - 1) {
+            setCurrentLineIndex(prev => prev + 1);
+        } else {
+            setIsPlaying(false);
+            setCurrentLineIndex(0);
+        }
     };
 
     const togglePlay = () => {
-        if (isPlaying) {
-            setIsPlaying(false);
-            synth.cancel(); // Reset to avoid weird pause states in some browsers
-        } else {
-            setIsPlaying(true);
-            speakLine(currentLineIndex);
-        }
+        setIsPlaying(!isPlaying);
     };
 
-    const handleRestart = () => {
-        synth.cancel();
-        setCurrentLineIndex(0);
-        setIsPlaying(true);
-        speakLine(0);
-    }
+    const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newIndex = parseInt(e.target.value);
+        setCurrentLineIndex(newIndex);
+        if (isPlaying) {
+            // Re-trigger play effect
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current.currentTime = 0;
+            }
+        }
+    };
 
     if (loading) {
         return (
@@ -151,6 +184,12 @@ const NeuroPodcast: React.FC<NeuroPodcastProps> = ({ context, topicTitle }) => {
 
     return (
         <div className="bg-slate-900 text-white rounded-3xl overflow-hidden shadow-2xl max-w-4xl mx-auto border border-slate-800">
+            <audio
+                ref={audioRef}
+                onEnded={handleAudioEnded}
+                className="hidden"
+            />
+
             {/* Tape Recorder Header Style */}
             <div className="p-6 bg-slate-800 border-b border-slate-700 flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -173,7 +212,7 @@ const NeuroPodcast: React.FC<NeuroPodcastProps> = ({ context, topicTitle }) => {
                 </div>
             </div>
 
-            {/* Cassette / Visualizer Area (Static for now) */}
+            {/* Visualizer Area */}
             <div className="h-32 bg-gradient-to-br from-violet-900/50 to-indigo-900/50 flex items-center justify-center relative overflow-hidden">
                 <div className="flex items-end gap-1 h-16">
                     {[...Array(20)].map((_, i) => (
@@ -190,7 +229,7 @@ const NeuroPodcast: React.FC<NeuroPodcastProps> = ({ context, topicTitle }) => {
             </div>
 
             {/* Transcript */}
-            <div className="h-96 overflow-y-auto p-8 bg-slate-900 space-y-6" ref={highlightRef}>
+            <div className="h-80 overflow-y-auto p-8 bg-slate-900 space-y-6" ref={highlightRef}>
                 {script.map((line, i) => (
                     <div
                         id={`line-${i}`}
@@ -214,33 +253,40 @@ const NeuroPodcast: React.FC<NeuroPodcastProps> = ({ context, topicTitle }) => {
                 ))}
             </div>
 
-            {/* Controls */}
-            <div className="p-6 bg-slate-800 border-t border-slate-700 flex justify-center gap-6">
-                <button onClick={() => {
-                    const prev = Math.max(0, currentLineIndex - 1);
-                    setCurrentLineIndex(prev);
-                    if (isPlaying) {
-                        synth.cancel();
-                        speakLine(prev);
-                    }
-                }} className="p-4 rounded-full bg-slate-700 hover:bg-slate-600 transition-all text-white">
-                    <span className="material-symbols-outlined">skip_previous</span>
-                </button>
+            {/* Controls & Progress */}
+            <div className="p-6 bg-slate-800 border-t border-slate-700 flex flex-col gap-4">
+                {/* Progress Bar */}
+                <div className="w-full flex items-center gap-3">
+                    <span className="text-xs font-mono text-slate-400">
+                        {Math.floor((currentLineIndex / script.length) * 100)}%
+                    </span>
+                    <input
+                        type="range"
+                        min="0"
+                        max={script.length - 1}
+                        value={currentLineIndex}
+                        onChange={handleProgressChange}
+                        className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                    />
+                    <span className="text-xs font-mono text-slate-400">
+                        {currentLineIndex + 1}/{script.length}
+                    </span>
+                </div>
 
-                <button onClick={togglePlay} className="w-20 h-20 rounded-full bg-white text-slate-900 hover:scale-105 transition-all flex items-center justify-center shadow-lg shadow-violet-500/20">
-                    <span className="material-symbols-outlined text-4xl fill-1 ml-1">{isPlaying ? 'pause' : 'play_arrow'}</span>
-                </button>
-
-                <button onClick={() => {
-                    const next = Math.min(script.length - 1, currentLineIndex + 1);
-                    setCurrentLineIndex(next);
-                    if (isPlaying) {
-                        synth.cancel();
-                        speakLine(next);
-                    }
-                }} className="p-4 rounded-full bg-slate-700 hover:bg-slate-600 transition-all text-white">
-                    <span className="material-symbols-outlined">skip_next</span>
-                </button>
+                {/* Play Button */}
+                <div className="flex justify-center">
+                    <button
+                        onClick={togglePlay}
+                        disabled={isLoadingAudio}
+                        className={`w-16 h-16 rounded-full bg-white text-slate-900 hover:scale-105 transition-all flex items-center justify-center shadow-lg shadow-violet-500/20 ${isLoadingAudio ? 'opacity-50 cursor-wait' : ''}`}
+                    >
+                        {isLoadingAudio ? (
+                            <div className="w-6 h-6 border-2 border-slate-900 border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                            <span className="material-symbols-outlined text-4xl fill-1 ml-1">{isPlaying ? 'pause' : 'play_arrow'}</span>
+                        )}
+                    </button>
+                </div>
             </div>
 
             <style>{`
