@@ -11,9 +11,10 @@ interface Message {
 interface AITutorChatProps {
     classId?: string; // Optional now
     topic?: string;   // Fallback context
+    currentContext?: string; // The specific question/card the student is seeing
 }
 
-const AITutorChat: React.FC<AITutorChatProps> = ({ classId, topic }) => {
+const AITutorChat: React.FC<AITutorChatProps> = ({ classId, topic, currentContext }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
         { id: '1', role: 'assistant', content: 'Hola, soy tu tutor de IA. ¿En qué puedo ayudarte hoy?' }
@@ -90,7 +91,7 @@ const AITutorChat: React.FC<AITutorChatProps> = ({ classId, topic }) => {
         setLoading(true);
 
         try {
-            const response = await getTutorResponse(finalContent, context, topic, mode);
+            const response = await getTutorResponse(finalContent, context, topic, mode, currentContext);
             const aiMessage: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',

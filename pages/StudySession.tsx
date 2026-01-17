@@ -771,10 +771,22 @@ const StudySession: React.FC = () => {
 
 
       {/* AI Tutor Chat - Always visible */}
-      <AITutorChat
-        classId={activeClassId || undefined}
-        topic={className || 'General Study'}
-      />
+      {(() => {
+        let activeContext = '';
+        if (mode === 'flashcards' && flashcards.length > 0) {
+          activeContext = `Flashcard Actual: ${flashcards[currentIndex]?.question} (Respuesta oculta: ${flashcards[currentIndex]?.answer})`;
+        } else if (mode === 'quiz' && quizQuestions.length > 0 && !quizComplete) {
+          activeContext = `Pregunta de Quiz Actual: ${quizQuestions[currentQuizIndex]?.question}`;
+        }
+
+        return (
+          <AITutorChat
+            classId={activeClassId || undefined}
+            topic={className || 'General Study'}
+            currentContext={activeContext}
+          />
+        );
+      })()}
 
       {/* CSS for animations */}
       <style>{`
