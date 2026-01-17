@@ -332,7 +332,8 @@ const TeacherClassDetail: React.FC = () => {
                         .update({
                             status: 'ready',
                             flashcard_count: flashcardCount,
-                            quiz_count: quizCount
+                            quiz_count: quizCount,
+                            content_text: extractedText // Save for AI Tutor
                         })
                         .eq('id', materialRecord.id);
 

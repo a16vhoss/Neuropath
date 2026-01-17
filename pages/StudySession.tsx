@@ -4,7 +4,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getClassFlashcards, getStudySetFlashcards, updateFlashcardProgress, supabase } from '../services/supabaseClient';
 import { generateStudyFlashcards, getTutorResponse, generateQuizQuestions } from '../services/geminiService';
-import SocraticChat from '../components/SocraticChat';
+import AITutorChat from '../components/AITutorChat';
 import NeuroPodcast from '../components/NeuroPodcast';
 
 type StudyMode = 'flashcards' | 'quiz' | 'exam' | 'cramming' | 'podcast';
@@ -762,13 +762,10 @@ const StudySession: React.FC = () => {
         )}
       </main>
 
-      {/* Socratic Chat */}
-      {(mode === 'flashcards' || mode === 'quiz') && (
-        <SocraticChat
-          context={flashcards[currentIndex]?.question || className || "General"}
-          studentName={profile?.full_name?.split(' ')[0]}
-        />
-      )}
+
+
+      {/* AI Tutor Chat */}
+      {classId && <AITutorChat classId={classId} />}
 
       {/* CSS for animations */}
       <style>{`
