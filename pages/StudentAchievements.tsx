@@ -1,31 +1,70 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { GamificationService, Achievement, UserStats } from '../services/GamificationService';
 
-const badges = [
-    { id: '1', name: 'Primera Racha', desc: '7 días seguidos estudiando', icon: 'local_fire_department', earned: true, date: '2026-01-08' },
-    { id: '2', name: 'Explorador', desc: 'Completa 10 sesiones', icon: 'explore', earned: true, date: '2026-01-10' },
-    { id: '3', name: 'Quiz Master', desc: 'Obtén 100% en un quiz', icon: 'military_tech', earned: true, date: '2026-01-12' },
-    { id: '4', name: 'Cerebro de Acero', desc: 'Domina 5 temas', icon: 'psychology', earned: false, progress: 60 },
-    { id: '5', name: 'Maratón', desc: 'Estudia 2 horas en un día', icon: 'timer', earned: false, progress: 45 },
-    { id: '6', name: 'Ayudante', desc: 'Responde 20 dudas', icon: 'support_agent', earned: false, progress: 25 },
-    { id: '7', name: 'Racha Legendaria', desc: '30 días seguidos', icon: 'whatshot', earned: false, progress: 40 },
-    { id: '8', name: 'Perfeccionista', desc: '5 exámenes perfectos', icon: 'workspace_premium', earned: false, progress: 20 }
-];
-
-const leaderboard = [
-    { rank: 1, name: 'María García', avatar: 'maria', xp: 4250, streak: 28 },
-    { rank: 2, name: 'Carlos López', avatar: 'carlos', xp: 3890, streak: 21 },
-    { rank: 3, name: 'Ana Martínez', avatar: 'ana', xp: 3650, streak: 18 },
-    { rank: 4, name: 'Alex (Tú)', avatar: 'alex', xp: 2450, streak: 12, isUser: true },
-    { rank: 5, name: 'Pedro Sánchez', avatar: 'pedro', xp: 2100, streak: 9 },
-    { rank: 6, name: 'Laura Díaz', avatar: 'laura', xp: 1850, streak: 7 },
-];
+interface ExtendedAchievement extends Achievement {
+    earned: boolean;
+    earnedDate?: string;
+    progress: number;
+}
 
 const StudentAchievements: React.FC = () => {
     const navigate = useNavigate();
-    const { signOut } = useAuth();
+    const { user, signOut } = useAuth();
     const [activeTab, setActiveTab] = useState<'badges' | 'leaderboard' | 'stats'>('badges');
+
+    // State
+    const [stats, setStats] = useState<UserStats | null>(null);
+    const [achievements, setAchievements] = useState<ExtendedAchievement[]>([]);
+    const [leaderboard, setLeaderboard] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!user) return;
+
+        const loadData = async () => {
+            try {
+                setLoading(true);
+
+                // 1. Load User Stats
+                const userStats = await GamificationService.getUserStats(user.id);
+                setStats(userStats);
+
+                // 2. Load Achievements
+                const allAchievements = await GamificationService.getAchievements();
+                const myAchievements = await GamificationService.getStudentAchievements(user.id);
+
+                const mergedAchievements = allAchievements.map(ach => {
+                    const earnedRecord = myAchievements.find(ma => ma.achievement_id === ach.id);
+                    return {
+                        ...ach,
+                        earned: !!earnedRecord,
+                        earnedDate: earnedRecord ? new Date(earnedRecord.earned_at).toLocaleDateString() : undefined,
+                        progress: earnedRecord ? 100 : 0 // Todo: Calculate real progress
+                    };
+                });
+                setAchievements(mergedAchievements);
+
+                // 3. Load Leaderboard
+                const lbData = await GamificationService.getLeaderboard();
+                setLeaderboard(lbData);
+
+            } catch (error) {
+                console.error("Error loading gamification data:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadData();
+    }, [user]);
+
+    if (loading) {
+        return <div className="min-h-screen flex items-center justify-center bg-[#F9FAFB]">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>;
+    }
 
     return (
         <div className="min-h-screen bg-[#F9FAFB] flex flex-col pb-24">
@@ -79,10 +118,10 @@ const StudentAchievements: React.FC = () => {
                 {/* Stats Summary */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {[
-                        { label: 'Racha Actual', value: '12 días', icon: 'local_fire_department', color: 'amber' },
-                        { label: 'XP Total', value: '2,450', icon: 'stars', color: 'violet' },
-                        { label: 'Badges', value: '3/8', icon: 'emoji_events', color: 'blue' },
-                        { label: 'Posición', value: '#4', icon: 'leaderboard', color: 'emerald' }
+                        { label: 'Racha Actual', value: `${stats?.streak_days || 0} días`, icon: 'local_fire_department', color: 'amber' },
+                        { label: 'XP Total', value: stats?.xp?.toLocaleString() || '0', icon: 'stars', color: 'violet' },
+                        { label: 'Badges', value: `${achievements.filter(a => a.earned).length}/${achievements.length}`, icon: 'emoji_events', color: 'blue' },
+                        { label: 'Nivel', value: `Lvl ${stats?.level || 1}`, icon: 'leaderboard', color: 'emerald' }
                     ].map((stat, i) => (
                         <div key={i} className={`bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-center`}>
                             <div className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center mb-2 ${stat.color === 'amber' ? 'bg-amber-100 text-amber-600' :
@@ -120,7 +159,7 @@ const StudentAchievements: React.FC = () => {
                 {/* Tab Content */}
                 {activeTab === 'badges' && (
                     <div className="grid md:grid-cols-2 gap-4">
-                        {badges.map((badge) => (
+                        {achievements.map((badge) => (
                             <div
                                 key={badge.id}
                                 className={`p-6 rounded-2xl border ${badge.earned ? 'bg-white border-slate-100' : 'bg-slate-50 border-slate-100'} relative overflow-hidden`}
@@ -137,9 +176,9 @@ const StudentAchievements: React.FC = () => {
                                     </div>
                                     <div className="flex-1">
                                         <h3 className={`font-bold ${badge.earned ? 'text-slate-900' : 'text-slate-500'}`}>{badge.name}</h3>
-                                        <p className="text-sm text-slate-500">{badge.desc}</p>
+                                        <p className="text-sm text-slate-500">{badge.description}</p>
                                         {badge.earned ? (
-                                            <p className="text-xs text-emerald-600 font-medium mt-1">Obtenido el {badge.date}</p>
+                                            <p className="text-xs text-emerald-600 font-medium mt-1">Obtenido el {badge.earnedDate}</p>
                                         ) : (
                                             <div className="mt-2">
                                                 <div className="flex justify-between text-xs mb-1">
@@ -161,102 +200,60 @@ const StudentAchievements: React.FC = () => {
                 {activeTab === 'leaderboard' && (
                     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                         <div className="p-4 bg-gradient-to-r from-primary to-violet-600 text-white">
-                            <h3 className="font-bold text-center">🏆 Top 10 de tu Clase</h3>
+                            <h3 className="font-bold text-center">🏆 Top Estudiantes</h3>
                         </div>
                         <div className="divide-y divide-slate-50">
-                            {leaderboard.map((user) => (
-                                <div
-                                    key={user.rank}
-                                    className={`p-4 flex items-center gap-4 ${user.isUser ? 'bg-primary/5' : 'hover:bg-slate-50'} transition-colors`}
-                                >
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm ${user.rank === 1 ? 'bg-amber-100 text-amber-600' :
-                                        user.rank === 2 ? 'bg-slate-200 text-slate-600' :
-                                            user.rank === 3 ? 'bg-orange-100 text-orange-600' :
-                                                'bg-slate-100 text-slate-500'
-                                        }`}>
-                                        {user.rank <= 3 ? ['🥇', '🥈', '🥉'][user.rank - 1] : user.rank}
+                            {leaderboard.map((lbUser, index) => {
+                                const isUser = lbUser.id === user?.id;
+                                const rank = index + 1;
+                                return (
+                                    <div
+                                        key={lbUser.id}
+                                        className={`p-4 flex items-center gap-4 ${isUser ? 'bg-primary/5' : 'hover:bg-slate-50'} transition-colors`}
+                                    >
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm ${rank === 1 ? 'bg-amber-100 text-amber-600' :
+                                            rank === 2 ? 'bg-slate-200 text-slate-600' :
+                                                rank === 3 ? 'bg-orange-100 text-orange-600' :
+                                                    'bg-slate-100 text-slate-500'
+                                            }`}>
+                                            {rank <= 3 ? ['🥇', '🥈', '🥉'][rank - 1] : rank}
+                                        </div>
+                                        <img
+                                            src={lbUser.avatar_url || `https://ui-avatars.com/api/?name=${lbUser.full_name || 'User'}&background=random`}
+                                            className="w-10 h-10 rounded-full object-cover"
+                                            alt={lbUser.full_name}
+                                        />
+                                        <div className="flex-1">
+                                            <p className={`font-bold ${isUser ? 'text-primary' : 'text-slate-900'}`}>
+                                                {lbUser.full_name || 'Estudiante'} {isUser && '(Tú)'}
+                                            </p>
+                                            <p className="text-xs text-slate-500">🔥 {lbUser.streak_days || 0} días de racha</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-black text-slate-900">{(lbUser.xp || 0).toLocaleString()}</p>
+                                            <p className="text-xs text-slate-500">XP</p>
+                                        </div>
                                     </div>
-                                    <img src={`https://picsum.photos/seed/${user.avatar}/40`} className="w-10 h-10 rounded-full" alt={user.name} />
-                                    <div className="flex-1">
-                                        <p className={`font-bold ${user.isUser ? 'text-primary' : 'text-slate-900'}`}>
-                                            {user.name}
-                                        </p>
-                                        <p className="text-xs text-slate-500">🔥 {user.streak} días de racha</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="font-black text-slate-900">{user.xp.toLocaleString()}</p>
-                                        <p className="text-xs text-slate-500">XP</p>
-                                    </div>
-                                </div>
-                            ))}
+                                )
+                            })}
                         </div>
                     </div>
                 )}
 
                 {activeTab === 'stats' && (
                     <div className="space-y-6">
-                        {/* Study Time Chart Placeholder */}
-                        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                            <h3 className="font-bold text-slate-900 mb-4">Tiempo de Estudio (Última Semana)</h3>
-                            <div className="flex items-end justify-between h-40 gap-2">
-                                {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day, i) => {
-                                    const heights = [60, 80, 45, 90, 70, 30, 55];
-                                    return (
-                                        <div key={day} className="flex-1 flex flex-col items-center gap-2">
-                                            <div className="w-full bg-primary/20 rounded-t-lg relative" style={{ height: `${heights[i]}%` }}>
-                                                <div className="absolute bottom-0 w-full bg-primary rounded-t-lg" style={{ height: '100%' }}></div>
-                                            </div>
-                                            <span className="text-xs text-slate-500">{day}</span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Detailed Stats */}
-                        <div className="grid md:grid-cols-2 gap-4">
-                            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                                <h3 className="font-bold text-slate-900 mb-4">Resumen General</h3>
-                                <div className="space-y-4">
-                                    {[
-                                        { label: 'Sesiones completadas', value: '47' },
-                                        { label: 'Preguntas respondidas', value: '892' },
-                                        { label: 'Precisión promedio', value: '78%' },
-                                        { label: 'Tiempo total estudiado', value: '24h 35m' },
-                                        { label: 'Racha más larga', value: '18 días' }
-                                    ].map((stat, i) => (
-                                        <div key={i} className="flex justify-between items-center">
-                                            <span className="text-slate-500">{stat.label}</span>
-                                            <span className="font-bold text-slate-900">{stat.value}</span>
-                                        </div>
-                                    ))}
+                        {/* Placeholder for Stats for now */}
+                        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-center">
+                            <h3 className="font-bold text-slate-900 mb-2">Estadísticas Detalladas</h3>
+                            <p className="text-slate-500">Próximamente verás aquí tus gráficos de estudio.</p>
+                            <div className="grid md:grid-cols-2 gap-4 mt-8 text-left">
+                                <div className="bg-slate-50 p-4 rounded-xl">
+                                    <h4 className="font-bold text-slate-700">XP Total</h4>
+                                    <p className="text-2xl font-black text-primary">{stats?.xp?.toLocaleString()}</p>
                                 </div>
-                            </div>
-
-                            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                                <h3 className="font-bold text-slate-900 mb-4">Temas Dominados</h3>
-                                <div className="space-y-3">
-                                    {[
-                                        { name: 'Neuroanatomía', progress: 92 },
-                                        { name: 'Sinapsis', progress: 78 },
-                                        { name: 'Sistema Limbico', progress: 65 },
-                                        { name: 'Neurotransmisores', progress: 45 }
-                                    ].map((topic, i) => (
-                                        <div key={i}>
-                                            <div className="flex justify-between text-sm mb-1">
-                                                <span className="text-slate-600">{topic.name}</span>
-                                                <span className={`font-bold ${topic.progress >= 80 ? 'text-emerald-600' : topic.progress >= 60 ? 'text-amber-600' : 'text-slate-600'}`}>
-                                                    {topic.progress}%
-                                                </span>
-                                            </div>
-                                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                <div
-                                                    className={`h-full rounded-full ${topic.progress >= 80 ? 'bg-emerald-500' : topic.progress >= 60 ? 'bg-amber-500' : 'bg-primary'}`}
-                                                    style={{ width: `${topic.progress}%` }}
-                                                ></div>
-                                            </div>
-                                        </div>
-                                    ))}
+                                <div className="bg-slate-50 p-4 rounded-xl">
+                                    <h4 className="font-bold text-slate-700">Nivel Actual</h4>
+                                    <p className="text-2xl font-black text-violet-600">{stats?.level}</p>
                                 </div>
                             </div>
                         </div>
