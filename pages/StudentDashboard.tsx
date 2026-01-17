@@ -636,6 +636,14 @@ const StudentDashboard: React.FC = () => {
                   <span className="material-symbols-outlined">auto_awesome</span>
                   <span className="text-xs font-bold">Magic Import</span>
                 </button>
+
+                <button
+                  onClick={() => navigate('/student/mock-exam')}
+                  className="p-4 rounded-xl bg-orange-50 text-orange-600 flex flex-col items-center gap-2 hover:bg-orange-100 transition-colors"
+                >
+                  <span className="material-symbols-outlined">timer</span>
+                  <span className="text-xs font-bold">Simulacro</span>
+                </button>
               </div>
             </div>
           </div>

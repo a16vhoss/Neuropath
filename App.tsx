@@ -10,6 +10,7 @@ import TeacherClassDetail from './pages/TeacherClassDetail';
 import StudentDashboard from './pages/StudentDashboard';
 import StudentAchievements from './pages/StudentAchievements';
 import StudySession from './pages/StudySession';
+import MockExamPage from './pages/MockExamPage';
 import { UserRole } from './types';
 
 // Protected Route component
@@ -100,6 +101,11 @@ const AppRoutes: React.FC = () => {
       <Route path="/student/study-set/:studySetId" element={
         <ProtectedRoute allowedRole="student">
           <StudySession />
+        </ProtectedRoute>
+      } />
+      <Route path="/student/mock-exam" element={
+        <ProtectedRoute allowedRole="student">
+          <MockExamPage />
         </ProtectedRoute>
       } />
 
