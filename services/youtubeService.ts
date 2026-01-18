@@ -18,15 +18,35 @@ export const getYoutubeTranscript = async (url: string): Promise<string> => {
         const html = await response.text();
 
         // 2. Extract Captions JSON
-        // Look for "captionTracks" inside the ytInitialPlayerResponse
-        const captionMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
+        // Strategy 1: classical "captionTracks"
+        let captionMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
+
+        // Strategy 2: Look for ytInitialPlayerResponse variable directly
+        if (!captionMatch) {
+            const playerResponseMatch = html.match(/var\s+ytInitialPlayerResponse\s*=\s*(\{.+?\});/);
+            if (playerResponseMatch) {
+                try {
+                    const playerResponse = JSON.parse(playerResponseMatch[1]);
+                    const tracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+                    if (tracks) {
+                        // Create a fake match object to reuse logic below
+                        captionMatch = [null, JSON.stringify(tracks)];
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse ytInitialPlayerResponse:', e);
+                }
+            }
+        }
 
         if (!captionMatch) {
-            // Check if it's because of "Sign in" or bot check
+            // Debugging: Log part of HTML to see what we got (Consent page? Bot check?)
+            console.error('YouTube HTML Preview (first 500 chars):', html.substring(0, 500));
+            console.error('YouTube HTML Preview (includes "captionTracks"?):', html.includes('captionTracks'));
+
             if (html.includes('consent.youtube.com') || html.includes('Sign in to confirm')) {
                 throw new Error('YouTube bloqueó la solicitud (Bot check). Intenta con otro video o pega el texto manualmente.');
             }
-            throw new Error('No se encontraron subtítulos para este video (o no están disponibles públicamente).');
+            throw new Error('No se encontraron subtítulos (la estructura de la página puede haber cambiado).');
         }
 
         const captionTracks = JSON.parse(captionMatch[1]);
