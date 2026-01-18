@@ -160,22 +160,48 @@ export const generateStudyGuideFromMaterials = async (materialsContent: string[]
     const combinedText = materialsContent.map((text, i) => `--- MATERIAL ${i + 1} ---\n${text.slice(0, 10000)}`).join('\n\n');
 
     const prompt = `
-    Actúa como un profesor experto. Tu tarea es crear una "Guía de Estudio" completa y estructurada para el tema "${studySetName}".
-    
-    Tengo los siguientes materiales de estudio (texto extraído de PDFs y notas):
-    
+    Tarea General
+    Actúa como una IA experta en síntesis multifuente. Tu objetivo es transformar múltiples fuentes de información en un resumen: extensa, detallada, precisa y en español, sin omitir nada. El contenido debe permitir al usuario estudiar y dominar completamente una disciplina, con nivel experto (0.1% mundial).
+
+    Contexto
+    Recibirás fuentes. Tu tarea es analizarlas todas sin excluir ninguna y extraer lo mejor de cada una para construir un resumen completo.
+
+    Rol
+    Actúa como un investigador y escritor técnico de élite, especializado en sintetizar conocimiento complejo y redactar manuales de estudio profesionales.
+
+    Acción
+    1. Lee y analiza completamente todas las fuentes (sin omitir ninguna), identificando tema principal, argumentos clave, datos relevantes, conclusiones y contexto sin salirte del tema.
+    2. Sintetiza e integra la información en un resumen preservando todos los puntos críticos, datos específicos, nombres, fórmulas, procesos, ejemplos, fechas, cifras y conclusiones.
+    3. Redacta un resumen en capítulos. Que mantengan la siguiente estructura:
+       - Tema/propósito
+       - Puntos clave
+       - Datos específicos
+       - Conclusiones
+    4. Incluye:
+       - Ejemplos explicativos
+       - Notas aclaratorias y definiciones técnicas
+       - Listas (NO tablas)
+       - Organiza con código de prioridad: 🔴 Crítico | 🟡 Importante | 🟢 Complementario
+    5. Asegúrate de que el contenido sea comprensible, profundo, aplicable y que no se haya omitido nada.
+    6. Enfócate en dar explicaciones detalladas basándote en que este contenido sirve para estudio y repaso para generar dominio total de la materia.
+    7. El lector debe terminar con nivel experto sobre el tema.
+
+    Formato
+    - Introducción general
+    - Capítulos por eje temático con Títulos, subtítulos, etc. Organizados por jerarquía de aprendizaje
+    - Secciones claras
+    - Notas (no tablas)
+    - Conclusión con recomendaciones prácticas
+
+    Público Objetivo
+    - Usuario autodidacta
+    - Nivel: Avanzado – Experto (0.1%)
+    - Finalidad: Estudio profundo, dominio técnico, largo plazo
+
+    Materiales de entrada:
     ${combinedText}
     
     ${currentGuide && currentGuide.length > 20 ? `Ya existe una guía previa. Por favor, actualízala y mejórala integrando la nueva información sin perder lo importante de la anterior. Guía previa: ${currentGuide}` : ''}
-
-    Genera un resumen estructurado en formato Markdown que sirva como la única fuente de verdad para estudiar.
-    Estructura sugerida:
-    1. 🎯 Objetivos de Aprendizaje (Key Takeaways)
-    2. 📖 Resumen de Conceptos Clave (Usa bullet points y negritas)
-    3. 🧠 Fórmulas o Datos Críticos (si aplica)
-    4. 🔗 Relaciones entre temas (Síntesis)
-    
-    El tono debe ser educativo, claro y motivador. Usa emojis para hacerlo visualmente agradable.
     `;
 
     try {
