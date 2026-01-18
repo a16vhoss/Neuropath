@@ -590,7 +590,7 @@ const StudySession: React.FC = () => {
   }
 
   return (
-    <div className={`min-h-screen flex flex-col relative ${mode === 'cramming' ? 'bg-gradient-to-br from-rose-600 to-orange-500' : mode === 'exam' ? 'bg-slate-100' : 'gradient-hero'}`}>
+    <div className={`min-h-screen flex flex-col relative ${mode === 'cramming' ? 'bg-gradient-to-br from-rose-600 to-orange-500' : 'gradient-hero'}`}>
       {/* Confetti Animation */}
       {showConfetti && (
         <div className="fixed inset-0 pointer-events-none z-50">
@@ -615,7 +615,7 @@ const StudySession: React.FC = () => {
       )}
 
       {/* Header */}
-      <header className={`relative z-40 p-4 md:p-6 flex items-center justify-between ${mode === 'exam' ? 'text-slate-900' : 'text-white'}`}>
+      <header className="relative z-40 p-4 md:p-6 flex items-center justify-between text-white">
         <button onClick={handleEndSession} className="flex items-center gap-2 font-medium hover:opacity-80">
           <span className="material-symbols-outlined">close</span>
           <span className="hidden md:inline">Finalizar Sesión</span>
@@ -661,9 +661,9 @@ const StudySession: React.FC = () => {
       </header>
 
       {/* Mode Selector */}
-      {mode !== 'exam' && !loading && (
+      {!loading && (
         <div className="flex justify-center px-4 mb-6">
-          <div className={`inline-flex p-1 rounded-xl ${mode === 'exam' ? 'bg-slate-200' : 'bg-white/20'}`}>
+          <div className="inline-flex p-1 rounded-xl bg-white/20">
             {[
               { id: 'flashcards', label: 'Flashcards', icon: 'style' },
               { id: 'quiz', label: 'Quiz', icon: 'quiz' },
@@ -681,10 +681,11 @@ const StudySession: React.FC = () => {
                   setExamSubmitted(false);
                   setExamTime(15 * 60);
                   setScore(0);
+                  setNoCardsDue(false);
                 }}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold text-sm transition-all ${mode === m.id
-                  ? (mode === 'exam' ? 'bg-white text-slate-900 shadow-sm' : 'bg-white text-primary shadow-sm')
-                  : (mode === 'exam' ? 'text-slate-500' : 'text-white/80')
+                  ? 'bg-white text-primary shadow-sm'
+                  : 'text-white/80 hover:text-white hover:bg-white/10'
                   }`}
               >
                 <span className="material-symbols-outlined text-lg">{m.icon}</span>
