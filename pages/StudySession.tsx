@@ -315,13 +315,17 @@ const StudySession: React.FC = () => {
 
 
 
+
+
   const handleKnow = async () => {
-    // Update flashcard progress in Supabase
+    // Always track XP and correct count locally
+    setXpEarned(prev => prev + 10);
+    setCorrectFlashcards(prev => prev + 1);
+
+    // Try to update flashcard progress in Supabase (optional, may fail for mock data)
     if (user && flashcards[currentIndex]?.id) {
       try {
-        await updateFlashcardProgress(user.id, flashcards[currentIndex].id, true); // Correct answer
-        setXpEarned(prev => prev + 10);
-        setCorrectFlashcards(prev => prev + 1);
+        await updateFlashcardProgress(user.id, flashcards[currentIndex].id, true);
       } catch (error) {
         console.error('Error updating progress:', error);
       }
