@@ -517,7 +517,7 @@ const StudySetDetail: React.FC = () => {
 
                         <div className="flex items-center gap-2">
                             <button
-                                onClick={() => navigate(`/student/study/adaptive/set/${studySet.id}?mode=adaptive`)}
+                                onClick={() => navigate(`/student/study-set/${studySet.id}?mode=flashcards`)}
                                 className="bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold px-6 py-2 rounded-xl hover:opacity-90 transition flex items-center gap-2"
                             >
                                 <span className="material-symbols-outlined">auto_awesome</span>
