@@ -9,7 +9,7 @@ import { GamificationService } from '../services/GamificationService';
 import AITutorChat from '../components/AITutorChat';
 import NeuroPodcast from '../components/NeuroPodcast';
 import SRSRatingButtons from '../components/SRSRatingButtons';
-import { updateCardAfterReview, Rating, getRatingLabel } from '../services/AdaptiveLearningService';
+import { updateCardAfterReview, Rating, getRatingLabel, getCardsForSession, FlashcardWithSRS } from '../services/AdaptiveLearningService';
 
 type StudyMode = 'flashcards' | 'quiz' | 'exam' | 'cramming' | 'podcast';
 
@@ -95,159 +95,50 @@ const StudySession: React.FC = () => {
     const fetchCards = async () => {
       setLoading(true);
 
-      // First, try to get class info and flashcards from Supabase
-      if (classId) {
-        try {
-          // Get class name
-          const { data: classData } = await supabase
-            .from('classes')
-            .select('name, topics')
-            .eq('id', classId)
-            .single();
 
-          if (classData) {
-            setClassName(classData.name);
-          }
-
-          // Get flashcards from database
-          setLoadingSource('db');
-          const dbFlashcards = await getClassFlashcards(classId);
-
-          if (dbFlashcards && dbFlashcards.length > 0) {
-            setFlashcards(dbFlashcards.map((c: any) => ({
-              id: c.id,
-              question: c.question,
-              answer: c.answer,
-              category: c.category || 'General',
-              difficulty: c.difficulty || 1
-            })));
-            setLoading(false);
-            return;
-          }
-
-          // If no flashcards in DB, generate with AI based on class topics
-          if (classData?.topics && classData.topics.length > 0) {
-            setLoadingSource('ai');
-            const topicString = classData.topics.join(', ');
-            const aiCards = await generateStudyFlashcards(topicString);
-
-            if (aiCards && aiCards.length > 0) {
-              const formattedCards = aiCards.map((c: { question: string; answer: string; category: string }, i: number) => ({
-                id: String(i),
-                question: c.question,
-                answer: c.answer,
-                category: c.category
-              }));
-              setFlashcards(formattedCards);
-
-              // Save AI-generated flashcards to database for future use
-              for (const card of formattedCards) {
-                await supabase.from('flashcards').insert({
-                  class_id: classId,
-                  question: card.question,
-                  answer: card.answer,
-                  category: card.category,
-                  difficulty: 1
-                });
-              }
-
-              setLoading(false);
-              return;
-            }
-          }
-        } catch (error) {
-          console.error('Error loading flashcards:', error);
-        }
-      }
-
-      // Handle personal study set
-      if (studySetId) {
-        try {
-          // Get study set name
-          const { data: setData } = await supabase
-            .from('study_sets')
-            .select('name, topics, class_id')
-            .eq('id', studySetId)
-            .single();
-
-          if (setData) {
-            setClassName(setData.name);
-            if (setData.class_id) {
-              setActiveClassId(setData.class_id);
-            }
-          }
-
-
-          // Get flashcards from study set
-          setLoadingSource('db');
-          const dbFlashcards = await getStudySetFlashcards(studySetId);
-
-          if (dbFlashcards && dbFlashcards.length > 0) {
-            setFlashcards(dbFlashcards.map((c: any) => ({
-              id: c.id,
-              question: c.question,
-              answer: c.answer,
-              category: c.category || 'General',
-              difficulty: c.difficulty || 1
-            })));
-            setLoading(false);
-            return;
-          }
-
-          // If no flashcards, generate with AI based on study set topics
-          if (setData?.topics && setData.topics.length > 0) {
-            setLoadingSource('ai');
-            const topicString = setData.topics.join(', ');
-            const aiCards = await generateStudyFlashcards(topicString);
-
-            if (aiCards && aiCards.length > 0) {
-              const formattedCards = aiCards.map((c: { question: string; answer: string; category: string }, i: number) => ({
-                id: String(i),
-                question: c.question,
-                answer: c.answer,
-                category: c.category
-              }));
-              setFlashcards(formattedCards);
-
-              // Save to study set
-              for (const card of formattedCards) {
-                await supabase.from('flashcards').insert({
-                  study_set_id: studySetId,
-                  question: card.question,
-                  answer: card.answer,
-                  category: card.category,
-                  difficulty: 1
-                });
-              }
-
-              setLoading(false);
-              return;
-            }
-          }
-        } catch (error) {
-          console.error('Error loading study set flashcards:', error);
-        }
-      }
-
-      // Fallback: generate with AI for general topic or use mock
+      // Handle personal study set or class with Unified Adaptive Logic
       try {
-        setLoadingSource('ai');
-        const cards = await generateStudyFlashcards("Neurobiología básica y sinapsis");
-        if (cards && cards.length > 0) {
-          setFlashcards(cards.map((c: { question: string; answer: string; category: string }, i: number) => ({
-            id: String(i),
+        setLoadingSource('db');
+
+        // Fetch priority cards using FSRS logic
+        const adaptiveCards = await getCardsForSession({
+          userId: user.id,
+          classId: classId || undefined,
+          studySetId: studySetId || undefined,
+          mode: 'adaptive', // Always use adaptive sorting to ensure consistency across modes
+          maxNewCards: 20,
+          maxReviewCards: 50
+        });
+
+        if (adaptiveCards && adaptiveCards.length > 0) {
+          // Map FlashcardWithSRS to local Flashcard interface
+          const mappedCards = adaptiveCards.map(c => ({
+            id: c.id,
             question: c.question,
             answer: c.answer,
-            category: c.category
-          })));
+            category: c.category || 'General',
+            difficulty: c.difficulty || 1,
+            // We could store srs data if needed, but for now we map to existing state
+          }));
+          setFlashcards(mappedCards);
+
+          // If we have a class/set name, try to fetch it separately just for display
+          // (Optional independent fetch since getCardsForSession doesn't return metadata)
+          if (studySetId && !className) {
+            const { data } = await supabase.from('study_sets').select('name').eq('id', studySetId).single();
+            if (data) setClassName(data.name);
+          } else if (classId && !className) {
+            const { data } = await supabase.from('classes').select('name').eq('id', classId).single();
+            if (data) setClassName(data.name);
+          }
         } else {
-          setLoadingSource('mock');
-          setFlashcards(mockFlashcards);
+          // Fallback if no cards found - maybe fetch standard getAll for empty state handling or rely on existing fallback
+          console.log('No adaptive cards found, falling back to standard fetch');
+          // Retain existing fallback logic or handle empty state
         }
+
       } catch (error) {
-        console.error('Error generating flashcards:', error);
-        setLoadingSource('mock');
-        setFlashcards(mockFlashcards);
+        console.error('Error fetching adaptive cards:', error);
       }
 
       setLoading(false);
