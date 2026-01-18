@@ -599,7 +599,7 @@ const StudySession: React.FC = () => {
       )}
 
       {/* Header */}
-      <header className={`relative z-20 p-4 md:p-6 flex items-center justify-between ${mode === 'exam' ? 'text-slate-900' : 'text-white'}`}>
+      <header className={`relative z-40 p-4 md:p-6 flex items-center justify-between ${mode === 'exam' ? 'text-slate-900' : 'text-white'}`}>
         <button onClick={handleEndSession} className="flex items-center gap-2 font-medium hover:opacity-80">
           <span className="material-symbols-outlined">close</span>
           <span className="hidden md:inline">Finalizar Sesión</span>
@@ -623,8 +623,11 @@ const StudySession: React.FC = () => {
         <div className="flex items-center gap-3">
           {studySetId && (
             <button
-              onClick={() => setShowStats(!showStats)}
-              className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-semibold transition-colors backdrop-blur-md border border-white/20"
+              onClick={() => {
+                console.log('Stats button clicked, toggling showStats from', showStats, 'to', !showStats);
+                setShowStats(!showStats);
+              }}
+              className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-semibold transition-colors backdrop-blur-md border border-white/20 cursor-pointer relative z-50"
             >
               <span className="material-symbols-outlined text-sm">analytics</span>
               Estadísticas
