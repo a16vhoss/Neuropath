@@ -599,7 +599,7 @@ const StudySession: React.FC = () => {
       )}
 
       {/* Header */}
-      <header className={`p-4 md:p-6 flex items-center justify-between ${mode === 'exam' ? 'text-slate-900' : 'text-white'}`}>
+      <header className={`relative z-20 p-4 md:p-6 flex items-center justify-between ${mode === 'exam' ? 'text-slate-900' : 'text-white'}`}>
         <button onClick={handleEndSession} className="flex items-center gap-2 font-medium hover:opacity-80">
           <span className="material-symbols-outlined">close</span>
           <span className="hidden md:inline">Finalizar Sesión</span>
