@@ -11,7 +11,7 @@ import {
     addMaterialToStudySet,
     supabase
 } from '../services/supabaseClient';
-import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials, generateMaterialSummary } from '../services/pdfProcessingService';
+import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary } from '../services/pdfProcessingService';
 
 interface Flashcard {
     id: string;
@@ -96,7 +96,57 @@ const StudySetDetail: React.FC = () => {
 
     const [generatingGuide, setGeneratingGuide] = useState(false);
 
-    const [viewContentModal, setViewContentModal] = useState<{ isOpen: boolean; content: string; title: string }>({ isOpen: false, content: '', title: '' });
+    const [viewContentModal, setViewContentModal] = useState<{
+        isOpen: boolean;
+        content: string;
+        title: string;
+        summary: string | null;
+        activeTab: 'summary' | 'text';
+        isGenerating: boolean;
+    }>({
+        isOpen: false,
+        content: '',
+        title: '',
+        summary: null,
+        activeTab: 'summary',
+        isGenerating: false
+    });
+
+    const handleOpenMaterial = async (material: Material) => {
+        setViewContentModal({
+            isOpen: true,
+            content: material.content_text || '',
+            title: material.name,
+            summary: null,
+            activeTab: 'summary',
+            isGenerating: true
+        });
+
+        // Generate summary if content exists
+        if (material.content_text && material.content_text.length > 50) {
+            try {
+                const summary = await generateStudySummary(material.content_text, material.name);
+                setViewContentModal(prev => ({
+                    ...prev,
+                    summary: summary,
+                    isGenerating: false
+                }));
+            } catch (error) {
+                console.error('Error generating summary:', error);
+                setViewContentModal(prev => ({
+                    ...prev,
+                    summary: 'No se pudo generar el resumen. Intenta de nuevo más tarde.',
+                    isGenerating: false
+                }));
+            }
+        } else {
+            setViewContentModal(prev => ({
+                ...prev,
+                summary: 'El contenido es demasiado corto para generar un resumen.',
+                isGenerating: false
+            }));
+        }
+    };
 
     const regenerateStudyGuide = async (newMaterialText?: string) => {
         if (!studySet) return;
@@ -752,16 +802,10 @@ const StudySetDetail: React.FC = () => {
                                                 )}
                                                 <button
                                                     className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 bg-white border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition"
-                                                    onClick={() => {
-                                                        setViewContentModal({
-                                                            isOpen: true,
-                                                            content: material.content_text || '',
-                                                            title: material.name
-                                                        });
-                                                    }}
+                                                    onClick={() => handleOpenMaterial(material)}
                                                 >
-                                                    <span className="material-symbols-outlined text-sm">text_snippet</span>
-                                                    Ver Texto
+                                                    <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                                                    Estudiar Material
                                                 </button>
                                             </div>
                                         </div>
@@ -909,39 +953,68 @@ const StudySetDetail: React.FC = () => {
                 )}
 
             {/* View Content Modal */}
-            {
-                viewContentModal.isOpen && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-xl font-bold text-slate-900 truncate pr-4">
-                                    {viewContentModal.title}
-                                </h3>
-                                <button
-                                    onClick={() => setViewContentModal(prev => ({ ...prev, isOpen: false }))}
-                                    className="text-slate-400 hover:text-slate-600 transition"
-                                >
-                                    <span className="material-symbols-outlined">close</span>
-                                </button>
-                            </div>
+            {viewContentModal.isOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-bold text-slate-900 truncate pr-4">
+                                {viewContentModal.title}
+                            </h3>
+                            <button
+                                onClick={() => setViewContentModal(prev => ({ ...prev, isOpen: false }))}
+                                className="text-slate-400 hover:text-slate-600 transition"
+                            >
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
 
-                            <div className="flex-1 overflow-y-auto p-4 bg-slate-50 rounded-xl border border-slate-100 font-mono text-sm text-slate-700 whitespace-pre-wrap">
-                                {viewContentModal.content}
-                            </div>
+                        {/* Tabs */}
+                        <div className="flex gap-2 mb-4 border-b border-slate-100">
+                            <button
+                                onClick={() => setViewContentModal(prev => ({ ...prev, activeTab: 'summary' }))}
+                                className={`pb-2 px-4 font-medium text-sm transition ${viewContentModal.activeTab === 'summary' ? 'text-primary border-b-2 border-primary' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Resumen IA
+                            </button>
+                            <button
+                                onClick={() => setViewContentModal(prev => ({ ...prev, activeTab: 'text' }))}
+                                className={`pb-2 px-4 font-medium text-sm transition ${viewContentModal.activeTab === 'text' ? 'text-primary border-b-2 border-primary' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Texto Original
+                            </button>
+                        </div>
 
-                            <div className="mt-6 flex justify-end">
-                                <button
-                                    onClick={() => setViewContentModal(prev => ({ ...prev, isOpen: false }))}
-                                    className="px-6 py-2.5 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 transition"
-                                >
-                                    Cerrar
-                                </button>
-                            </div>
+                        <div className="flex-1 overflow-y-auto p-4 bg-slate-50 rounded-xl border border-slate-100">
+                            {viewContentModal.activeTab === 'summary' ? (
+                                viewContentModal.isGenerating ? (
+                                    <div className="flex flex-col items-center justify-center py-10">
+                                        <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mb-3"></div>
+                                        <p className="text-sm text-slate-500">Analizando documento con IA...</p>
+                                    </div>
+                                ) : (
+                                    <div className="whitespace-pre-wrap font-sans text-sm text-slate-700 leading-relaxed">
+                                        {viewContentModal.summary || 'No hay resumen disponible.'}
+                                    </div>
+                                )
+                            ) : (
+                                <div className="font-mono text-xs text-slate-600 whitespace-pre-wrap">
+                                    {viewContentModal.content}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="mt-6 flex justify-end">
+                            <button
+                                onClick={() => setViewContentModal(prev => ({ ...prev, isOpen: false }))}
+                                className="px-6 py-2.5 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 transition"
+                            >
+                                Cerrar
+                            </button>
                         </div>
                     </div>
-                )
-            }
-        </div >
+                </div>
+            )}
+        </div>
     );
 };
 
