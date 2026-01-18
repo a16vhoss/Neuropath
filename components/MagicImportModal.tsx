@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { extractTextFromPDF } from '../services/pdfProcessingService';
 import { generateStudySetFromContext } from '../services/geminiService';
 import { useAuth } from '../contexts/AuthContext';
-import { createStudySet, addFlashcardsBatch } from '../services/supabaseClient';
+import { createStudySet, addFlashcardsBatch, addMaterialToStudySet } from '../services/supabaseClient';
 
 interface MagicImportModalProps {
     onClose: () => void;
@@ -90,6 +90,33 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
                 }));
 
                 await addFlashcardsBatch(flashcardsToInsert);
+
+                // 4. Save the source material
+                if (processedContent) {
+                    setStatus('Guardando material original...');
+                    let fileUrl = '';
+
+                    // If PDF, try to upload (reuse logic from StudySetDetail if possible, or just save text for now)
+                    // Since we don't have the file upload logic here fully robust yet (bucket checks), 
+                    // we will save as 'pdf' type but with the text content.
+
+                    try {
+                        await addMaterialToStudySet({
+                            study_set_id: newSet.id,
+                            name: activeTab === 'pdf' && selectedFile ? selectedFile.name : `Material Original (${activeTab})`,
+                            type: activeTab === 'pdf' ? 'pdf' : (activeTab === 'youtube' ? 'url' : 'notes'),
+                            file_url: activeTab === 'youtube' ? inputValue : '', // Save URL if youtube
+                            content_text: processedContent,
+                            flashcards_generated: cardData.length,
+                            summary: `Material importado automáticamente desde ${activeTab}`
+                        });
+                    } catch (matError) {
+                        console.error('Error saving material:', matError);
+                        // Don't fail the whole process if material save fails, 
+                        // as flashcards are the priority in "Magic Import".
+                        // But finding this bug was key!
+                    }
+                }
 
                 return newSet;
             };

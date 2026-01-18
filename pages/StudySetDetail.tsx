@@ -327,8 +327,9 @@ const StudySetDetail: React.FC = () => {
                 // Regenerate guide with new text
                 await regenerateStudyGuide(extractedText);
 
-            } catch (matError) {
-                console.log('Materials tracking skipped:', matError);
+            } catch (matError: any) {
+                console.error('Materials tracking skipped:', matError);
+                alert(`Error al guardar material en base de datos: ${matError.message || JSON.stringify(matError)}`);
             }
 
             setUploadProgress('');
