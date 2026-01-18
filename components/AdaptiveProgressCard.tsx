@@ -78,8 +78,8 @@ const AdaptiveProgressCard: React.FC<AdaptiveProgressCardProps> = ({ onStartSess
         }
         return {
             icon: 'add_circle',
-            text: 'Todo al día. ¿Aprender más?',
-            action: 'Nuevas tarjetas',
+            text: stats.newCount > 0 ? `Tienes ${stats.newCount} nuevas por aprender` : 'Todo al día. ¿Práctica extra?',
+            action: 'Aprender Nuevas',
             mode: 'learn_new' as const,
             priority: 'low',
         };
@@ -110,8 +110,8 @@ const AdaptiveProgressCard: React.FC<AdaptiveProgressCardProps> = ({ onStartSess
                     <div className="text-xs text-white/70">Pendientes</div>
                 </div>
                 <div className="text-center">
-                    <div className={`text-3xl font-bold`}>{stats.avgRetention}%</div>
-                    <div className="text-xs text-white/70">Retención</div>
+                    <div className="text-3xl font-bold">{stats.newCount}</div>
+                    <div className="text-xs text-white/70">Nuevas</div>
                 </div>
                 <div className="text-center">
                     <div className="text-3xl font-bold">{stats.masteredCount}</div>
@@ -128,7 +128,7 @@ const AdaptiveProgressCard: React.FC<AdaptiveProgressCardProps> = ({ onStartSess
                 <div className="h-2 bg-white/20 rounded-full overflow-hidden">
                     <div
                         className={`h-full rounded-full transition-all duration-500 ${stats.avgRetention >= 80 ? 'bg-emerald-400' :
-                                stats.avgRetention >= 60 ? 'bg-yellow-400' : 'bg-red-400'
+                            stats.avgRetention >= 60 ? 'bg-yellow-400' : 'bg-red-400'
                             }`}
                         style={{ width: `${Math.min(100, stats.avgRetention)}%` }}
                     />
@@ -139,7 +139,7 @@ const AdaptiveProgressCard: React.FC<AdaptiveProgressCardProps> = ({ onStartSess
             <div className="bg-white/10 backdrop-blur rounded-xl p-4 mb-4">
                 <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center ${recommendation.priority === 'high' ? 'bg-red-500' :
-                            recommendation.priority === 'medium' ? 'bg-yellow-500' : 'bg-emerald-500'
+                        recommendation.priority === 'medium' ? 'bg-yellow-500' : 'bg-emerald-500'
                         }`}>
                         <span className="material-symbols-outlined">{recommendation.icon}</span>
                     </div>

@@ -671,17 +671,39 @@ export async function getUserStudyStats(userId: string): Promise<{
 
     const avgRetention = srsData.length > 0 ? (totalRetrievability / srsData.length) * 100 : 0;
 
-    // Get streak from profile
     const { data: profile } = await supabase
         .from('profiles')
         .select('streak_days')
         .eq('id', userId)
         .single();
 
+    // Calculate New Cards (Total Flashcards - Cards with SRS Data)
+    // 1. Get user's study sets
+    const { data: studySets } = await supabase
+        .from('study_sets')
+        .select('id')
+        .eq('owner_id', userId);
+
+    let totalFlashcards = 0;
+
+    if (studySets && studySets.length > 0) {
+        const studySetIds = studySets.map(s => s.id);
+
+        // 2. Count flashcards in those sets
+        const { count } = await supabase
+            .from('flashcards')
+            .select('*', { count: 'exact', head: true })
+            .in('study_set_id', studySetIds);
+
+        totalFlashcards = count || 0;
+    }
+
+    const newCount = Math.max(0, totalFlashcards - srsData.length);
+
     return {
         dueToday,
         learningCount,
-        newCount: 0, // Would need to count cards without SRS data
+        newCount,
         masteredCount,
         avgRetention: Math.round(avgRetention),
         streakDays: profile?.streak_days || 0,
