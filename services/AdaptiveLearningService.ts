@@ -413,7 +413,8 @@ export async function getCardsForSession(
         .from('flashcard_srs_data')
         .select('*')
         .eq('user_id', userId)
-        .in('flashcard_id', flashcardIds);
+        .in('flashcard_id', flashcardIds)
+        .eq('archived', false); // Exclude archived cards
 
     // Create a map for quick lookup
     const srsMap = new Map<string, SRSCard>();

@@ -10,6 +10,7 @@ import AITutorChat from '../components/AITutorChat';
 import NeuroPodcast from '../components/NeuroPodcast';
 import SRSRatingButtons from '../components/SRSRatingButtons';
 import { updateCardAfterReview, Rating, getRatingLabel, getCardsForSession, FlashcardWithSRS } from '../services/AdaptiveLearningService';
+import { handleSessionComplete, updateConsecutiveCorrect, DIFFICULTY_TIERS } from '../services/DynamicContentService';
 
 type StudyMode = 'flashcards' | 'quiz' | 'exam' | 'cramming' | 'podcast';
 
@@ -89,6 +90,10 @@ const StudySession: React.FC = () => {
   // Cramming state
   const [crammingIntensity, setCrammingIntensity] = useState<'low' | 'medium' | 'high'>('high');
   const [crammingComplete, setCrammingComplete] = useState(false);
+
+  // Dynamic content generation state
+  const [generatingNewContent, setGeneratingNewContent] = useState(false);
+  const [newContentMessage, setNewContentMessage] = useState<string | null>(null);
 
   // Load flashcards from Supabase or generate with AI
   useEffect(() => {
@@ -271,8 +276,30 @@ const StudySession: React.FC = () => {
         const finalXp = xpEarned + (rating >= 3 ? 10 : 0);
         await GamificationService.awardXP(user.id, finalXp);
         await GamificationService.updateStreak(user.id);
+
+        // Update consecutive correct counter
+        await updateConsecutiveCorrect(user.id, flashcards[currentIndex].id, rating >= 3);
+
+        // Trigger dynamic content generation if study set exists
+        if (studySetId) {
+          setGeneratingNewContent(true);
+          const correctRate = (correctFlashcards + (rating >= 3 ? 1 : 0)) / flashcards.length;
+          const result = await handleSessionComplete(user.id, studySetId, {
+            correctRate,
+            cardsStudied: flashcards.length
+          });
+
+          if (result.newCardsGenerated > 0) {
+            const tierName = DIFFICULTY_TIERS[result.newTier!]?.name || 'nuevo';
+            setNewContentMessage(
+              `🎉 ¡Has dominado ${result.archivedCount} tarjetas! Se generaron ${result.newCardsGenerated} preguntas nivel "${tierName}".`
+            );
+          }
+          setGeneratingNewContent(false);
+        }
       } catch (error) {
         console.error('Error in session completion:', error);
+        setGeneratingNewContent(false);
       }
       setIsProcessing(false);
     }
@@ -605,6 +632,25 @@ const StudySession: React.FC = () => {
                   <span className="text-lg font-bold text-orange-600">Racha activada</span>
                 </div>
               </div>
+
+              {/* Dynamic Content Generation Notification */}
+              {generatingNewContent && (
+                <div className="bg-gradient-to-r from-indigo-100 to-purple-100 rounded-xl p-4 mb-6 animate-pulse">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="material-symbols-outlined text-indigo-500 animate-spin">autorenew</span>
+                    <span className="text-lg font-bold text-indigo-600">Generando nuevas preguntas...</span>
+                  </div>
+                </div>
+              )}
+
+              {newContentMessage && (
+                <div className="bg-gradient-to-r from-emerald-100 to-teal-100 rounded-xl p-4 mb-6">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-500">auto_awesome</span>
+                    <span className="text-sm font-bold text-emerald-700">{newContentMessage}</span>
+                  </div>
+                </div>
+              )}
 
               <button
                 onClick={handleEndSession}
