@@ -506,3 +506,97 @@ export const getClassAnalytics = async (classId: string) => {
 
     return { enrollments, sessions };
 };
+
+// ============================================
+// STUDY SET MATERIALS HELPERS
+// ============================================
+
+export interface StudySetMaterial {
+    id?: string;
+    study_set_id: string;
+    name: string;
+    type: 'pdf' | 'manual' | 'url' | 'notes';
+    file_url?: string;
+    content_text?: string;
+    flashcards_generated?: number;
+    created_at?: string;
+}
+
+export const getStudySetMaterials = async (studySetId: string) => {
+    const { data, error } = await supabase
+        .from('study_set_materials')
+        .select('*')
+        .eq('study_set_id', studySetId)
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+};
+
+export const addMaterialToStudySet = async (material: StudySetMaterial) => {
+    const { data, error } = await supabase
+        .from('study_set_materials')
+        .insert(material)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+};
+
+export const updateStudySetMaterial = async (materialId: string, updates: Partial<StudySetMaterial>) => {
+    const { data, error } = await supabase
+        .from('study_set_materials')
+        .update(updates)
+        .eq('id', materialId)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+};
+
+export const deleteMaterialFromStudySet = async (materialId: string) => {
+    const { error } = await supabase
+        .from('study_set_materials')
+        .delete()
+        .eq('id', materialId);
+
+    if (error) throw error;
+};
+
+// Get study set with full details (materials + flashcard count)
+export const getStudySetWithDetails = async (studySetId: string) => {
+    const { data: studySet, error: setError } = await supabase
+        .from('study_sets')
+        .select('*')
+        .eq('id', studySetId)
+        .single();
+
+    if (setError) throw setError;
+
+    const { data: flashcards, error: flashError } = await supabase
+        .from('flashcards')
+        .select('id, question, answer, category')
+        .eq('study_set_id', studySetId);
+
+    if (flashError) throw flashError;
+
+    const { data: materials, error: matError } = await supabase
+        .from('study_set_materials')
+        .select('*')
+        .eq('study_set_id', studySetId)
+        .order('created_at', { ascending: false });
+
+    // Materials table might not exist yet, so we handle this gracefully
+    const safeMatError = matError?.code === '42P01' ? null : matError;
+    if (safeMatError) throw safeMatError;
+
+    return {
+        ...studySet,
+        flashcards: flashcards || [],
+        materials: materials || [],
+        flashcard_count: flashcards?.length || 0,
+        material_count: materials?.length || 0
+    };
+};

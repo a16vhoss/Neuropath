@@ -518,7 +518,7 @@ const StudentDashboard: React.FC = () => {
                       {studySets.map((set) => (
                         <div
                           key={set.id}
-                          onClick={() => navigate(`/student/study-set/${set.id}`)}
+                          onClick={() => navigate(`/student/set/${set.id}`)}
                           className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
                         >
                           <div className="flex items-center gap-4 mb-4">
