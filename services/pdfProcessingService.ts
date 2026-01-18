@@ -160,6 +160,11 @@ export const generateStudyGuideFromMaterials = async (materialsContent: string[]
     const combinedText = materialsContent.map((text, i) => `--- MATERIAL ${i + 1} ---\n${text.slice(0, 10000)}`).join('\n\n');
 
     const prompt = `
+    [SISTEMA: REGLA CRÍTICA]
+    🚫 PROHIBIDO USAR TABLAS MARKDOWN. BAJO NINGUNA CIRCUNSTANCIA GENERES CONTENIDO CON FORMATO DE TABLA  (| ... |).
+    El sistema de renderizado NO soporta tablas. Si necesitas comparar datos, USA LISTAS DE VIÑETAS O TARJETAS DE TEXTO.
+    Si ignoras esta regla, el usuario no podrá leer el contenido.
+    
     Tarea General
     Actúa como una IA experta en síntesis multifuente. Tu objetivo es transformar múltiples fuentes de información en un resumen: extensa, detallada, precisa y en español, sin omitir nada. El contenido debe permitir al usuario estudiar y dominar completamente una disciplina, con nivel experto (0.1% mundial).
 
@@ -185,7 +190,6 @@ export const generateStudyGuideFromMaterials = async (materialsContent: string[]
     5. Asegúrate de que el contenido sea comprensible, profundo, aplicable y que no se haya omitido nada.
     6. Enfócate en dar explicaciones detalladas basándote en que este contenido sirve para estudio y repaso para generar dominio total de la materia.
     7. El lector debe terminar con nivel experto sobre el tema.
-    8. IMPORTANTE: NO uses formato de tabla Markdown (| col | col |). El sistema no las renderiza bien. Siempre convierte tablas comparativas en listas estructuradas o tarjetas de texto.
 
     Formato
     - Introducción general
