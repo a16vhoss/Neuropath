@@ -11,7 +11,7 @@ import {
     addMaterialToStudySet,
     supabase
 } from '../services/supabaseClient';
-import { generateFlashcardsFromText, extractTextFromPDF } from '../services/pdfProcessingService';
+import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials } from '../services/pdfProcessingService';
 
 interface Flashcard {
     id: string;
@@ -89,6 +89,32 @@ const StudySetDetail: React.FC = () => {
             console.error('Error loading study set:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const regenerateStudyGuide = async (newMaterialText?: string) => {
+        if (!studySet) return;
+
+        try {
+            console.log('Regenerating study guide...');
+            // Collect existing texts + new one
+            const materials = studySet.materials.filter(m => m.content_text && m.content_text.length > 50).map(m => m.content_text!);
+            if (newMaterialText) materials.push(newMaterialText);
+
+            if (materials.length === 0) {
+                console.log('No materials to generate guide from');
+                return;
+            }
+
+            const guide = await generateStudyGuideFromMaterials(materials, studySet.name, studySet.description);
+            if (guide) {
+                await updateStudySet(studySet.id, { description: guide });
+                setStudySet(prev => prev ? { ...prev, description: guide } : null);
+                setEditDescription(guide);
+                console.log('Study guide updated');
+            }
+        } catch (error) {
+            console.error('Error generating guide:', error);
         }
     };
 
@@ -209,8 +235,13 @@ const StudySetDetail: React.FC = () => {
                     name: file.name,
                     type: 'pdf',
                     file_url: fileUrl,
+                    content_text: extractedText, // Save text for guide generation
                     flashcards_generated: flashcards.length
                 });
+
+                // Regenerate guide with new text
+                await regenerateStudyGuide(extractedText);
+
             } catch (matError) {
                 console.log('Materials tracking skipped:', matError);
             }
@@ -260,6 +291,10 @@ const StudySetDetail: React.FC = () => {
                     content_text: textContent,
                     flashcards_generated: flashcards.length
                 });
+
+                // Regenerate guide with new text
+                await regenerateStudyGuide(textContent);
+
             } catch (matError) {
                 console.log('Materials tracking skipped:', matError);
             }
@@ -506,17 +541,50 @@ const StudySetDetail: React.FC = () => {
                             </button>
                         </div>
 
-                        {/* Description */}
+                        {/* Study Guide (formerly Description) */}
                         <div className="md:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                            <h3 className="font-bold text-slate-900 mb-2">📝 Descripción</h3>
-                            <textarea
-                                value={editDescription}
-                                onChange={(e) => setEditDescription(e.target.value)}
-                                onBlur={handleUpdateDetails}
-                                placeholder="Agrega una descripción para este set..."
-                                className="w-full p-3 bg-slate-50 rounded-xl border-0 resize-none focus:ring-2 focus:ring-primary/20"
-                                rows={3}
-                            />
+                            <div className="flex justify-between items-center mb-2">
+                                <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-indigo-500">auto_stories</span>
+                                    Guía de Estudio
+                                    <span className="text-xs font-normal text-indigo-500 bg-indigo-50 px-2 py-1 rounded-full border border-indigo-100">
+                                        Auto-generada con IA
+                                    </span>
+                                </h3>
+                                <button
+                                    onClick={() => regenerateStudyGuide()}
+                                    className="text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-medium"
+                                    title="Regenerar buscando nuevo contenido en todos los materiales"
+                                >
+                                    <span className="material-symbols-outlined text-sm">refresh</span>
+                                    Regenerar Guía
+                                </button>
+                            </div>
+
+                            {isEditingName ? (
+                                <textarea
+                                    value={editDescription}
+                                    onChange={(e) => setEditDescription(e.target.value)}
+                                    className="w-full p-4 bg-slate-50 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-slate-700 min-h-[200px]"
+                                    placeholder="La guía de estudio aparecerá aquí automáticamente..."
+                                />
+                            ) : (
+                                <div className="prose prose-slate max-w-none">
+                                    {studySet.description ? (
+                                        <div className="whitespace-pre-wrap text-slate-600 bg-slate-50 p-6 rounded-xl border border-slate-100">
+                                            {studySet.description}
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center py-12 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center">
+                                            <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">magic_button</span>
+                                            <p className="text-slate-500 font-medium">No hay guía de estudio aún</p>
+                                            <p className="text-sm text-slate-400 mt-1 max-w-md">
+                                                Sube materiales (PDF, Notas, Enlaces) y usa el botón "Regenerar" para crear una guía de estudio automática.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}

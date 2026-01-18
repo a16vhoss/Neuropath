@@ -143,11 +143,47 @@ Devuelve SOLO el JSON, sin texto adicional.`;
                 return recoveredCards;
             }
 
-            throw parseError;
+            console.error('Failed to parse or recover JSON:', parseError);
+            return null;
         }
     } catch (error) {
         console.error('Error generating flashcards:', error);
         return null;
+    }
+};
+
+export const generateStudyGuideFromMaterials = async (materialsContent: string[], studySetName: string, currentGuide?: string): Promise<string | null> => {
+    if (materialsContent.length === 0) return null;
+
+    // Combine texts (truncate if too long to avoid huge token usage, though Gemini 1.5 is generous)
+    // We'll take first 10k chars of each to save context window and cost
+    const combinedText = materialsContent.map((text, i) => `--- MATERIAL ${i + 1} ---\n${text.slice(0, 10000)}`).join('\n\n');
+
+    const prompt = `
+    Actúa como un profesor experto. Tu tarea es crear una "Guía de Estudio" completa y estructurada para el tema "${studySetName}".
+    
+    Tengo los siguientes materiales de estudio (texto extraído de PDFs y notas):
+    
+    ${combinedText}
+    
+    ${currentGuide && currentGuide.length > 20 ? `Ya existe una guía previa. Por favor, actualízala y mejórala integrando la nueva información sin perder lo importante de la anterior. Guía previa: ${currentGuide}` : ''}
+
+    Genera un resumen estructurado en formato Markdown que sirva como la única fuente de verdad para estudiar.
+    Estructura sugerida:
+    1. 🎯 Objetivos de Aprendizaje (Key Takeaways)
+    2. 📖 Resumen de Conceptos Clave (Usa bullet points y negritas)
+    3. 🧠 Fórmulas o Datos Críticos (si aplica)
+    4. 🔗 Relaciones entre temas (Síntesis)
+    
+    El tono debe ser educativo, claro y motivador. Usa emojis para hacerlo visualmente agradable.
+    `;
+
+    try {
+        const response = await callGemini(prompt);
+        return response || null;
+    } catch (error) {
+        console.error('Error generating study guide:', error);
+        return null; // Don't crash if guide fails, just return null
     }
 };
 
