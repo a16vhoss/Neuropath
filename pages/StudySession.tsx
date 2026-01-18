@@ -740,6 +740,7 @@ const StudySession: React.FC = () => {
                 <SRSRatingButtons
                   onRate={handleRate}
                   disabled={isProcessing}
+                  cardState="new"
                 />
               </div>
             )}

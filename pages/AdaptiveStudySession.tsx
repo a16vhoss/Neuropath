@@ -458,6 +458,7 @@ const AdaptiveStudySession: React.FC = () => {
                         <SRSRatingButtons
                             onRate={handleRate}
                             currentStability={currentCard?.srs?.stability || 1}
+                            cardState={currentCard?.srs?.state || 'new'}
                             showIntervals={true}
                         />
                     ) : (
