@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { extractTextFromPDF } from '../services/pdfProcessingService';
 import { generateStudySetFromContext } from '../services/geminiService';
+import { getYoutubeTranscript } from '../services/youtubeService';
 import { useAuth } from '../contexts/AuthContext';
 import { createStudySet, addFlashcardsBatch, addMaterialToStudySet } from '../services/supabaseClient';
 
@@ -48,15 +49,23 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
             } else if (activeTab === 'text') {
                 processedContent = inputValue;
             } else if (activeTab === 'youtube') {
-                // For V1, pass the input directly. The prompt in geminiService handles it.
-                processedContent = inputValue;
+                setStatus('Extrayendo transcripción del video...');
+                try {
+                    processedContent = await getYoutubeTranscript(inputValue);
+                } catch (err) {
+                    // Try to be helpful if automatic extraction fails
+                    console.error('Youtube extraction failed:', err);
+                    throw new Error(`No se pudo extraer el audio del video. ${(err as Error).message}. Prueba pegando el texto manualmente.`);
+                }
             }
 
             if (!processedContent) throw new Error("No hay contenido para procesar. Asegúrate de subir un archivo o escribir texto.");
 
             // 2. Generate Metadata & Flashcards via Gemini
-            setStatus('Gemini está creando tu set de estudio...');
-            const cardData = await generateStudySetFromContext(processedContent, activeTab);
+            setStatus(`Analizando ${processedContent.length} caracteres con Gemini...`);
+            // Note: For YouTube derived text, we pass it as 'text' context to Gemini now since it's raw text
+            const sourceType = activeTab === 'youtube' ? 'text' : activeTab;
+            const cardData = await generateStudySetFromContext(processedContent, sourceType);
 
             if (!cardData || cardData.length === 0) {
                 throw new Error("No se pudieron generar flashcards. Intenta con otro contenido.");
@@ -94,12 +103,6 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
                 // 4. Save the source material
                 if (processedContent) {
                     setStatus('Guardando material original...');
-                    let fileUrl = '';
-
-                    // If PDF, try to upload (reuse logic from StudySetDetail if possible, or just save text for now)
-                    // Since we don't have the file upload logic here fully robust yet (bucket checks), 
-                    // we will save as 'pdf' type but with the text content.
-
                     try {
                         await addMaterialToStudySet({
                             study_set_id: newSet.id,
@@ -112,9 +115,7 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
                         });
                     } catch (matError) {
                         console.error('Error saving material:', matError);
-                        // Don't fail the whole process if material save fails, 
-                        // as flashcards are the priority in "Magic Import".
-                        // But finding this bug was key!
+                        // Don't fail the whole process if material save fails
                     }
                 }
 
@@ -130,9 +131,7 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
         } catch (error) {
             console.error('Magic Import Failed:', error);
             setStatus('Error: ' + ((error as any).message || 'Ocurrió un error inesperado.'));
-            // Keep loading false but allow user to try again or close
-            // Don't close automatically so user can see error
-            setTimeout(() => setLoading(false), 2000);
+            setTimeout(() => setLoading(false), 3000);
         }
     };
 
@@ -228,13 +227,13 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
 
                         {activeTab === 'youtube' && (
                             <div>
-                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex items-start gap-2">
-                                    <span className="material-symbols-outlined text-amber-600 text-lg">lightbulb</span>
-                                    <p className="text-xs text-amber-700">
-                                        <strong>Tip:</strong> Por ahora, pega la <em>transcripción</em> del video o un enlace (próximamente extracción automática).
+                                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-4 flex items-start gap-2">
+                                    <span className="material-symbols-outlined text-indigo-600 text-lg">auto_awesome</span>
+                                    <p className="text-xs text-indigo-700">
+                                        <strong>Nuevo:</strong> Pega el enlace del video y extraeremos la transcripción automáticamente para generar tus tarjetas.
                                     </p>
                                 </div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Enlace de YouTube o Transcripción</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Enlace de YouTube</label>
                                 <input
                                     type="text"
                                     placeholder="https://youtube.com/watch?v=..."
