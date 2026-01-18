@@ -100,8 +100,10 @@ Requirements:
 - Include the correct answer index (0-3)
 - Add a brief explanation for each answer
 - Include a topic/category for each question
-- Questions should test understanding, not just memorization
-- If there are weak topics, include 2-3 questions specifically about those topics
+
+ADAPTIVE RULES:
+1. For "Weak Topics" listed above: Generate questions that verify the core concept again, but with different phrasing.
+2. For TOPICS NOT LISTED as weak (mastered topics): Generate MORE COMPLEX questions. Move from simple recall to application or analysis scenarios. EVOLVE the difficulty.
 
 Return as JSON array:
 [{
