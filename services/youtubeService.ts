@@ -8,13 +8,38 @@
  * Note: This relies on the '/youtube-proxy' configuration in vite.config.ts
  */
 
+// Helper to route requests through the correct proxy
+const fetchViaProxy = async (targetUrl: string) => {
+    // In Production (Vercel), use the serverless API function
+    // We check !import.meta.env.DEV to be safe (Prod build = true usually)
+    // Actually, looking at the previous screenshot, it's a Vercel deployment.
+    if (import.meta.env.PROD) {
+        const proxyUrl = `/api/youtube-proxy?url=${encodeURIComponent(targetUrl)}`;
+        const res = await fetch(proxyUrl);
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(`Proxy error (${res.status}): ${err}`);
+        }
+        return res;
+    }
+
+    // In Development (Vite), use local proxy from vite.config.ts
+    // Convert https://www.youtube.com/xyz -> /youtube-proxy/xyz
+    let localUrl = targetUrl;
+    if (targetUrl.includes('youtube.com')) {
+        localUrl = targetUrl.replace(/https:\/\/(www\.)?youtube\.com/, '/youtube-proxy');
+    }
+    return fetch(localUrl);
+};
+
 export const getYoutubeTranscript = async (url: string): Promise<string> => {
     try {
         const videoId = extractVideoID(url);
         if (!videoId) throw new Error('ID de video inválido');
 
-        // 1. Fetch Video Page via Proxy
-        const response = await fetch(`/youtube-proxy/watch?v=${videoId}`);
+        // 1. Fetch Video Page
+        const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+        const response = await fetchViaProxy(watchUrl);
         const html = await response.text();
 
         // 2. Extract Captions JSON
@@ -61,14 +86,9 @@ export const getYoutubeTranscript = async (url: string): Promise<string> => {
 
         // 3. Fetch the transcript XML/JSON
         // The baseUrl is usually an absolute URL like https://www.youtube.com/api/timedtext?...
-        // We need to route it through our proxy
-        let transcriptUrl = track.baseUrl;
+        // We route it through our proxy helper
 
-        // Replace domain with proxy
-        // Handles: https://www.youtube.com/api/timedtext... -> /youtube-proxy/api/timedtext...
-        transcriptUrl = transcriptUrl.replace(/https:\/\/(www\.)?youtube\.com/, '/youtube-proxy');
-
-        const transcriptResponse = await fetch(transcriptUrl);
+        const transcriptResponse = await fetchViaProxy(track.baseUrl);
         const transcriptXml = await transcriptResponse.text();
 
         // 4. Parse XML to Text
