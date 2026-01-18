@@ -68,6 +68,7 @@ const StudySession: React.FC = () => {
   const [xpEarned, setXpEarned] = useState(0);
   const [flashcardsComplete, setFlashcardsComplete] = useState(false);
   const [correctFlashcards, setCorrectFlashcards] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Quiz state
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(mockQuizQuestions);
@@ -318,6 +319,9 @@ const StudySession: React.FC = () => {
 
 
   const handleKnow = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+
     // Always track XP and correct count locally
     setXpEarned(prev => prev + 10);
     setCorrectFlashcards(prev => prev + 1);
@@ -337,6 +341,9 @@ const StudySession: React.FC = () => {
   };
 
   const handleDontKnow = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+
     // Update flashcard progress with low quality
     if (user && flashcards[currentIndex]?.id) {
       try {
@@ -352,6 +359,7 @@ const StudySession: React.FC = () => {
     setIsFlipped(false);
     if (currentIndex < flashcards.length - 1) {
       setCurrentIndex(currentIndex + 1);
+      setTimeout(() => setIsProcessing(false), 300); // Small delay to prevent accidental double taps
     } else {
       // Session complete!
       if (mode === 'cramming') {
@@ -603,13 +611,15 @@ const StudySession: React.FC = () => {
             <div className="flex gap-4 mt-8">
               <button
                 onClick={handleDontKnow}
-                className="bg-white/20 backdrop-blur-sm text-white font-bold px-8 py-4 rounded-xl hover:bg-white/30 transition-all flex items-center gap-2"
+                disabled={isProcessing}
+                className={`bg-white/20 backdrop-blur-sm text-white font-bold px-8 py-4 rounded-xl hover:bg-white/30 transition-all flex items-center gap-2 ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <span className="material-symbols-outlined">close</span> No lo sé
               </button>
               <button
                 onClick={handleKnow}
-                className="bg-white text-primary font-bold px-8 py-4 rounded-xl shadow-lg hover:scale-105 transition-all flex items-center gap-2"
+                disabled={isProcessing}
+                className={`bg-white text-primary font-bold px-8 py-4 rounded-xl shadow-lg hover:scale-105 transition-all flex items-center gap-2 ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <span className="material-symbols-outlined">check</span> Lo sé
               </button>
