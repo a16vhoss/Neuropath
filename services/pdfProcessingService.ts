@@ -160,20 +160,16 @@ export const generateStudyGuideFromMaterials = async (materialsContent: string[]
     const combinedText = materialsContent.map((text, i) => `--- MATERIAL ${i + 1} ---\n${text.slice(0, 10000)}`).join('\n\n');
 
     const prompt = `
-    [SISTEMA: REGLA CRÍTICA DE FORMATO]
-    🚫 PROHIBIDO USAR TABLAS MARKDOWN. NUNCA uses el caracter "|" para estructurar datos.
+    [SISTEMA: REGLAS CRÍTICAS DE FORMATO Y CONTENIDO]
+    1. 🚫 PROHIBIDO USAR TABLAS. Usa listas o tarjetas de texto.
+    2. 🚫 PROHIBIDO SER "VAGO". NUNCA escribas "(Ver detalles en la versión anterior)". SIEMPRE genera el contenido COMPLETO y detallado, reescribiendo todo desde cero con la mejor calidad posible.
+    3. 🎨 FORMATO LIMPIO: Minimiza el uso de negritas (**texto**). Úsalas SOLO para el concepto principal de una lista, no para toda la frase.
     
-    SIEMPRE transforma cualquier tabla en Liatas o Tarjetas de Texto.
+    ❌ INCORRECTO (Mala visualización):
+    *   **🔴 **Concepto Importante:**** **Definición larga que se ve muy cargada y sucia visualmente.**
     
-    ❌ INCORRECTO (NO HAGAS ESTO):
-    | Concepto | Definición | Ejemplo |
-    |---|---|---|
-    | Estrés | Tensión física | Dolor de cabeza |
-
-    ✅ CORRECTO (HAZ ESTO ASÍ):
-    *   **Concepto**: Estrés
-        *   *Definición*: Tensión física y emocional.
-        *   *Ejemplo*: Dolor de cabeza ante un examen.
+    ✅ CORRECTO (Limpio y legible):
+    *   🔴 **Concepto Importante**: Definición clara y legible sin exceso de asteriscos.
 
     Tarea General
     Actúa como una IA experta en síntesis multifuente. Tu objetivo es transformar múltiples fuentes de información en un resumen: extensa, detallada, precisa y en español, sin omitir nada. El contenido debe permitir al usuario estudiar y dominar completamente una disciplina, con nivel experto (0.1% mundial).
@@ -187,7 +183,7 @@ export const generateStudyGuideFromMaterials = async (materialsContent: string[]
     Acción
     1. Lee y analiza completamente todas las fuentes (sin omitir ninguna), identificando tema principal, argumentos clave, datos relevantes, conclusiones y contexto sin salirte del tema.
     2. Sintetiza e integra la información en un resumen preservando todos los puntos críticos, datos específicos, nombres, fórmulas, procesos, ejemplos, fechas, cifras y conclusiones.
-    3. Redacta un resumen en capítulos. Que mantengan la siguiente estructura:
+    3. Redacta un resumen en capítulos. Estructura:
        - Tema/propósito
        - Puntos clave
        - Datos específicos
@@ -195,7 +191,7 @@ export const generateStudyGuideFromMaterials = async (materialsContent: string[]
     4. Incluye:
        - Ejemplos explicativos
        - Notas aclaratorias y definiciones técnicas
-       - Listas (NO tablas - usa listas con viñetas o numeradas para estructurar datos)
+       - Listas limpias y ordenadas
        - Organiza con código de prioridad: 🔴 Crítico | 🟡 Importante | 🟢 Complementario
     5. Asegúrate de que el contenido sea comprensible, profundo, aplicable y que no se haya omitido nada.
     6. Enfócate en dar explicaciones detalladas basándote en que este contenido sirve para estudio y repaso para generar dominio total de la materia.
@@ -203,7 +199,7 @@ export const generateStudyGuideFromMaterials = async (materialsContent: string[]
 
     Formato
     - Introducción general
-    - Capítulos por eje temático con Títulos, subtítulos, etc. Organizados por jerarquía de aprendizaje
+    - Capítulos por eje temático con Títulos, subtítulos, etc.
     - Secciones claras
     - Notas (USA LISTAS, NUNCA TABLAS)
     - Conclusión con recomendaciones prácticas
@@ -213,10 +209,10 @@ export const generateStudyGuideFromMaterials = async (materialsContent: string[]
     - Nivel: Avanzado – Experto (0.1%)
     - Finalidad: Estudio profundo, dominio técnico, largo plazo
 
-    Materiales de entrada:
+    Materiales de entrada (Revisa TODO exhaustivamente):
     ${combinedText}
     
-    ${currentGuide && currentGuide.length > 20 ? `Ya existe una guía previa. Por favor, actualízala y mejórala integrando la nueva información sin perder lo importante de la anterior. Guía previa: ${currentGuide}` : ''}
+    ${currentGuide ? `(Contexto extra: Existe una guía previa, pero NO la cites ni la resumas. Úsala solo para entender qué mejorías hacer. TU SALIDA DEBE SER EL DOCUMENTO COMPLETO Y FINAL).` : ''}
     `;
 
     try {
