@@ -77,7 +77,7 @@ const StudySession: React.FC = () => {
   const [responseStartTime, setResponseStartTime] = useState<number>(Date.now());
 
   // Quiz state
-  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(mockQuizQuestions);
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [currentQuizIndex, setCurrentQuizIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showResult, setShowResult] = useState(false);
@@ -903,58 +903,70 @@ const StudySession: React.FC = () => {
         {/* Quiz Mode */}
         {mode === 'quiz' && !quizComplete && (
           <div className="w-full max-w-2xl">
-            <div className="bg-white rounded-3xl shadow-2xl p-8">
-              <div className="mb-6">
-                <span className="bg-violet-100 text-violet-600 text-xs font-bold px-3 py-1 rounded-full">Pregunta {currentQuizIndex + 1}</span>
-              </div>
-              <h2 className="text-2xl font-black text-slate-900 mb-8">{quizQuestions[currentQuizIndex].question}</h2>
-
-              <div className="space-y-3">
-                {quizQuestions[currentQuizIndex].options.map((option, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleQuizAnswer(i)}
-                    disabled={showResult}
-                    className={`w-full p-4 rounded-xl text-left font-medium transition-all flex items-center gap-3 ${showResult
-                      ? i === quizQuestions[currentQuizIndex].correctIndex
-                        ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500'
-                        : selectedAnswer === i
-                          ? 'bg-rose-100 text-rose-700 border-2 border-rose-500'
-                          : 'bg-slate-100 text-slate-500'
-                      : selectedAnswer === i
-                        ? 'bg-primary text-white'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
-                  >
-                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${showResult && i === quizQuestions[currentQuizIndex].correctIndex ? 'bg-emerald-500 text-white' :
-                      showResult && selectedAnswer === i ? 'bg-rose-500 text-white' :
-                        selectedAnswer === i ? 'bg-white/20 text-white' : 'bg-white text-slate-600'
-                      }`}>
-                      {String.fromCharCode(65 + i)}
-                    </span>
-                    {option}
-                    {showResult && i === quizQuestions[currentQuizIndex].correctIndex && (
-                      <span className="material-symbols-outlined ml-auto text-emerald-600">check_circle</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-
-              {showResult && (
-                <div className="mt-6 p-4 bg-blue-50 rounded-xl text-sm text-blue-700">
-                  <strong>Explicación:</strong> {quizQuestions[currentQuizIndex].explanation}
+            {quizLoading || quizQuestions.length === 0 ? (
+              <div className="bg-white rounded-3xl shadow-2xl p-8 text-center">
+                <div className="animate-pulse">
+                  <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="material-symbols-outlined text-3xl text-violet-600 animate-spin">sync</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">Generando Quiz...</h3>
+                  <p className="text-slate-500">Creando preguntas basadas en el contenido del set</p>
                 </div>
-              )}
+              </div>
+            ) : (
+              <div className="bg-white rounded-3xl shadow-2xl p-8">
+                <div className="mb-6">
+                  <span className="bg-violet-100 text-violet-600 text-xs font-bold px-3 py-1 rounded-full">Pregunta {currentQuizIndex + 1}</span>
+                </div>
+                <h2 className="text-2xl font-black text-slate-900 mb-8">{quizQuestions[currentQuizIndex]?.question}</h2>
 
-              {showResult && (
-                <button
-                  onClick={nextQuizQuestion}
-                  className="w-full mt-6 bg-primary text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-all"
-                >
-                  {currentQuizIndex < quizQuestions.length - 1 ? 'Siguiente Pregunta' : 'Ver Resultados'}
-                </button>
-              )}
-            </div>
+                <div className="space-y-3">
+                  {quizQuestions[currentQuizIndex]?.options.map((option, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleQuizAnswer(i)}
+                      disabled={showResult}
+                      className={`w-full p-4 rounded-xl text-left font-medium transition-all flex items-center gap-3 ${showResult
+                        ? i === quizQuestions[currentQuizIndex].correctIndex
+                          ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500'
+                          : selectedAnswer === i
+                            ? 'bg-rose-100 text-rose-700 border-2 border-rose-500'
+                            : 'bg-slate-100 text-slate-500'
+                        : selectedAnswer === i
+                          ? 'bg-primary text-white'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                    >
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${showResult && i === quizQuestions[currentQuizIndex].correctIndex ? 'bg-emerald-500 text-white' :
+                        showResult && selectedAnswer === i ? 'bg-rose-500 text-white' :
+                          selectedAnswer === i ? 'bg-white/20 text-white' : 'bg-white text-slate-600'
+                        }`}>
+                        {String.fromCharCode(65 + i)}
+                      </span>
+                      {option}
+                      {showResult && i === quizQuestions[currentQuizIndex].correctIndex && (
+                        <span className="material-symbols-outlined ml-auto text-emerald-600">check_circle</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {showResult && (
+                  <div className="mt-6 p-4 bg-blue-50 rounded-xl text-sm text-blue-700">
+                    <strong>Explicación:</strong> {quizQuestions[currentQuizIndex].explanation}
+                  </div>
+                )}
+
+                {showResult && (
+                  <button
+                    onClick={nextQuizQuestion}
+                    className="w-full mt-6 bg-primary text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-all"
+                  >
+                    {currentQuizIndex < quizQuestions.length - 1 ? 'Siguiente Pregunta' : 'Ver Resultados'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -965,8 +977,8 @@ const StudySession: React.FC = () => {
               {/* Header */}
               <div className="text-center mb-8">
                 <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${score >= (quizQuestions.length * 0.6)
-                    ? 'bg-gradient-to-br from-emerald-400 to-emerald-600'
-                    : 'bg-gradient-to-br from-amber-400 to-amber-600'
+                  ? 'bg-gradient-to-br from-emerald-400 to-emerald-600'
+                  : 'bg-gradient-to-br from-amber-400 to-amber-600'
                   }`}>
                   <span className="material-symbols-outlined text-4xl text-white">
                     {score >= (quizQuestions.length * 0.6) ? 'school' : 'psychology'}
