@@ -120,28 +120,55 @@ const StudySetDetail: React.FC = () => {
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file || !studySet || !user) return;
+        if (!file || !studySet || !user) {
+            console.log('Missing required data:', { file: !!file, studySet: !!studySet, user: !!user });
+            return;
+        }
+
+        console.log('Starting file upload:', file.name);
 
         try {
             setUploading(true);
-            setUploadProgress('Subiendo archivo...');
+            setUploadProgress('Procesando PDF...');
 
-            // Upload to storage
-            const fileName = `${user.id}/${studySet.id}/${Date.now()}_${file.name}`;
-            const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('materials')
-                .upload(fileName, file);
+            // Try to upload to storage (optional - may fail if bucket doesn't exist)
+            let fileUrl = '';
+            try {
+                const fileName = `${user.id}/${studySet.id}/${Date.now()}_${file.name}`;
+                const { error: uploadError } = await supabase.storage
+                    .from('materials')
+                    .upload(fileName, file);
 
-            if (uploadError) throw uploadError;
-
-            const { data: urlData } = supabase.storage.from('materials').getPublicUrl(fileName);
+                if (!uploadError) {
+                    const { data: urlData } = supabase.storage.from('materials').getPublicUrl(fileName);
+                    fileUrl = urlData.publicUrl;
+                    console.log('File uploaded to storage:', fileUrl);
+                } else {
+                    console.log('Storage upload failed (optional):', uploadError.message);
+                }
+            } catch (storageError) {
+                console.log('Storage not available, continuing without it');
+            }
 
             setUploadProgress('Extrayendo texto del PDF...');
+            console.log('Extracting text from PDF...');
             const extractedText = await extractTextFromPDF(file);
 
+            if (!extractedText || extractedText.length < 50) {
+                throw new Error('No se pudo extraer suficiente texto del PDF');
+            }
+            console.log('Extracted text length:', extractedText.length);
+
             setUploadProgress('Generando flashcards con IA...');
+            console.log('Generating flashcards with AI...');
             const flashcards = await generateFlashcardsFromText(extractedText, studySet.name);
 
+            if (!flashcards || flashcards.length === 0) {
+                throw new Error('No se pudieron generar flashcards');
+            }
+            console.log('Generated flashcards:', flashcards.length);
+
+            setUploadProgress(`Guardando ${flashcards.length} flashcards...`);
             // Save flashcards
             for (const card of flashcards) {
                 await addFlashcardToStudySet(studySet.id, {
@@ -151,24 +178,27 @@ const StudySetDetail: React.FC = () => {
                 });
             }
 
-            // Track material
+            // Track material (optional)
             try {
                 await addMaterialToStudySet({
                     study_set_id: studySet.id,
                     name: file.name,
                     type: 'pdf',
-                    file_url: urlData.publicUrl,
+                    file_url: fileUrl,
                     flashcards_generated: flashcards.length
                 });
             } catch (matError) {
-                console.log('Materials table may not exist yet:', matError);
+                console.log('Materials tracking skipped:', matError);
             }
 
             setUploadProgress('');
+            // Reset file input
+            e.target.value = '';
             loadStudySet();
-        } catch (error) {
-            console.error('Error uploading file:', error);
-            setUploadProgress('Error al procesar archivo');
+        } catch (error: any) {
+            console.error('Error processing file:', error);
+            setUploadProgress(`Error: ${error.message || 'Error al procesar archivo'}`);
+            setTimeout(() => setUploadProgress(''), 5000);
         } finally {
             setUploading(false);
         }
