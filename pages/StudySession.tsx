@@ -694,6 +694,38 @@ const StudySession: React.FC = () => {
                 Has repasado todas tus tarjetas pendientes. El sistema SR (Repetición Espaciada) te avisará cuando sea el momento óptimo para repasar de nuevo.
               </p>
 
+              {/* Mode Navigation */}
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <button
+                  onClick={() => { setNoCardsDue(false); setMode('flashcards'); }}
+                  className="bg-indigo-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-indigo-700 transition flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-lg">style</span>
+                  Flashcards
+                </button>
+                <button
+                  onClick={() => { setNoCardsDue(false); setMode('quiz'); }}
+                  className="bg-purple-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-purple-700 transition flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-lg">quiz</span>
+                  Quiz
+                </button>
+                <button
+                  onClick={() => { setNoCardsDue(false); setMode('exam'); }}
+                  className="bg-orange-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-orange-700 transition flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-lg">assignment</span>
+                  Examen
+                </button>
+                <button
+                  onClick={() => { setNoCardsDue(false); setMode('cramming'); }}
+                  className="bg-teal-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-teal-700 transition flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-lg">speed</span>
+                  Cramming
+                </button>
+              </div>
+
               <div className="space-y-4">
                 <button
                   onClick={() => navigate('/classes')}
@@ -702,9 +734,6 @@ const StudySession: React.FC = () => {
                   <span className="material-symbols-outlined">arrow_back</span>
                   Volver al inicio
                 </button>
-                <div className="text-xs text-slate-400 mt-4">
-                  ¿Quieres estudiar más? Intenta el modo "Cramming" (aprende sin afectar tu horario)
-                </div>
               </div>
             </div>
           </div>
