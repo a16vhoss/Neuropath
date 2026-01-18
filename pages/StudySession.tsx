@@ -903,7 +903,7 @@ const StudySession: React.FC = () => {
         {/* Quiz Mode */}
         {mode === 'quiz' && !quizComplete && (
           <div className="w-full max-w-2xl">
-            {quizLoading || quizQuestions.length === 0 ? (
+            {quizLoading ? (
               <div className="bg-white rounded-3xl shadow-2xl p-8 text-center">
                 <div className="animate-pulse">
                   <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -912,6 +912,20 @@ const StudySession: React.FC = () => {
                   <h3 className="text-xl font-bold text-slate-900 mb-2">Generando Quiz...</h3>
                   <p className="text-slate-500">Creando preguntas basadas en el contenido del set</p>
                 </div>
+              </div>
+            ) : quizQuestions.length === 0 ? (
+              <div className="bg-white rounded-3xl shadow-2xl p-8 text-center animate-fade-in-up">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="material-symbols-outlined text-3xl text-red-600">error</span>
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">No pudimos generar el quiz</h3>
+                <p className="text-slate-500 mb-6">Hubo un problema al crear las preguntas con IA. Por favor, intenta de nuevo.</p>
+                <button
+                  onClick={() => setQuizGenerated(false)}
+                  className="px-6 py-3 bg-violet-600 text-white font-bold rounded-xl hover:bg-violet-700 transition-colors shadow-lg hover:shadow-xl"
+                >
+                  Intentar Nuevamente
+                </button>
               </div>
             ) : (
               <div className="bg-white rounded-3xl shadow-2xl p-8">
