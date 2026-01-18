@@ -160,16 +160,25 @@ export const generateStudyGuideFromMaterials = async (materialsContent: string[]
     const combinedText = materialsContent.map((text, i) => `--- MATERIAL ${i + 1} ---\n${text.slice(0, 10000)}`).join('\n\n');
 
     const prompt = `
-    [SISTEMA: REGLAS CRÍTICAS DE FORMATO Y CONTENIDO]
-    1. 🚫 PROHIBIDO USAR TABLAS. Usa listas o tarjetas de texto.
-    2. 🚫 PROHIBIDO SER "VAGO". NUNCA escribas "(Ver detalles en la versión anterior)". SIEMPRE genera el contenido COMPLETO y detallado, reescribiendo todo desde cero con la mejor calidad posible.
-    3. 🎨 FORMATO LIMPIO: Minimiza el uso de negritas (**texto**). Úsalas SOLO para el concepto principal de una lista, no para toda la frase.
+    [SISTEMA: REGLAS CRÍTICAS DE FORMATO - NIVEL MÁXIMO]
+    1. 🚫 **PROHIBICIÓN ABSOLUTA DE TABLAS**: NO generes ninguna tabla. Ni siquiera pequeña.
+    2. 🚫 **PROHIBICIÓN DEL CARACTER "|" (PIPE)**: NO uses el símbolo "|" bajo ninguna circunstancia. Si lo usas, el sistema fallará.
+    3. 🔄 **TRANSFORMACIÓN OBLIGATORIA**: Si tienes datos comparativos (como "Crisis vs Respuesta"), ESTÁS OBLIGADO a usar el formato de "Tarjetas" o "Listas Anidadas".
     
-    ❌ INCORRECTO (Mala visualización):
-    *   **🔴 **Concepto Importante:**** **Definición larga que se ve muy cargada y sucia visualmente.**
+    ❌ ESTO ROMPE EL SISTEMA (NO LO HAGAS):
+    | Crisis | Respuesta |
+    |---|---|
+    | Puntos | Jugar |
+
+    ✅ ESTO ES LO CORRECTO (HAZLO ASÍ):
     
-    ✅ CORRECTO (Limpio y legible):
-    *   🔴 **Concepto Importante**: Definición clara y legible sin exceso de asteriscos.
+    *   🔴 **Situación de Crisis**: Pérdida de Foco
+        *   **Señal**: Mira al suelo, se queja.
+        *   **Respuesta**: "Respira profundo y mira la pelota".
+    
+    *   🔴 **Situación de Crisis**: Frustración
+        *   **Señal**: Grita tras fallo.
+        *   **Respuesta**: Validación emocional rápida.
 
     Tarea General
     Actúa como una IA experta en síntesis multifuente. Tu objetivo es transformar múltiples fuentes de información en un resumen: extensa, detallada, precisa y en español, sin omitir nada. El contenido debe permitir al usuario estudiar y dominar completamente una disciplina, con nivel experto (0.1% mundial).
