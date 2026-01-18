@@ -160,11 +160,21 @@ export const generateStudyGuideFromMaterials = async (materialsContent: string[]
     const combinedText = materialsContent.map((text, i) => `--- MATERIAL ${i + 1} ---\n${text.slice(0, 10000)}`).join('\n\n');
 
     const prompt = `
-    [SISTEMA: REGLA CRÍTICA]
-    🚫 PROHIBIDO USAR TABLAS MARKDOWN. BAJO NINGUNA CIRCUNSTANCIA GENERES CONTENIDO CON FORMATO DE TABLA  (| ... |).
-    El sistema de renderizado NO soporta tablas. Si necesitas comparar datos, USA LISTAS DE VIÑETAS O TARJETAS DE TEXTO.
-    Si ignoras esta regla, el usuario no podrá leer el contenido.
+    [SISTEMA: REGLA CRÍTICA DE FORMATO]
+    🚫 PROHIBIDO USAR TABLAS MARKDOWN. NUNCA uses el caracter "|" para estructurar datos.
     
+    SIEMPRE transforma cualquier tabla en Liatas o Tarjetas de Texto.
+    
+    ❌ INCORRECTO (NO HAGAS ESTO):
+    | Concepto | Definición | Ejemplo |
+    |---|---|---|
+    | Estrés | Tensión física | Dolor de cabeza |
+
+    ✅ CORRECTO (HAZ ESTO ASÍ):
+    *   **Concepto**: Estrés
+        *   *Definición*: Tensión física y emocional.
+        *   *Ejemplo*: Dolor de cabeza ante un examen.
+
     Tarea General
     Actúa como una IA experta en síntesis multifuente. Tu objetivo es transformar múltiples fuentes de información en un resumen: extensa, detallada, precisa y en español, sin omitir nada. El contenido debe permitir al usuario estudiar y dominar completamente una disciplina, con nivel experto (0.1% mundial).
 
