@@ -13,6 +13,7 @@ import StudySetDetail from './pages/StudySetDetail';
 import StudyBattles from './pages/StudyBattles';
 import BattleArena from './pages/BattleArena';
 import StudySession from './pages/StudySession';
+import AdaptiveStudySession from './pages/AdaptiveStudySession';
 import MockExamPage from './pages/MockExamPage';
 import { UserRole } from './types';
 
@@ -124,6 +125,21 @@ const AppRoutes: React.FC = () => {
       <Route path="/student/battle/:battleId" element={
         <ProtectedRoute allowedRole="student">
           <BattleArena />
+        </ProtectedRoute>
+      } />
+      <Route path="/student/adaptive-study/:classId" element={
+        <ProtectedRoute allowedRole="student">
+          <AdaptiveStudySession />
+        </ProtectedRoute>
+      } />
+      <Route path="/student/adaptive-study" element={
+        <ProtectedRoute allowedRole="student">
+          <AdaptiveStudySession />
+        </ProtectedRoute>
+      } />
+      <Route path="/student/adaptive/:studySetId" element={
+        <ProtectedRoute allowedRole="student">
+          <AdaptiveStudySession />
         </ProtectedRoute>
       } />
 

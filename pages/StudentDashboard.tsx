@@ -7,6 +7,7 @@ import { generateFlashcardsFromText, extractTextFromPDF } from '../services/pdfP
 
 import StudySetManager from '../components/StudySetManager';
 import MagicImportModal from '../components/MagicImportModal';
+import AdaptiveProgressCard from '../components/AdaptiveProgressCard';
 
 interface ClassData {
   id: string;
@@ -609,6 +610,13 @@ const StudentDashboard: React.FC = () => {
                 >
                   <span className="material-symbols-outlined">style</span>
                   <span className="text-xs font-bold">Flashcards</span>
+                </button>
+                <button
+                  onClick={() => navigate('/student/adaptive-study')}
+                  className="p-4 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex flex-col items-center gap-2 hover:opacity-90 transition-opacity shadow-lg"
+                >
+                  <span className="material-symbols-outlined">psychology</span>
+                  <span className="text-xs font-bold">Adaptativo</span>
                 </button>
                 <button
                   onClick={() => classes.length > 0 && navigate(`/student/study/${classes[0]?.id}?mode=quiz`)}
