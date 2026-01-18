@@ -180,17 +180,18 @@ export const generateStudyGuideFromMaterials = async (materialsContent: string[]
     4. Incluye:
        - Ejemplos explicativos
        - Notas aclaratorias y definiciones técnicas
-       - Listas (NO tablas)
+       - Listas (NO tablas - usa listas con viñetas o numeradas para estructurar datos)
        - Organiza con código de prioridad: 🔴 Crítico | 🟡 Importante | 🟢 Complementario
     5. Asegúrate de que el contenido sea comprensible, profundo, aplicable y que no se haya omitido nada.
     6. Enfócate en dar explicaciones detalladas basándote en que este contenido sirve para estudio y repaso para generar dominio total de la materia.
     7. El lector debe terminar con nivel experto sobre el tema.
+    8. IMPORTANTE: NO uses formato de tabla Markdown (| col | col |). El sistema no las renderiza bien. Siempre convierte tablas comparativas en listas estructuradas o tarjetas de texto.
 
     Formato
     - Introducción general
     - Capítulos por eje temático con Títulos, subtítulos, etc. Organizados por jerarquía de aprendizaje
     - Secciones claras
-    - Notas (no tablas)
+    - Notas (USA LISTAS, NUNCA TABLAS)
     - Conclusión con recomendaciones prácticas
 
     Público Objetivo
