@@ -12,6 +12,7 @@ import SRSRatingButtons from '../components/SRSRatingButtons';
 import { updateCardAfterReview, Rating, getRatingLabel, getCardsForSession, FlashcardWithSRS } from '../services/AdaptiveLearningService';
 import { handleSessionComplete, handleStrugglingSession, updateConsecutiveCorrect, DIFFICULTY_TIERS } from '../services/DynamicContentService';
 import StudySetStatistics from '../components/StudySetStatistics';
+import { generateAdaptiveQuiz, saveQuizSession, QuizQuestion as AdaptiveQuizQuestion, QuizResult, QuizReport } from '../services/QuizService';
 
 type StudyMode = 'flashcards' | 'quiz' | 'cramming' | 'podcast';
 
@@ -82,6 +83,10 @@ const StudySession: React.FC = () => {
   const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState(0);
   const [quizComplete, setQuizComplete] = useState(false);
+  const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
+  const [quizReport, setQuizReport] = useState<QuizReport | null>(null);
+  const [quizLoading, setQuizLoading] = useState(false);
+  const [quizStartTime, setQuizStartTime] = useState<number>(Date.now());
 
   // Exam state
   const [examTime, setExamTime] = useState(15 * 60); // 15 minutes
@@ -258,39 +263,48 @@ const StudySession: React.FC = () => {
   useEffect(() => {
     const generateQuizAndExam = async () => {
       // Only generate once when we have real flashcards loaded
-      if (flashcards.length > 0 && !quizGenerated && loadingSource !== 'mock') {
-        const context = flashcards.slice(0, 15).map(c => `Q: ${c.question} A: ${c.answer}`).join('\n');
+      if (flashcards.length > 0 && !quizGenerated && loadingSource !== 'mock' && studySetId && user) {
+        setQuizLoading(true);
         try {
-          console.log('Generating quiz from flashcards context...');
-          const generatedQuiz = await generateQuizQuestions(context);
+          console.log('Generating adaptive quiz from flashcards...');
 
-          if (generatedQuiz && generatedQuiz.length > 0) {
-            setQuizQuestions(generatedQuiz);
+          // Use adaptive quiz service that considers weak topics
+          const adaptiveQuestions = await generateAdaptiveQuiz(studySetId, user.id, 5);
+
+          if (adaptiveQuestions && adaptiveQuestions.length > 0) {
+            // Map to local QuizQuestion format
+            const mappedQuestions: QuizQuestion[] = adaptiveQuestions.map((q, i) => ({
+              id: q.id,
+              question: q.question,
+              options: q.options,
+              correctIndex: q.correctIndex,
+              explanation: q.explanation
+            }));
+
+            setQuizQuestions(mappedQuestions);
             setQuizGenerated(true);
-            console.log('Quiz generated successfully:', generatedQuiz.length);
-
-            // Generate separate Exam questions (request a different variation if possible, or just generate again)
-            console.log('Generating exam questions...');
-            // We use a slightly different prompt context or just call again to get variation
-            // (Gemini is non-deterministic enough usually)
-            const generatedExam = await generateQuizQuestions(context + "\nGenera preguntas diferentes a las anteriores.");
-            if (generatedExam && generatedExam.length > 0) {
-              setExamQuestions(generatedExam);
-              setExamAnswers(new Array(generatedExam.length).fill(null));
-              console.log('Exam generated successfully:', generatedExam.length);
-            } else {
-              // Fallback: use same questions shuffled if 2nd gen fails
-              setExamQuestions([...generatedQuiz].sort(() => Math.random() - 0.5));
-              setExamAnswers(new Array(generatedQuiz.length).fill(null));
+            setQuizStartTime(Date.now());
+            setQuizResults([]);
+            console.log('Adaptive quiz generated:', mappedQuestions.length);
+          } else {
+            // Fallback to basic generation
+            const context = flashcards.slice(0, 15).map(c => `Q: ${c.question} A: ${c.answer}`).join('\n');
+            const generatedQuiz = await generateQuizQuestions(context);
+            if (generatedQuiz && generatedQuiz.length > 0) {
+              setQuizQuestions(generatedQuiz);
+              setQuizGenerated(true);
+              setQuizStartTime(Date.now());
             }
           }
         } catch (e) {
-          console.error("Quiz/Exam gen error", e);
+          console.error("Quiz gen error", e);
+        } finally {
+          setQuizLoading(false);
         }
       }
     }
     generateQuizAndExam();
-  }, [flashcards, loadingSource, quizGenerated]);
+  }, [flashcards, loadingSource, quizGenerated, studySetId, user]);
 
 
   // Exam timer
@@ -448,7 +462,22 @@ const StudySession: React.FC = () => {
     if (showResult) return;
     setSelectedAnswer(optionIndex);
     setShowResult(true);
-    if (optionIndex === quizQuestions[currentQuizIndex].correctIndex) {
+
+    const currentQ = quizQuestions[currentQuizIndex];
+    const isCorrect = optionIndex === currentQ.correctIndex;
+
+    // Track this result
+    const result: QuizResult = {
+      questionIndex: currentQuizIndex,
+      question: currentQ.question,
+      userAnswerIndex: optionIndex,
+      correctAnswerIndex: currentQ.correctIndex,
+      isCorrect,
+      topic: (currentQ as any).topic || 'General'
+    };
+    setQuizResults(prev => [...prev, result]);
+
+    if (isCorrect) {
       setScore(score + 1);
       setXpEarned(prev => prev + 20);
       triggerConfetti();
@@ -475,13 +504,31 @@ const StudySession: React.FC = () => {
     }
   };
 
-  const nextQuizQuestion = () => {
+  const nextQuizQuestion = async () => {
     if (currentQuizIndex < quizQuestions.length - 1) {
       setCurrentQuizIndex(currentQuizIndex + 1);
       setSelectedAnswer(null);
       setShowResult(false);
     } else {
+      // Quiz complete - save session and generate report
       setQuizComplete(true);
+
+      if (user && studySetId && quizResults.length > 0) {
+        const durationSeconds = Math.floor((Date.now() - quizStartTime) / 1000);
+
+        const report = await saveQuizSession(
+          user.id,
+          studySetId,
+          quizQuestions as any,
+          quizResults,
+          durationSeconds
+        );
+
+        if (report) {
+          setQuizReport(report);
+          console.log('Quiz report saved:', report);
+        }
+      }
     }
   };
 
@@ -911,44 +958,143 @@ const StudySession: React.FC = () => {
           </div>
         )}
 
-        {/* Quiz Complete */}
+        {/* Quiz Complete - Detailed Report */}
         {mode === 'quiz' && quizComplete && (
-          <div className="w-full max-w-md text-center">
+          <div className="w-full max-w-2xl">
             <div className="bg-white rounded-3xl shadow-2xl p-8">
-              <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="material-symbols-outlined text-4xl text-white">emoji_events</span>
+              {/* Header */}
+              <div className="text-center mb-8">
+                <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${score >= (quizQuestions.length * 0.6)
+                    ? 'bg-gradient-to-br from-emerald-400 to-emerald-600'
+                    : 'bg-gradient-to-br from-amber-400 to-amber-600'
+                  }`}>
+                  <span className="material-symbols-outlined text-4xl text-white">
+                    {score >= (quizQuestions.length * 0.6) ? 'school' : 'psychology'}
+                  </span>
+                </div>
+                <h2 className="text-3xl font-black text-slate-900 mb-2">Reporte del Quiz</h2>
+                <p className="text-slate-500">
+                  {score >= (quizQuestions.length * 0.6) ? '¡Excelente trabajo!' : 'Sigue practicando los temas difíciles'}
+                </p>
               </div>
-              <h2 className="text-3xl font-black text-slate-900 mb-2">¡Quiz Completado!</h2>
-              <p className="text-slate-500 mb-6">Has terminado todas las preguntas</p>
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-violet-50 rounded-xl p-4">
+              {/* Stats Grid */}
+              <div className="grid grid-cols-3 gap-4 mb-8">
+                <div className="bg-violet-50 rounded-xl p-4 text-center">
                   <div className="text-3xl font-black text-violet-600">+{xpEarned}</div>
                   <div className="text-xs text-violet-500 font-bold">XP GANADOS</div>
                 </div>
-                <div className="bg-emerald-50 rounded-xl p-4">
-                  <div className="text-3xl font-black text-emerald-600">{score}/{quizQuestions.length}</div>
-                  <div className="text-xs text-emerald-500 font-bold">CORRECTAS</div>
+                <div className={`rounded-xl p-4 text-center ${score >= (quizQuestions.length * 0.6) ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+                  <div className={`text-3xl font-black ${score >= (quizQuestions.length * 0.6) ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {Math.round((score / quizQuestions.length) * 100)}%
+                  </div>
+                  <div className={`text-xs font-bold ${score >= (quizQuestions.length * 0.6) ? 'text-emerald-500' : 'text-rose-500'}`}>PRECISIÓN</div>
+                </div>
+                <div className="bg-blue-50 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-black text-blue-600">{score}/{quizQuestions.length}</div>
+                  <div className="text-xs text-blue-500 font-bold">CORRECTAS</div>
                 </div>
               </div>
 
-              <div className="bg-gradient-to-r from-orange-100 to-red-100 rounded-xl p-4 mb-6">
-                <div className="flex items-center justify-center gap-2">
-                  <span className="material-symbols-outlined text-orange-500">local_fire_department</span>
-                  <span className="text-lg font-bold text-orange-600">Racha activada</span>
+              {/* Topic Breakdown */}
+              {quizReport && quizReport.topicBreakdown.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-lg">analytics</span>
+                    Rendimiento por Tema
+                  </h3>
+                  <div className="space-y-2">
+                    {quizReport.topicBreakdown.map((topic, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="font-medium text-slate-700">{topic.topic}</span>
+                            <span className={`font-bold ${topic.percentage >= 60 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                              {topic.correct}/{topic.total} ({topic.percentage}%)
+                            </span>
+                          </div>
+                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${topic.percentage >= 60 ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                              style={{ width: `${topic.percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Questions Review */}
+              <div className="mb-8">
+                <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-lg">fact_check</span>
+                  Revisión de Preguntas
+                </h3>
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {quizResults.map((result, i) => (
+                    <div
+                      key={i}
+                      className={`p-3 rounded-xl border-2 ${result.isCorrect ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className={`material-symbols-outlined ${result.isCorrect ? 'text-emerald-500' : 'text-rose-500'}`}>
+                          {result.isCorrect ? 'check_circle' : 'cancel'}
+                        </span>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-slate-800 line-clamp-2">{result.question}</p>
+                          {!result.isCorrect && (
+                            <p className="text-xs text-rose-600 mt-1">
+                              Tu respuesta: {quizQuestions[result.questionIndex]?.options[result.userAnswerIndex]}
+                            </p>
+                          )}
+                          <p className={`text-xs mt-1 ${result.isCorrect ? 'text-emerald-600' : 'text-slate-600'}`}>
+                            Respuesta correcta: {quizQuestions[result.questionIndex]?.options[result.correctAnswerIndex]}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
+              {/* Weak Topics Alert */}
+              {quizReport && quizReport.incorrectQuestions.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+                  <div className="flex items-center gap-2 text-amber-700">
+                    <span className="material-symbols-outlined">lightbulb</span>
+                    <span className="font-bold">El próximo quiz enfatizará:</span>
+                  </div>
+                  <p className="text-sm text-amber-600 mt-1">
+                    Las preguntas que fallaste se repetirán y las que acertaste serán reemplazadas por contenido nuevo o más avanzado.
+                  </p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
               <div className="flex gap-4">
                 <button
-                  onClick={() => { setQuizComplete(false); setCurrentQuizIndex(0); setScore(0); setXpEarned(0); }}
-                  className="flex-1 bg-slate-100 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-200"
+                  onClick={async () => {
+                    // Generate new adaptive quiz
+                    setQuizComplete(false);
+                    setQuizGenerated(false);
+                    setCurrentQuizIndex(0);
+                    setScore(0);
+                    setXpEarned(0);
+                    setQuizResults([]);
+                    setQuizReport(null);
+                    setSelectedAnswer(null);
+                    setShowResult(false);
+                  }}
+                  className="flex-1 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2"
                 >
-                  Reintentar
+                  <span className="material-symbols-outlined">autorenew</span>
+                  Siguiente Quiz
                 </button>
                 <button
                   onClick={handleEndSession}
-                  className="flex-1 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold py-3 rounded-xl hover:opacity-90"
+                  className="flex-1 bg-slate-100 text-slate-700 font-bold py-4 rounded-xl hover:bg-slate-200 transition"
                 >
                   Finalizar
                 </button>
