@@ -333,7 +333,7 @@ const StudySetDetail: React.FC = () => {
 
             setUploadProgress('');
             // Reset file input
-            event.target.value = '';
+            e.target.value = '';
             loadStudySet();
             setActiveTab('materials'); // Switch to materials tab to show new upload
         } catch (error: any) {
