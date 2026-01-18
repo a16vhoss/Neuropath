@@ -101,11 +101,50 @@ Devuelve SOLO el JSON, sin texto adicional.`;
         const response = await callGemini(prompt);
         if (!response) return null;
 
-        // Parse JSON response
-        const cleanJson = response.replace(/```json\n?|\n?```/g, '').trim();
-        const flashcards = JSON.parse(cleanJson);
+        // Clean and parse JSON response
+        let cleanJson = response
+            .replace(/```json\n?|\n?```/g, '')  // Remove markdown code blocks
+            .replace(/```\n?/g, '')              // Remove any remaining code blocks
+            .trim();
 
-        return flashcards;
+        // Try to extract JSON array if there's extra text
+        const jsonMatch = cleanJson.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+            cleanJson = jsonMatch[0];
+        }
+
+        // Fix common JSON issues
+        cleanJson = cleanJson
+            .replace(/,\s*]/g, ']')           // Remove trailing commas
+            .replace(/,\s*}/g, '}')           // Remove trailing commas in objects
+            .replace(/[\x00-\x1F\x7F]/g, ' ') // Remove control characters
+            .replace(/\n/g, ' ')              // Replace newlines with spaces in strings
+            .replace(/\t/g, ' ');             // Replace tabs with spaces
+
+        try {
+            const flashcards = JSON.parse(cleanJson);
+            return flashcards;
+        } catch (parseError) {
+            console.error('JSON parse error, attempting recovery...');
+
+            // Last resort: try to manually extract flashcards
+            const cardMatches = cleanJson.matchAll(/"question"\s*:\s*"([^"]+)"\s*,\s*"answer"\s*:\s*"([^"]+)"/g);
+            const recoveredCards = [];
+            for (const match of cardMatches) {
+                recoveredCards.push({
+                    question: match[1],
+                    answer: match[2],
+                    category: 'General'
+                });
+            }
+
+            if (recoveredCards.length > 0) {
+                console.log('Recovered', recoveredCards.length, 'flashcards from malformed JSON');
+                return recoveredCards;
+            }
+
+            throw parseError;
+        }
     } catch (error) {
         console.error('Error generating flashcards:', error);
         return null;
