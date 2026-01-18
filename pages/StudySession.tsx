@@ -426,7 +426,12 @@ const StudySession: React.FC = () => {
 
   // End session: award XP and update streak
   const handleEndSession = async () => {
+    console.log('=== handleEndSession called ===');
+    console.log('User:', user?.id);
+    console.log('XP Earned in session:', xpEarned);
+
     if (!user) {
+      console.log('No user found, navigating back');
       navigate(-1);
       return;
     }
@@ -434,11 +439,17 @@ const StudySession: React.FC = () => {
     try {
       // Calculate XP: xpEarned already tracks session XP (10 per correct flashcard, 25 per correct exam question)
       if (xpEarned > 0) {
-        await GamificationService.awardXP(user.id, xpEarned);
+        console.log('Calling awardXP with:', user.id, xpEarned);
+        const newTotal = await GamificationService.awardXP(user.id, xpEarned);
+        console.log('awardXP result - new total XP:', newTotal);
+      } else {
+        console.log('XP is 0, skipping awardXP');
       }
 
       // Update streak
-      await GamificationService.updateStreak(user.id);
+      console.log('Calling updateStreak');
+      const newStreak = await GamificationService.updateStreak(user.id);
+      console.log('updateStreak result - new streak:', newStreak);
 
       // Show confetti for good performance
       if (xpEarned >= 50) {
@@ -446,7 +457,7 @@ const StudySession: React.FC = () => {
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
     } catch (error) {
-      console.error('Error saving session rewards:', error);
+      console.error('ERROR in handleEndSession:', error);
     }
 
     navigate(-1);
