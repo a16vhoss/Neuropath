@@ -384,6 +384,8 @@ export const createStudySet = async (studentId: string, studySetData: {
     return data;
 };
 
+
+
 export const getStudentStudySets = async (studentId: string) => {
     const { data, error } = await supabase
         .from('study_sets')
@@ -518,8 +520,9 @@ export interface StudySetMaterial {
     type: 'pdf' | 'manual' | 'url' | 'notes';
     file_url?: string;
     content_text?: string;
-    flashcards_generated?: number;
+    flashcards_generated: number;
     created_at?: string;
+    summary?: string | null;
 }
 
 export const getStudySetMaterials = async (studySetId: string) => {

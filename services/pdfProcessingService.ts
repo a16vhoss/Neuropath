@@ -233,6 +233,32 @@ export const generateStudyGuideFromMaterials = async (materialsContent: string[]
     }
 };
 
+export const generateMaterialSummary = async (content: string, type: 'pdf' | 'text' | 'url' | 'video'): Promise<string | null> => {
+    if (!content || content.length < 50) return null;
+
+    const summaryPrompt = `
+    Actúa como un asistente de estudio experto.
+    Tu tarea es generar un "Micro-Resumen" para este material de estudio (${type}).
+    
+    Reglas:
+    1. EXTENSIÓN: Máximo 3-4 viñetas (bullet points).
+    2. CONTENIDO: Extrae solo las ideas centrales y el propósito del material.
+    3. ESTILO: Conciso, directo y fácil de leer rápidamente.
+    4. IDIOMA: Español.
+    
+    Material:
+    ${content.slice(0, 5000)}
+    `;
+
+    try {
+        const summary = await callGemini(summaryPrompt);
+        return summary;
+    } catch (error) {
+        console.error('Error generating material summary:', error);
+        return null;
+    }
+};
+
 /**
  * Generate quiz questions from extracted text using Gemini
  */
