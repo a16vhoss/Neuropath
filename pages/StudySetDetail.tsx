@@ -152,10 +152,27 @@ const StudySetDetail: React.FC = () => {
 
             setUploadProgress('Extrayendo texto del PDF...');
             console.log('Extracting text from PDF...');
-            const extractedText = await extractTextFromPDF(file);
+
+            // Convert File to base64 for Gemini API
+            const fileToBase64 = (file: File): Promise<string> => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = () => {
+                        const base64 = (reader.result as string).split(',')[1];
+                        resolve(base64);
+                    };
+                    reader.onerror = reject;
+                });
+            };
+
+            const pdfBase64 = await fileToBase64(file);
+            console.log('PDF converted to base64, length:', pdfBase64.length);
+
+            const extractedText = await extractTextFromPDF(pdfBase64);
 
             if (!extractedText || extractedText.length < 50) {
-                throw new Error('No se pudo extraer suficiente texto del PDF');
+                throw new Error('No se pudo extraer suficiente texto del PDF. ¿Es un PDF con texto seleccionable?');
             }
             console.log('Extracted text length:', extractedText.length);
 
