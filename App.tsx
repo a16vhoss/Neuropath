@@ -142,6 +142,11 @@ const AppRoutes: React.FC = () => {
           <AdaptiveStudySession />
         </ProtectedRoute>
       } />
+      <Route path="/student/study/adaptive/set/:studySetId" element={
+        <ProtectedRoute allowedRole="student">
+          <AdaptiveStudySession />
+        </ProtectedRoute>
+      } />
 
       {/* Teacher Routes */}
       <Route path="/teacher" element={
