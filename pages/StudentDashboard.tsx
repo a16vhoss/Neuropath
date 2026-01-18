@@ -597,6 +597,11 @@ const StudentDashboard: React.FC = () => {
               </div>
             </div>
 
+            {/* Adaptive Study Widget */}
+            <AdaptiveProgressCard
+              onStartSession={(mode) => navigate(`/student/adaptive-study?mode=${mode}`)}
+            />
+
             {/* Quick Actions */}
             <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
               <h3 className="font-bold text-slate-900 mb-4">Acciones Rápidas</h3>

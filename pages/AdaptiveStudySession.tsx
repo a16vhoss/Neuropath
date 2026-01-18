@@ -416,11 +416,10 @@ const AdaptiveStudySession: React.FC = () => {
                     onClick={handleFlip}
                     className={`
                         relative bg-white rounded-3xl shadow-xl p-8 min-h-[300px]
-                        cursor-pointer transition-all duration-500 transform
-                        ${isFlipped ? 'rotate-y-180' : ''}
+                        cursor-pointer transition-all duration-300
                         hover:shadow-2xl
+                        ${isFlipped ? 'ring-2 ring-emerald-400' : ''}
                     `}
-                    style={{ perspective: '1000px' }}
                 >
                     <div className="flex flex-col items-center justify-center min-h-[250px]">
                         {!isFlipped ? (
@@ -435,7 +434,7 @@ const AdaptiveStudySession: React.FC = () => {
                             </>
                         ) : (
                             <>
-                                <span className="material-symbols-outlined text-5xl text-emerald-200 mb-4">lightbulb</span>
+                                <span className="material-symbols-outlined text-5xl text-emerald-400 mb-4">lightbulb</span>
                                 <p className="text-xl text-center font-medium text-slate-800 leading-relaxed">
                                     {currentCard?.answer}
                                 </p>
