@@ -1,9 +1,11 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getClassFlashcards, getStudySetFlashcards, updateFlashcardProgress, supabase } from '../services/supabaseClient';
 import { generateStudyFlashcards, getTutorResponse, generateQuizQuestions } from '../services/geminiService';
+import { GamificationService } from '../services/GamificationService';
 import AITutorChat from '../components/AITutorChat';
 import NeuroPodcast from '../components/NeuroPodcast';
 
@@ -406,6 +408,34 @@ const StudySession: React.FC = () => {
     }
   };
 
+  // End session: award XP and update streak
+  const handleEndSession = async () => {
+    if (!user) {
+      navigate(-1);
+      return;
+    }
+
+    try {
+      // Calculate XP: xpEarned already tracks session XP (10 per correct flashcard, 25 per correct exam question)
+      if (xpEarned > 0) {
+        await GamificationService.awardXP(user.id, xpEarned);
+      }
+
+      // Update streak
+      await GamificationService.updateStreak(user.id);
+
+      // Show confetti for good performance
+      if (xpEarned >= 50) {
+        setShowConfetti(true);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+    } catch (error) {
+      console.error('Error saving session rewards:', error);
+    }
+
+    navigate(-1);
+  };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -453,7 +483,7 @@ const StudySession: React.FC = () => {
 
       {/* Header */}
       <header className={`p-4 md:p-6 flex items-center justify-between ${mode === 'exam' ? 'text-slate-900' : 'text-white'}`}>
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 font-medium hover:opacity-80">
+        <button onClick={handleEndSession} className="flex items-center gap-2 font-medium hover:opacity-80">
           <span className="material-symbols-outlined">close</span>
           <span className="hidden md:inline">Finalizar Sesión</span>
         </button>
@@ -637,7 +667,7 @@ const StudySession: React.FC = () => {
                   Reintentar
                 </button>
                 <button
-                  onClick={() => navigate(-1)}
+                  onClick={handleEndSession}
                   className="flex-1 bg-primary text-white font-bold py-3 rounded-xl hover:bg-blue-700"
                 >
                   Finalizar
@@ -708,7 +738,7 @@ const StudySession: React.FC = () => {
               <div className={`text-6xl font-black mb-2 ${score >= 4 ? 'text-emerald-600' : 'text-rose-600'}`}>{score}/{quizQuestions.length}</div>
               <p className="text-slate-600 mb-8">{Math.round((score / quizQuestions.length) * 100)}%</p>
               <button
-                onClick={() => navigate(-1)}
+                onClick={handleEndSession}
                 className="w-full bg-primary text-white font-bold py-3 rounded-xl hover:bg-blue-700"
               >
                 Volver al Dashboard

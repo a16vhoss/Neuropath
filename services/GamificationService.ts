@@ -76,5 +76,66 @@ export const GamificationService = {
 
         if (error) throw error;
         return data;
+    },
+
+    async awardXP(userId: string, xpAmount: number): Promise<number> {
+        // Get current XP
+        const { data: profile, error: fetchError } = await supabase
+            .from('profiles')
+            .select('xp, level')
+            .eq('id', userId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        const newXP = (profile?.xp || 0) + xpAmount;
+        // Level up every 500 XP
+        const newLevel = Math.floor(newXP / 500) + 1;
+
+        const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ xp: newXP, level: newLevel })
+            .eq('id', userId);
+
+        if (updateError) throw updateError;
+        return newXP;
+    },
+
+    async updateStreak(userId: string): Promise<number> {
+        const today = new Date().toISOString().split('T')[0];
+
+        const { data: profile, error: fetchError } = await supabase
+            .from('profiles')
+            .select('streak_days, last_study_date')
+            .eq('id', userId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        let newStreak = 1;
+        const lastStudy = profile?.last_study_date;
+
+        if (lastStudy) {
+            const lastDate = new Date(lastStudy);
+            const todayDate = new Date(today);
+            const diffDays = Math.floor((todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 0) {
+                // Same day, streak unchanged
+                newStreak = profile.streak_days || 1;
+            } else if (diffDays === 1) {
+                // Consecutive day, increment streak
+                newStreak = (profile.streak_days || 0) + 1;
+            }
+            // if diffDays > 1, streak resets to 1
+        }
+
+        const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ streak_days: newStreak, last_study_date: today })
+            .eq('id', userId);
+
+        if (updateError) throw updateError;
+        return newStreak;
     }
 };
