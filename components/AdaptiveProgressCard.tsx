@@ -103,21 +103,7 @@ const AdaptiveProgressCard: React.FC<AdaptiveProgressCardProps> = ({ onStartSess
                 )}
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="text-center">
-                    <div className="text-3xl font-bold">{stats.dueToday}</div>
-                    <div className="text-xs text-white/70">Pendientes</div>
-                </div>
-                <div className="text-center">
-                    <div className="text-3xl font-bold">{stats.newCount}</div>
-                    <div className="text-xs text-white/70">Nuevas</div>
-                </div>
-                <div className="text-center">
-                    <div className="text-3xl font-bold">{stats.masteredCount}</div>
-                    <div className="text-xs text-white/70">Dominadas</div>
-                </div>
-            </div>
+
 
             {/* Retention Progress Bar */}
             <div className="mb-6">
