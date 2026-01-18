@@ -8,6 +8,8 @@ import { generateStudyFlashcards, getTutorResponse, generateQuizQuestions } from
 import { GamificationService } from '../services/GamificationService';
 import AITutorChat from '../components/AITutorChat';
 import NeuroPodcast from '../components/NeuroPodcast';
+import SRSRatingButtons from '../components/SRSRatingButtons';
+import { updateCardAfterReview, Rating, getRatingLabel } from '../services/AdaptiveLearningService';
 
 type StudyMode = 'flashcards' | 'quiz' | 'exam' | 'cramming' | 'podcast';
 
@@ -69,6 +71,7 @@ const StudySession: React.FC = () => {
   const [flashcardsComplete, setFlashcardsComplete] = useState(false);
   const [correctFlashcards, setCorrectFlashcards] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [responseStartTime, setResponseStartTime] = useState<number>(Date.now());
 
   // Quiz state
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(mockQuizQuestions);
@@ -314,46 +317,80 @@ const StudySession: React.FC = () => {
   }, [mode, examTime, examSubmitted]);
 
 
+  // Initialize timer for first card
+  useEffect(() => {
+    if (!loading && flashcards.length > 0) {
+      setResponseStartTime(Date.now());
+    }
+  }, [loading, flashcards.length]);
 
-
-
-
-  const handleKnow = async () => {
-    if (isProcessing) return;
+  const handleRate = async (rating: Rating) => {
+    if (isProcessing || !user || !flashcards[currentIndex]?.id) return;
     setIsProcessing(true);
+
+    const responseTime = Date.now() - responseStartTime;
 
     // Always track XP and correct count locally
-    setXpEarned(prev => prev + 10);
-    setCorrectFlashcards(prev => prev + 1);
-
-    // Try to update flashcard progress in Supabase (optional, may fail for mock data)
-    if (user && flashcards[currentIndex]?.id) {
-      try {
-        await updateFlashcardProgress(user.id, flashcards[currentIndex].id, true);
-      } catch (error) {
-        console.error('Error updating progress:', error);
-      }
+    // Rating 3 (Good) and 4 (Easy) are considered "Correct"
+    if (rating >= 3) {
+      setXpEarned(prev => prev + 10);
+      setCorrectFlashcards(prev => prev + 1);
+      setStreak(s => s + 1);
+      triggerConfetti();
+    } else {
+      setStreak(0);
     }
 
-    setStreak(s => s + 1);
-    triggerConfetti();
-    nextCard();
-  };
-
-  const handleDontKnow = async () => {
-    if (isProcessing) return;
-    setIsProcessing(true);
-
-    // Update flashcard progress with low quality
-    if (user && flashcards[currentIndex]?.id) {
-      try {
-        await updateFlashcardProgress(user.id, flashcards[currentIndex].id, false); // Incorrect answer
-      } catch (error) {
-        console.error('Error updating progress:', error);
-      }
+    // Update Adaptive SRS system
+    try {
+      console.log(`[SRS] Updating card ${flashcards[currentIndex].id} with rating ${rating}`);
+      await updateCardAfterReview(
+        user.id,
+        flashcards[currentIndex].id,
+        rating,
+        responseTime
+      );
+    } catch (error) {
+      console.error('Error updating SRS progress:', error);
     }
-    nextCard();
+
+    // Move to next
+    setIsFlipped(false);
+    if (currentIndex < flashcards.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+      setResponseStartTime(Date.now()); // Reset timer
+      setTimeout(() => setIsProcessing(false), 300);
+    } else {
+      // Session complete!
+      if (mode === 'cramming') {
+        const result = {
+          totalCards: flashcards.length,
+          correct: correctFlashcards + (rating >= 3 ? 1 : 0),
+          wrong: flashcards.length - (correctFlashcards + (rating >= 3 ? 1 : 0)),
+          skipped: 0
+        };
+        // TODO: Save cramming result if needed
+      }
+
+      setFlashcardsComplete(true);
+      setShowConfetti(true);
+
+      // Award XP
+      try {
+        const finalXp = xpEarned + (rating >= 3 ? 10 : 0);
+        await GamificationService.awardXP(user.id, finalXp);
+        await GamificationService.updateStreak(user.id);
+      } catch (error) {
+        console.error('Error in session completion:', error);
+      }
+      setIsProcessing(false);
+    }
   };
+
+  // Legacy handlers for backward compatibility or Cramming mode if strictly required
+  // But we will prefer SRS buttons for 'flashcards' mode
+  const handleKnow = async () => handleRate(3);
+  const handleDontKnow = async () => handleRate(1);
 
   const nextCard = () => {
     setIsFlipped(false);
@@ -383,6 +420,26 @@ const StudySession: React.FC = () => {
       setScore(score + 1);
       setXpEarned(prev => prev + 20);
       triggerConfetti();
+
+      // Update Adaptive SRS for correct answer (Rating 4 - Easy/Perfect)
+      if (user && flashcards[currentQuizIndex]?.id) {
+        updateCardAfterReview(
+          user.id,
+          flashcards[currentQuizIndex].id,
+          4, // Easy/Perfect
+          5000 // Assumed response time
+        ).catch(console.error);
+      }
+    } else {
+      // Update Adaptive SRS for incorrect answer (Rating 1 - Again)
+      if (user && flashcards[currentQuizIndex]?.id) {
+        updateCardAfterReview(
+          user.id,
+          flashcards[currentQuizIndex].id,
+          1, // Again/Fail
+          5000
+        ).catch(console.error);
+      }
     }
   };
 
@@ -401,6 +458,15 @@ const StudySession: React.FC = () => {
     examAnswers.forEach((answer, i) => {
       if (answer === quizQuestions[i].correctIndex) {
         examScore++;
+        // Update Adaptive SRS for correct answer
+        if (user && flashcards[i]?.id) {
+          updateCardAfterReview(user.id, flashcards[i].id, 4, 3000).catch(console.error);
+        }
+      } else {
+        // Update Adaptive SRS for incorrect answer
+        if (user && flashcards[i]?.id) {
+          updateCardAfterReview(user.id, flashcards[i].id, 1, 3000).catch(console.error);
+        }
       }
     });
     setScore(examScore);
@@ -608,22 +674,16 @@ const StudySession: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex gap-4 mt-8">
-              <button
-                onClick={handleDontKnow}
-                disabled={isProcessing}
-                className={`bg-white/20 backdrop-blur-sm text-white font-bold px-8 py-4 rounded-xl hover:bg-white/30 transition-all flex items-center gap-2 ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <span className="material-symbols-outlined">close</span> No lo sé
-              </button>
-              <button
-                onClick={handleKnow}
-                disabled={isProcessing}
-                className={`bg-white text-primary font-bold px-8 py-4 rounded-xl shadow-lg hover:scale-105 transition-all flex items-center gap-2 ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <span className="material-symbols-outlined">check</span> Lo sé
-              </button>
-            </div>
+            {/* Rating Buttons (Adaptive Mode style) */}
+            {isFlipped && (
+              <div className="mt-8">
+                <SRSRatingButtons
+                  onRate={handleRate}
+                  disabled={isProcessing}
+                />
+              </div>
+            )}
+
           </>
         )}
 

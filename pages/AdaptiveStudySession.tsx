@@ -137,6 +137,7 @@ const AdaptiveStudySession: React.FC = () => {
 
         const responseTime = Date.now() - responseStartTime;
         setLastResponseTime(responseTime);
+        console.log(`[Rate] Card ${currentCard.id} rated: ${rating} (${getRatingLabel(rating)})`);
 
         // Update card with FSRS
         const result = await updateCardAfterReview(
@@ -160,6 +161,9 @@ const AdaptiveStudySession: React.FC = () => {
             const newCardsStudied = prev.cardsStudied + 1;
             const newCardsCorrect = rating >= 3 ? prev.cardsCorrect + 1 : prev.cardsCorrect;
             const newCardsAgain = rating === 1 ? prev.cardsAgain + 1 : prev.cardsAgain;
+
+            console.log(`[Stats Update] Rating: ${rating}, Correct (>=3): ${rating >= 3}, PrevCorrect: ${prev.cardsCorrect}, NewCorrect: ${newCardsCorrect}`);
+
             const newAvgTime = Math.round(
                 (prev.avgResponseTimeMs * prev.cardsStudied + responseTime) / newCardsStudied
             );

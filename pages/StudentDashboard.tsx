@@ -602,67 +602,6 @@ const StudentDashboard: React.FC = () => {
               onStartSession={(mode) => navigate(`/student/adaptive-study?mode=${mode}`)}
             />
 
-            {/* Quick Actions */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-              <h3 className="font-bold text-slate-900 mb-4">Acciones Rápidas</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => (classes.length > 0 || studySets.length > 0) && navigate(
-                    classes.length > 0 ? `/student/study/${classes[0]?.id}?mode=flashcards` : `/student/study-set/${studySets[0]?.id}`
-                  )}
-                  disabled={classes.length === 0 && studySets.length === 0}
-                  className="p-4 rounded-xl bg-blue-50 text-blue-600 flex flex-col items-center gap-2 hover:bg-blue-100 transition-colors disabled:opacity-50"
-                >
-                  <span className="material-symbols-outlined">style</span>
-                  <span className="text-xs font-bold">Flashcards</span>
-                </button>
-                <button
-                  onClick={() => navigate('/student/adaptive-study')}
-                  className="p-4 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex flex-col items-center gap-2 hover:opacity-90 transition-opacity shadow-lg"
-                >
-                  <span className="material-symbols-outlined">psychology</span>
-                  <span className="text-xs font-bold">Adaptativo</span>
-                </button>
-                <button
-                  onClick={() => classes.length > 0 && navigate(`/student/study/${classes[0]?.id}?mode=quiz`)}
-                  disabled={classes.length === 0}
-                  className="p-4 rounded-xl bg-violet-50 text-violet-600 flex flex-col items-center gap-2 hover:bg-violet-100 transition-colors disabled:opacity-50"
-                >
-                  <span className="material-symbols-outlined">quiz</span>
-                  <span className="text-xs font-bold">Quiz</span>
-                </button>
-                <button
-                  onClick={() => setShowCreateSetModal(true)}
-                  className="p-4 rounded-xl bg-amber-50 text-amber-600 flex flex-col items-center gap-2 hover:bg-amber-100 transition-colors"
-                >
-                  <span className="material-symbols-outlined">add_circle</span>
-                  <span className="text-xs font-bold">Nuevo Set</span>
-                </button>
-                <button
-                  onClick={() => navigate('/student/achievements')}
-                  className="p-4 rounded-xl bg-emerald-50 text-emerald-600 flex flex-col items-center gap-2 hover:bg-emerald-100 transition-colors"
-                >
-                  <span className="material-symbols-outlined">emoji_events</span>
-                  <span className="text-xs font-bold">Logros ({badges})</span>
-                </button>
-
-                <button
-                  onClick={() => setShowMagicModal(true)}
-                  className="p-4 rounded-xl bg-indigo-50 text-indigo-600 flex flex-col items-center gap-2 hover:bg-indigo-100 transition-colors"
-                >
-                  <span className="material-symbols-outlined">auto_awesome</span>
-                  <span className="text-xs font-bold">Magic Import</span>
-                </button>
-
-                <button
-                  onClick={() => navigate('/student/mock-exam')}
-                  className="p-4 rounded-xl bg-orange-50 text-orange-600 flex flex-col items-center gap-2 hover:bg-orange-100 transition-colors"
-                >
-                  <span className="material-symbols-outlined">timer</span>
-                  <span className="text-xs font-bold">Simulacro</span>
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </main>

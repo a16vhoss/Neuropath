@@ -517,11 +517,18 @@ const StudySetDetail: React.FC = () => {
 
                         <div className="flex items-center gap-2">
                             <button
-                                onClick={() => navigate(`/student/study-set/${studySet.id}?mode=flashcards`)}
+                                onClick={() => navigate(`/student/study/adaptive/set/${studySet.id}?mode=adaptive`)}
                                 className="bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold px-6 py-2 rounded-xl hover:opacity-90 transition flex items-center gap-2"
                             >
-                                <span className="material-symbols-outlined">play_arrow</span>
-                                Estudiar Ahora
+                                <span className="material-symbols-outlined">auto_awesome</span>
+                                Estudiar (Adaptativo)
+                            </button>
+                            <button
+                                onClick={() => navigate(`/student/study-set/${studySet.id}?mode=exam`)}
+                                className="bg-white text-slate-700 border border-slate-200 font-bold px-6 py-2 rounded-xl hover:bg-slate-50 transition flex items-center gap-2"
+                            >
+                                <span className="material-symbols-outlined">timer</span>
+                                Simulacro
                             </button>
                             <button
                                 onClick={handleDeleteSet}
