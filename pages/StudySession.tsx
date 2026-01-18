@@ -125,12 +125,10 @@ const StudySession: React.FC = () => {
             answer: c.answer,
             category: c.category || 'General',
             difficulty: c.difficulty || 1,
-            // We could store srs data if needed, but for now we map to existing state
           }));
           setFlashcards(mappedCards);
 
           // If we have a class/set name, try to fetch it separately just for display
-          // (Optional independent fetch since getCardsForSession doesn't return metadata)
           if (studySetId && !className) {
             const { data } = await supabase.from('study_sets').select('name').eq('id', studySetId).single();
             if (data) setClassName(data.name);
@@ -139,13 +137,46 @@ const StudySession: React.FC = () => {
             if (data) setClassName(data.name);
           }
         } else {
-          // Fallback if no cards found - maybe fetch standard getAll for empty state handling or rely on existing fallback
-          console.log('No adaptive cards found, falling back to standard fetch');
-          // Retain existing fallback logic or handle empty state
+          // No adaptive cards found - all might be archived
+          // Try fetching ALL flashcards from the study set (including archived ones as fallback)
+          console.log('No adaptive cards found, fetching all cards from study set');
+
+          if (studySetId) {
+            const { data: allCards } = await supabase
+              .from('flashcards')
+              .select('*')
+              .eq('study_set_id', studySetId);
+
+            if (allCards && allCards.length > 0) {
+              // Map and use all cards (they might need to be un-archived or reviewed)
+              const mappedCards = allCards.map(c => ({
+                id: c.id,
+                question: c.question,
+                answer: c.answer,
+                category: c.category || 'General',
+                difficulty: c.difficulty || 1,
+              }));
+              setFlashcards(mappedCards);
+
+              const { data } = await supabase.from('study_sets').select('name').eq('id', studySetId).single();
+              if (data) setClassName(data.name);
+            } else {
+              // No cards at all - use mock as last resort
+              console.log('No cards found, using mock flashcards');
+              setFlashcards(mockFlashcards);
+              setLoadingSource('mock');
+            }
+          } else {
+            // Fallback to mock
+            setFlashcards(mockFlashcards);
+            setLoadingSource('mock');
+          }
         }
 
       } catch (error) {
         console.error('Error fetching adaptive cards:', error);
+        setFlashcards(mockFlashcards);
+        setLoadingSource('mock');
       }
 
       setLoading(false);
@@ -182,15 +213,21 @@ const StudySession: React.FC = () => {
   }, [classId, studySetId]);
 
   // Effect to generate quiz when flashcards change (and are not empty)
+  const [quizGenerated, setQuizGenerated] = useState(false);
+
   useEffect(() => {
     const generateQuiz = async () => {
-      if (flashcards.length > 0 && quizQuestions === mockQuizQuestions) {
+      // Only generate once when we have real flashcards loaded
+      if (flashcards.length > 0 && !quizGenerated && loadingSource !== 'mock') {
         const context = flashcards.slice(0, 15).map(c => `Q: ${c.question} A: ${c.answer}`).join('\n');
         try {
+          console.log('Generating quiz from flashcards context...');
           const generated = await generateQuizQuestions(context);
           if (generated && generated.length > 0) {
             setQuizQuestions(generated);
             setExamAnswers(new Array(generated.length).fill(null));
+            setQuizGenerated(true);
+            console.log('Quiz generated successfully:', generated.length, 'questions');
           }
         } catch (e) {
           console.error("Quiz gen error", e);
@@ -198,7 +235,7 @@ const StudySession: React.FC = () => {
       }
     }
     generateQuiz();
-  }, [flashcards]);
+  }, [flashcards, loadingSource, quizGenerated]);
 
 
   // Exam timer
