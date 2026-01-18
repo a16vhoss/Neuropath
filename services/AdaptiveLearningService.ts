@@ -80,8 +80,8 @@ const FSRS_PARAMS = {
     STABILITY_FACTORS: {
         1: 0.2,   // Again - significant decrease
         2: 0.8,   // Hard - slight decrease
-        3: 1.0,   // Good - maintain/slight increase
-        4: 1.3,   // Easy - significant increase
+        3: 1.2,   // Good - moderate increase
+        4: 1.5,   // Easy - significant increase
     },
 
     // Difficulty adjustment factors
@@ -96,19 +96,30 @@ const FSRS_PARAMS = {
     TARGET_RETENTION: 0.9,
 
     // Minimum and maximum intervals
-    MIN_INTERVAL_MINUTES: 1,
+    MIN_INTERVAL_MINUTES: 10,
     MAX_INTERVAL_DAYS: 60, // Max 2 months between reviews
 
-    // Learning steps (in minutes)
-    LEARNING_STEPS: [1, 10, 60, 1440], // 1min, 10min, 1hr, 1 day
+    // Learning steps (in minutes) - used for new/learning cards
+    LEARNING_STEPS: {
+        1: 10,      // Again: 10 minutes
+        2: 60,      // Hard: 1 hour
+        3: 1440,    // Good: 1 day
+        4: 4320,    // Easy: 3 days
+    },
+
+    // Graduating interval (days) - when card moves from learning to review
+    GRADUATING_INTERVALS: {
+        3: 1,   // Good: 1 day
+        4: 4,   // Easy: 4 days
+    },
 
     // Mastery thresholds
     MASTERY_THRESHOLDS: {
         1: 2,   // 2 successful reviews
-        2: 5,   // 5 successful reviews  
-        3: 10,  // 10 successful reviews with interval > 7 days
-        4: 20,  // 20 successful reviews with interval > 21 days
-        5: 30,  // 30 successful reviews with interval > 45 days
+        2: 4,   // 4 successful reviews  
+        3: 7,   // 7 successful reviews
+        4: 12,  // 12 successful reviews
+        5: 20,  // 20 successful reviews
     }
 };
 
@@ -137,33 +148,34 @@ export function calculateNewStability(
     currentStability: number,
     difficulty: number,
     rating: Rating,
-    retrievability: number
+    retrievability: number,
+    isNew: boolean = false
 ): number {
-    const factor = FSRS_PARAMS.STABILITY_FACTORS[rating];
-
-    // The "surprise" factor - how unexpected was this result?
-    const successProbability = retrievability;
-    const outcome = rating >= 3 ? 1 : 0;
-    const surprise = Math.abs(outcome - successProbability);
-
-    // New stability calculation
-    let newStability: number;
-
-    if (rating === 1) {
-        // Again - reset to near initial
-        newStability = FSRS_PARAMS.INITIAL_STABILITY * factor;
-    } else {
-        // Increase stability based on success
-        const stabilityIncrease = (1 + (11 - difficulty * 10) * Math.pow(currentStability, -0.5)) * factor;
-        newStability = currentStability * stabilityIncrease;
-
-        // Bonus for successful recall when retrievability was low
-        if (rating >= 3 && retrievability < 0.7) {
-            newStability *= (1 + (1 - retrievability) * 0.5);
+    // For new cards, use simpler initial stability based on rating
+    if (isNew) {
+        switch (rating) {
+            case 1: return 0.1;  // Again: very short
+            case 2: return 0.3;  // Hard: short
+            case 3: return 1.0;  // Good: 1 day
+            case 4: return 3.0;  // Easy: 3 days
         }
     }
 
-    // Clamp to reasonable range (max stability = max interval in days)
+    const factor = FSRS_PARAMS.STABILITY_FACTORS[rating];
+
+    let newStability: number;
+
+    if (rating === 1) {
+        // Again - reset but don't go below minimum
+        newStability = Math.max(0.1, currentStability * 0.3);
+    } else {
+        // Gradual increase based on success
+        // The formula: stability * (1 + small_increase)
+        const baseIncrease = 0.1 + (0.5 / (difficulty + 0.1));
+        newStability = currentStability * (1 + baseIncrease * (rating - 1) * 0.5);
+    }
+
+    // Clamp to reasonable range
     return Math.max(0.1, Math.min(60, newStability));
 }
 
@@ -186,18 +198,26 @@ export function calculateNewDifficulty(
  */
 export function calculateNextInterval(
     stability: number,
-    state: CardState
+    state: CardState,
+    rating: Rating
 ): number {
-    // For learning cards, use fixed steps
+    // For learning/relearning cards, use fixed steps based on rating
     if (state === 'learning' || state === 'relearning') {
-        return FSRS_PARAMS.LEARNING_STEPS[0] / (60 * 24); // First step in days
+        const stepMinutes = FSRS_PARAMS.LEARNING_STEPS[rating] || 10;
+        return stepMinutes / (60 * 24); // Convert to days
     }
 
-    // For review cards, interval based on stability and target retention
-    // I = S * ln(R_target)^(-1)
-    const interval = stability * Math.pow(-Math.log(FSRS_PARAMS.TARGET_RETENTION), -1);
+    // For review cards that just graduated, use graduating intervals
+    if (stability <= 1) {
+        const graduatingDays = FSRS_PARAMS.GRADUATING_INTERVALS[rating as 3 | 4] || 1;
+        return graduatingDays;
+    }
 
-    // Add some randomness to prevent "card clusters"
+    // For established review cards, use stability-based calculation
+    // Interval = stability (in days), clamped to max
+    const interval = Math.min(stability, FSRS_PARAMS.MAX_INTERVAL_DAYS);
+
+    // Add small randomness to prevent clustering
     const fuzz = 1 + (Math.random() - 0.5) * 0.1;
 
     return Math.max(
@@ -207,18 +227,20 @@ export function calculateNextInterval(
 }
 
 /**
- * Calculate mastery level based on reps and stability
+ * Calculate mastery level based on reps and lapses
+ * Simpler formula: purely based on successful review count
  */
 export function calculateMasteryLevel(
     reps: number,
     lapses: number,
     stability: number
 ): number {
-    const successfulReps = reps - lapses * 2; // Lapses count against progress
+    // Net successful reps (lapses count against progress)
+    const successfulReps = Math.max(0, reps - lapses);
 
-    if (successfulReps >= FSRS_PARAMS.MASTERY_THRESHOLDS[5] && stability >= 45) return 5;
-    if (successfulReps >= FSRS_PARAMS.MASTERY_THRESHOLDS[4] && stability >= 21) return 4;
-    if (successfulReps >= FSRS_PARAMS.MASTERY_THRESHOLDS[3] && stability >= 7) return 3;
+    if (successfulReps >= FSRS_PARAMS.MASTERY_THRESHOLDS[5]) return 5;
+    if (successfulReps >= FSRS_PARAMS.MASTERY_THRESHOLDS[4]) return 4;
+    if (successfulReps >= FSRS_PARAMS.MASTERY_THRESHOLDS[3]) return 3;
     if (successfulReps >= FSRS_PARAMS.MASTERY_THRESHOLDS[2]) return 2;
     if (successfulReps >= FSRS_PARAMS.MASTERY_THRESHOLDS[1]) return 1;
     return 0;
@@ -290,12 +312,16 @@ export async function updateCardAfterReview(
     // Calculate current retrievability
     const currentRetrievability = calculateRetrievability(srsData.stability, daysSinceLastReview);
 
+    // Detect if this is a new card
+    const isNewCard = srsData.state === 'new';
+
     // Calculate new values
     const newStability = calculateNewStability(
         srsData.stability,
         srsData.difficulty,
         rating,
-        currentRetrievability
+        currentRetrievability,
+        isNewCard
     );
 
     const newDifficulty = calculateNewDifficulty(srsData.difficulty, rating);
@@ -322,7 +348,7 @@ export async function updateCardAfterReview(
     }
 
     // Calculate next interval
-    const nextIntervalDays = calculateNextInterval(newStability, newState);
+    const nextIntervalDays = calculateNextInterval(newStability, newState, rating);
     const nextReviewAt = new Date(now.getTime() + nextIntervalDays * 24 * 60 * 60 * 1000);
 
     // Calculate mastery level
