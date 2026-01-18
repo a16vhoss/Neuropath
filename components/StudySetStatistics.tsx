@@ -109,12 +109,33 @@ const StudySetStatistics: React.FC<{ studySetId: string }> = ({ studySetId }) =>
         const date = new Date(dateStr);
         const now = new Date();
         const diffMs = date.getTime() - now.getTime();
-        const diffHours = diffMs / (1000 * 60 * 60);
-        const diffDays = diffHours / 24;
 
-        if (diffMs < 0) return 'Ahora';
-        if (diffHours < 24) return `${Math.round(diffHours)} horas`;
-        return `${Math.round(diffDays)} días`;
+        if (diffMs < 0) return '¡Ahora!';
+
+        const totalMinutes = Math.floor(diffMs / (1000 * 60));
+        const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const days = Math.floor(totalHours / 24);
+        const hours = totalHours % 24;
+        const minutes = totalMinutes % 60;
+
+        // Less than 1 hour: show minutes
+        if (totalHours < 1) {
+            return `${totalMinutes} min`;
+        }
+
+        // Less than 24 hours: show hours and minutes
+        if (days < 1) {
+            if (minutes > 0) {
+                return `${totalHours}h ${minutes}m`;
+            }
+            return `${totalHours} horas`;
+        }
+
+        // 1+ days: show days and hours
+        if (hours > 0) {
+            return `${days}d ${hours}h`;
+        }
+        return `${days} días`;
     };
 
     const getStateColor = (state: string) => {
