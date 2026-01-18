@@ -87,15 +87,45 @@ const StudySetStatistics: React.FC<{ studySetId: string }> = ({ studySetId }) =>
 
             setFlashcardStats(mergedStats);
 
-            // 4. Fetch Session History
+            // 4. Fetch Session History (Adaptive Sessions)
             const { data: sessions, error: sessError } = await supabase
                 .from('adaptive_study_sessions')
                 .select('id, created_at, mode, cards_correct, cards_studied, retention_rate')
                 .eq('study_set_id', studySetId)
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false });
+                .eq('user_id', user.id);
 
-            if (sessions) setSessionHistory(sessions);
+            // 5. Fetch Quiz Sessions (New Adaptive Quizzes)
+            const { data: quizSessions, error: quizError } = await supabase
+                .from('quiz_sessions')
+                .select('id, created_at, score, total_questions')
+                .eq('study_set_id', studySetId)
+                .eq('user_id', user.id);
+
+            if (quizError) console.error('Error fetching quiz sessions:', quizError);
+
+            // Merge and format
+            let allSessions: SessionHistory[] = [];
+
+            if (sessions) {
+                allSessions = [...allSessions, ...sessions];
+            }
+
+            if (quizSessions) {
+                const mappedQuizzes: SessionHistory[] = quizSessions.map(q => ({
+                    id: q.id,
+                    created_at: q.created_at,
+                    mode: 'quiz',
+                    cards_correct: q.score,
+                    cards_studied: q.total_questions,
+                    retention_rate: 0 // Not used for sorting, calculated on display
+                }));
+                allSessions = [...allSessions, ...mappedQuizzes];
+            }
+
+            // Sort by date desc
+            allSessions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+            setSessionHistory(allSessions);
 
         } catch (e) {
             console.error("Error loading stats", e);
@@ -163,8 +193,8 @@ const StudySetStatistics: React.FC<{ studySetId: string }> = ({ studySetId }) =>
                     <div className="text-2xl font-bold text-emerald-600">{flashcardStats.filter(s => s.mastery_level >= 4).length}</div>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <div className="text-sm text-slate-500 font-medium">Exámenes Tomados</div>
-                    <div className="text-2xl font-bold text-indigo-600">{sessionHistory.filter(s => s.mode === 'exam').length}</div>
+                    <div className="text-sm text-slate-500 font-medium">Quizzes/Exámenes</div>
+                    <div className="text-2xl font-bold text-indigo-600">{sessionHistory.filter(s => s.mode === 'exam' || s.mode === 'quiz').length}</div>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                     <div className="text-sm text-slate-500 font-medium">Precisión Promedio</div>
