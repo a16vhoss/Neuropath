@@ -162,7 +162,35 @@ const StudySession: React.FC = () => {
         } else {
           // No adaptive cards found
           if (studySetId) {
-            // Check if we have archived cards
+            // For quiz/exam modes, ALWAYS get all cards - no SRS restriction
+            if (mode === 'quiz' || mode === 'exam' || mode === 'cramming') {
+              const { data: allCards } = await supabase
+                .from('flashcards')
+                .select('*')
+                .eq('study_set_id', studySetId)
+                .limit(mode === 'exam' ? 50 : 20);
+
+              if (allCards && allCards.length > 0) {
+                sessionCards = allCards.map(c => ({
+                  id: c.id,
+                  question: c.question,
+                  answer: c.answer,
+                  category: c.category || 'General',
+                  difficulty: c.difficulty || 1
+                }));
+                setFlashcards(sessionCards);
+              } else {
+                // Only show "no cards" if there are literally zero flashcards
+                sessionCards = mockFlashcards;
+                setFlashcards(sessionCards);
+                setLoadingSource('mock');
+              }
+              setLoading(false);
+              // Quiz/exam questions will be generated in the useEffect that watches flashcards
+              return;
+            }
+
+            // For flashcards mode, check archived/mastered status
             const { count: archivedCount } = await supabase
               .from('flashcard_srs_data')
               .select('*', { count: 'exact', head: true })
@@ -197,20 +225,8 @@ const StudySession: React.FC = () => {
               }
               setGeneratingNewContent(false);
             } else {
-              // Really no cards due?
-              // Since we updated logic for quiz/exam, this means ABSOLUTELY NO cards exist or are available.
-              // Try to fallback to ALL cards for quiz/exam if adaptive returned nothing (just safety net)
-              if (mode === 'quiz' || mode === 'exam') {
-                const { data: allCards } = await supabase.from('flashcards').select('*').eq('study_set_id', studySetId).limit(20);
-                if (allCards && allCards.length > 0) {
-                  sessionCards = allCards.map(c => ({ ...c, difficulty: c.difficulty || 1 }));
-                  setFlashcards(sessionCards);
-                } else {
-                  setNoCardsDue(true);
-                }
-              } else {
-                setNoCardsDue(true);
-              }
+              // Flashcards mode - no cards due, show "Todo al día"
+              setNoCardsDue(true);
               setLoading(false);
               return;
             }
