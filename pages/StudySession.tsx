@@ -13,7 +13,7 @@ import { updateCardAfterReview, Rating, getRatingLabel, getCardsForSession, Flas
 import { handleSessionComplete, handleStrugglingSession, updateConsecutiveCorrect, DIFFICULTY_TIERS } from '../services/DynamicContentService';
 import StudySetStatistics from '../components/StudySetStatistics';
 
-type StudyMode = 'flashcards' | 'quiz' | 'exam' | 'cramming' | 'podcast';
+type StudyMode = 'flashcards' | 'quiz' | 'cramming' | 'podcast';
 
 interface Flashcard {
   id: string;
@@ -667,7 +667,6 @@ const StudySession: React.FC = () => {
             {[
               { id: 'flashcards', label: 'Flashcards', icon: 'style' },
               { id: 'quiz', label: 'Quiz', icon: 'quiz' },
-              { id: 'exam', label: 'Examen', icon: 'assignment' },
               { id: 'cramming', label: 'Cramming', icon: 'bolt' },
               { id: 'podcast', label: 'Podcast', icon: 'headphones' }
             ].map((m) => (
@@ -712,7 +711,7 @@ const StudySession: React.FC = () => {
               </p>
 
               {/* Mode Navigation */}
-              <div className="grid grid-cols-2 gap-3 mb-6">
+              <div className="grid grid-cols-3 gap-3 mb-6">
                 <button
                   onClick={() => { setNoCardsDue(false); setMode('flashcards'); }}
                   className="bg-indigo-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-indigo-700 transition flex items-center justify-center gap-2"
@@ -726,13 +725,6 @@ const StudySession: React.FC = () => {
                 >
                   <span className="material-symbols-outlined text-lg">quiz</span>
                   Quiz
-                </button>
-                <button
-                  onClick={() => { setNoCardsDue(false); setMode('exam'); }}
-                  className="bg-orange-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-orange-700 transition flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-lg">assignment</span>
-                  Examen
                 </button>
                 <button
                   onClick={() => { setNoCardsDue(false); setMode('cramming'); }}
@@ -961,96 +953,6 @@ const StudySession: React.FC = () => {
                   Finalizar
                 </button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Exam Mode */}
-        {mode === 'exam' && !examSubmitted && (
-          <div className="w-full max-w-3xl">
-            <div className="bg-white rounded-3xl shadow-xl p-6 mb-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold">Examen de Práctica</h2>
-                <span className={`px-3 py-1 rounded-full text-sm font-bold ${examTime < 60 ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                  {examTime < 60 ? '⚠️ Último minuto' : '✓ Tiempo restante'}
-                </span>
-              </div>
-
-              <div className="space-y-6">
-                {examQuestions.map((q, i) => (
-                  <div key={i} className="p-4 bg-slate-50 rounded-xl">
-                    <p className="font-bold text-slate-900 mb-3">{i + 1}. {q.question}</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {q.options.map((opt, j) => (
-                        <button
-                          key={j}
-                          onClick={() => {
-                            const newAnswers = [...examAnswers];
-                            newAnswers[i] = j;
-                            setExamAnswers(newAnswers);
-                          }}
-                          className={`p-3 rounded-lg text-left text-sm font-medium transition-all ${examAnswers[i] === j
-                            ? 'bg-primary text-white'
-                            : 'bg-white border border-slate-200 hover:border-primary'
-                            }`}
-                        >
-                          <span className={`inline-block w-6 h-6 rounded-full text-center text-xs leading-6 mr-2 ${examAnswers[i] === j ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                            }`}>
-                            {String.fromCharCode(65 + j)}
-                          </span>
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <button
-              onClick={handleExamSubmit}
-              className="w-full bg-primary text-white font-bold py-4 rounded-xl shadow-lg hover:bg-blue-700 transition-all"
-            >
-              Entregar Examen
-            </button>
-          </div>
-        )}
-
-        {/* Exam Submitted */}
-        {mode === 'exam' && examSubmitted && (
-          <div className="w-full max-w-md text-center">
-            <div className="bg-white rounded-3xl shadow-2xl p-8">
-              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${score >= (examQuestions.length * 0.6) ? 'bg-gradient-to-br from-emerald-400 to-teal-500' : 'bg-gradient-to-br from-rose-400 to-red-500'}`}>
-                <span className="material-symbols-outlined text-4xl text-white">
-                  {score >= (examQuestions.length * 0.6) ? 'school' : 'psychology'}
-                </span>
-              </div>
-              <h2 className="text-3xl font-black text-slate-900 mb-2">¡Examen Completado!</h2>
-              <p className="text-slate-500 mb-6">{score >= (examQuestions.length * 0.6) ? '¡Excelente trabajo!' : 'Sigue practicando'}</p>
-
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-violet-50 rounded-xl p-4">
-                  <div className="text-3xl font-black text-violet-600">+{xpEarned}</div>
-                  <div className="text-xs text-violet-500 font-bold">XP GANADOS</div>
-                </div>
-                <div className={`rounded-xl p-4 ${score >= (examQuestions.length * 0.6) ? 'bg-emerald-50' : 'bg-rose-50'}`}>
-                  <div className={`text-3xl font-black ${score >= (examQuestions.length * 0.6) ? 'text-emerald-600' : 'text-rose-600'}`}>{score}/{examQuestions.length}</div>
-                  <div className={`text-xs font-bold ${score >= (examQuestions.length * 0.6) ? 'text-emerald-500' : 'text-rose-500'}`}>{Math.round((score / (examQuestions.length || 1)) * 100)}%</div>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-r from-orange-100 to-red-100 rounded-xl p-4 mb-6">
-                <div className="flex items-center justify-center gap-2">
-                  <span className="material-symbols-outlined text-orange-500">local_fire_department</span>
-                  <span className="text-lg font-bold text-orange-600">Racha activada</span>
-                </div>
-              </div>
-
-              <button
-                onClick={handleEndSession}
-                className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition"
-              >
-                Finalizar y Guardar Progreso
-              </button>
             </div>
           </div>
         )}
