@@ -488,10 +488,206 @@ export async function handleSessionComplete(
 }
 
 // ============================================
+// REGRESSION HANDLING (When student is struggling)
+// ============================================
+
+// Threshold for detecting struggling sessions
+const STRUGGLING_THRESHOLD = {
+    correctRate: 0.5, // Less than 50% correct
+    minCardsStudied: 3, // At least 3 cards studied
+};
+
+export interface RegressionResult {
+    unarchivedCount: number;
+    reducedMasteryCount: number;
+    previousTier: DifficultyTier | null;
+    message: string;
+}
+
+/**
+ * Detect if user is struggling with current content
+ */
+export async function detectStruggling(
+    userId: string,
+    studySetId: string,
+    sessionStats: { correctRate: number; cardsStudied: number }
+): Promise<{ isStruggling: boolean; currentTier: DifficultyTier }> {
+    // Get the highest difficulty tier the user is currently studying
+    const { data: flashcards, error } = await supabase
+        .from('flashcards')
+        .select('id, difficulty_tier')
+        .eq('study_set_id', studySetId);
+
+    if (error || !flashcards) {
+        return { isStruggling: false, currentTier: 1 };
+    }
+
+    // Get active (non-archived) SRS data
+    const flashcardIds = flashcards.map(f => f.id);
+    const { data: srsData } = await supabase
+        .from('flashcard_srs_data')
+        .select('flashcard_id')
+        .eq('user_id', userId)
+        .in('flashcard_id', flashcardIds)
+        .eq('archived', false);
+
+    const activeCardIds = srsData?.map(s => s.flashcard_id) || [];
+    const activeTiers = flashcards
+        .filter(f => activeCardIds.includes(f.id))
+        .map(f => f.difficulty_tier || 1);
+
+    const currentTier = Math.max(...activeTiers, 1) as DifficultyTier;
+
+    // User is struggling if:
+    // 1. Correct rate is below threshold
+    // 2. They studied enough cards to make it meaningful
+    // 3. They are at tier 2 or higher (can regress)
+    const isStruggling =
+        sessionStats.correctRate < STRUGGLING_THRESHOLD.correctRate &&
+        sessionStats.cardsStudied >= STRUGGLING_THRESHOLD.minCardsStudied &&
+        currentTier > 1;
+
+    return { isStruggling, currentTier };
+}
+
+/**
+ * Unarchive cards from a previous tier to provide reinforcement
+ */
+export async function unarchiveReinforcementCards(
+    userId: string,
+    studySetId: string,
+    targetTier: DifficultyTier,
+    count: number = 3
+): Promise<string[]> {
+    // Find archived cards from the target (lower) tier
+    const { data: flashcards } = await supabase
+        .from('flashcards')
+        .select('id')
+        .eq('study_set_id', studySetId)
+        .eq('difficulty_tier', targetTier);
+
+    if (!flashcards || flashcards.length === 0) {
+        return [];
+    }
+
+    const flashcardIds = flashcards.map(f => f.id);
+
+    // Find archived SRS data for these cards
+    const { data: archivedSrs } = await supabase
+        .from('flashcard_srs_data')
+        .select('flashcard_id')
+        .eq('user_id', userId)
+        .in('flashcard_id', flashcardIds)
+        .eq('archived', true)
+        .limit(count);
+
+    if (!archivedSrs || archivedSrs.length === 0) {
+        return [];
+    }
+
+    const cardsToUnarchive = archivedSrs.map(s => s.flashcard_id);
+
+    // Unarchive these cards
+    const { error } = await supabase
+        .from('flashcard_srs_data')
+        .update({
+            archived: false,
+            archived_at: null,
+            // Reduce mastery level to force more reviews
+            mastery_level: 2,
+            consecutive_correct: 0,
+        })
+        .eq('user_id', userId)
+        .in('flashcard_id', cardsToUnarchive);
+
+    if (error) {
+        console.error('Error unarchiving cards:', error);
+        return [];
+    }
+
+    return cardsToUnarchive;
+}
+
+/**
+ * Reduce mastery level of failed cards to ensure more reviews
+ */
+export async function reduceMasteryForFailedCards(
+    userId: string,
+    flashcardIds: string[]
+): Promise<number> {
+    if (flashcardIds.length === 0) return 0;
+
+    // Update mastery level and reset consecutive correct
+    const { error, count } = await supabase
+        .from('flashcard_srs_data')
+        .update({
+            mastery_level: 1, // Reset to learning
+            consecutive_correct: 0,
+            state: 'relearning',
+        })
+        .eq('user_id', userId)
+        .in('flashcard_id', flashcardIds);
+
+    if (error) {
+        console.error('Error reducing mastery:', error);
+        return 0;
+    }
+
+    return count || 0;
+}
+
+/**
+ * Handle a struggling session - bring back easier content
+ */
+export async function handleStrugglingSession(
+    userId: string,
+    studySetId: string,
+    sessionStats: { correctRate: number; cardsStudied: number },
+    failedCardIds: string[] = []
+): Promise<RegressionResult> {
+    const { isStruggling, currentTier } = await detectStruggling(userId, studySetId, sessionStats);
+
+    if (!isStruggling) {
+        return {
+            unarchivedCount: 0,
+            reducedMasteryCount: 0,
+            previousTier: null,
+            message: '',
+        };
+    }
+
+    const previousTier = Math.max(currentTier - 1, 1) as DifficultyTier;
+    const tierName = DIFFICULTY_TIERS[previousTier].name;
+
+    // 1. Unarchive some cards from the previous tier
+    const unarchivedCards = await unarchiveReinforcementCards(
+        userId,
+        studySetId,
+        previousTier,
+        3 // Bring back 3 cards
+    );
+
+    // 2. Reduce mastery of failed cards (if provided)
+    const reducedCount = await reduceMasteryForFailedCards(userId, failedCardIds);
+
+    return {
+        unarchivedCount: unarchivedCards.length,
+        reducedMasteryCount: reducedCount,
+        previousTier,
+        message: unarchivedCards.length > 0
+            ? `📚 Se detectó dificultad. Se recuperaron ${unarchivedCards.length} tarjetas de nivel "${tierName}" para reforzar.`
+            : reducedCount > 0
+                ? `🔄 Las tarjetas fallidas se reprogramarán para más práctica.`
+                : '',
+    };
+}
+
+// ============================================
 // EXPORTS
 // ============================================
 
 export {
     DIFFICULTY_TIERS,
     MASTERY_ARCHIVE_THRESHOLD,
+    STRUGGLING_THRESHOLD,
 };
