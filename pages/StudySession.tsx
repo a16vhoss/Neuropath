@@ -137,37 +137,70 @@ const StudySession: React.FC = () => {
             if (data) setClassName(data.name);
           }
         } else {
-          // No adaptive cards found - all might be archived
-          // Try fetching ALL flashcards from the study set (including archived ones as fallback)
-          console.log('No adaptive cards found, fetching all cards from study set');
-
+          // No adaptive cards found
           if (studySetId) {
-            const { data: allCards } = await supabase
+            // Check if we have archived cards (meaning user has mastered previous content)
+            const { count: archivedCount } = await supabase
+              .from('flashcard_srs_data')
+              .select('*', { count: 'exact', head: true })
+              .eq('user_id', user.id)
+              .eq('archived', true);
+
+            // Check total cards in set
+            const { count: totalCards } = await supabase
               .from('flashcards')
-              .select('*')
+              .select('*', { count: 'exact', head: true })
               .eq('study_set_id', studySetId);
 
-            if (allCards && allCards.length > 0) {
-              // Map and use all cards (they might need to be un-archived or reviewed)
-              const mappedCards = allCards.map(c => ({
-                id: c.id,
-                question: c.question,
-                answer: c.answer,
-                category: c.category || 'General',
-                difficulty: c.difficulty || 1,
-              }));
-              setFlashcards(mappedCards);
+            if (archivedCount && totalCards && archivedCount >= totalCards) {
+              console.log('All cards mastered/archived. Generating next level content...');
+              setGeneratingNewContent(true);
+              // Trigger generation for next tier
+              // We need to determine current tier first, but for now we can rely on handleSessionComplete logic 
+              // or calling generateNewFlashcards directly. 
+              // Better approach: Trigger a "Generation" session type or just Generate immediate.
 
-              const { data } = await supabase.from('study_sets').select('name').eq('id', studySetId).single();
-              if (data) setClassName(data.name);
+              // Let's force a generation check
+              const result = await handleSessionComplete(user.id, studySetId, { correctRate: 1.0, cardsStudied: 10 });
+
+              if (result.newCardsGenerated > 0) {
+                // Reload cards
+                const newCards = await getCardsForSession({
+                  userId: user.id,
+                  studySetId: studySetId,
+                  mode: 'adaptive'
+                });
+
+                if (newCards && newCards.length > 0) {
+                  const mapped = newCards.map(c => ({
+                    id: c.id,
+                    question: c.question,
+                    answer: c.answer,
+                    category: c.category || 'General',
+                    difficulty: c.difficulty || 1,
+                  }));
+                  setFlashcards(mapped);
+                  setNewContentMessage(`🎉 ¡Increíble! Has dominado todo el contenido anterior. Hemos generado ${result.newCardsGenerated} nuevas preguntas de nivel avanzado.`);
+                }
+              } else {
+                // Optimization: if no new cards generated (maybe max tier reached), THEN show archived or celebration
+                console.log('Max tier reached or generation failed.');
+                // Fallback to all cards just to show something
+                const { data: allCards } = await supabase.from('flashcards').select('*').eq('study_set_id', studySetId);
+                if (allCards) setFlashcards(allCards.map(c => ({ ...c, difficulty: c.difficulty || 1 })));
+              }
+              setGeneratingNewContent(false);
             } else {
-              // No cards at all - use mock as last resort
-              console.log('No cards found, using mock flashcards');
-              setFlashcards(mockFlashcards);
-              setLoadingSource('mock');
+              // Just a new set or empty set, try fetching all to be safe or mock
+              const { data: allCards } = await supabase.from('flashcards').select('*').eq('study_set_id', studySetId);
+              if (allCards && allCards.length > 0) {
+                setFlashcards(allCards.map(c => ({ ...c, difficulty: c.difficulty || 1 })));
+              } else {
+                setFlashcards(mockFlashcards);
+                setLoadingSource('mock');
+              }
             }
           } else {
-            // Fallback to mock
             setFlashcards(mockFlashcards);
             setLoadingSource('mock');
           }
