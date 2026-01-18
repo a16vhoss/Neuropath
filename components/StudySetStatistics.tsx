@@ -23,6 +23,15 @@ interface SessionHistory {
     retention_rate: number;
 }
 
+interface QuizQuestionResult {
+    id: string;
+    question_text: string;
+    user_answer: string;
+    correct_answer: string;
+    is_correct: boolean;
+    topic: string;
+}
+
 const StudySetStatistics: React.FC<{ studySetId: string }> = ({ studySetId }) => {
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
@@ -31,6 +40,11 @@ const StudySetStatistics: React.FC<{ studySetId: string }> = ({ studySetId }) =>
     const [flashcardStats, setFlashcardStats] = useState<SRSStats[]>([]);
     const [sessionHistory, setSessionHistory] = useState<SessionHistory[]>([]);
     const [viewMode, setViewMode] = useState<'flashcards' | 'history'>('flashcards');
+
+    // Detail view state
+    const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
+    const [sessionDetails, setSessionDetails] = useState<QuizQuestionResult[]>([]);
+    const [loadingDetails, setLoadingDetails] = useState(false);
 
     useEffect(() => {
         fetchStats();
@@ -168,6 +182,35 @@ const StudySetStatistics: React.FC<{ studySetId: string }> = ({ studySetId }) =>
         return `${days} días`;
     };
 
+
+
+    const handleExpandSession = async (sessionId: string, mode: string) => {
+        if (expandedSessionId === sessionId) {
+            setExpandedSessionId(null);
+            setSessionDetails([]);
+            return;
+        }
+
+        if (mode !== 'quiz') return;
+
+        setExpandedSessionId(sessionId);
+        setLoadingDetails(true);
+
+        try {
+            const { data, error } = await supabase
+                .from('quiz_question_results')
+                .select('*')
+                .eq('quiz_session_id', sessionId);
+
+            if (error) throw error;
+            setSessionDetails(data || []);
+        } catch (e) {
+            console.error("Error fetching session details:", e);
+        } finally {
+            setLoadingDetails(false);
+        }
+    };
+
     const getStateColor = (state: string) => {
         switch (state) {
             case 'new': return 'bg-gray-100 text-gray-600';
@@ -288,30 +331,91 @@ const StudySetStatistics: React.FC<{ studySetId: string }> = ({ studySetId }) =>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-sm">
                             {sessionHistory.map(sess => (
-                                <tr key={sess.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-4 text-slate-700">
-                                        {new Date(sess.created_at).toLocaleDateString()} {new Date(sess.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </td>
-                                    <td className="p-4">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-semibold uppercase ${sess.mode === 'exam' ? 'bg-rose-100 text-rose-700' :
-                                            sess.mode === 'quiz' ? 'bg-indigo-100 text-indigo-700' :
-                                                'bg-slate-100 text-slate-600'
-                                            }`}>
-                                            {sess.mode}
-                                        </span>
-                                    </td>
-                                    <td className="p-4 font-medium">
-                                        <span className={
-                                            (sess.cards_correct / sess.cards_studied) >= 0.8 ? 'text-emerald-600' :
-                                                (sess.cards_correct / sess.cards_studied) >= 0.6 ? 'text-orange-600' : 'text-red-600'
-                                        }>
-                                            {Math.round((sess.cards_correct / sess.cards_studied) * 100)}%
-                                        </span>
-                                    </td>
-                                    <td className="p-4 text-slate-500">
-                                        {sess.cards_correct}/{sess.cards_studied} correctas
-                                    </td>
-                                </tr>
+                                <React.Fragment key={sess.id}>
+                                    <tr
+                                        className={`hover:bg-slate-50 transition-colors cursor-pointer ${expandedSessionId === sess.id ? 'bg-slate-50' : ''}`}
+                                        onClick={() => handleExpandSession(sess.id, sess.mode)}
+                                    >
+                                        <td className="p-4 text-slate-700">
+                                            <div className="flex items-center gap-2">
+                                                {sess.mode === 'quiz' && (
+                                                    <span className="material-symbols-outlined text-slate-400 text-sm">
+                                                        {expandedSessionId === sess.id ? 'expand_less' : 'expand_more'}
+                                                    </span>
+                                                )}
+                                                <div>
+                                                    <div>{new Date(sess.created_at).toLocaleDateString()}</div>
+                                                    <div className="text-xs text-slate-400">{new Date(sess.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="p-4">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold uppercase ${sess.mode === 'exam' ? 'bg-rose-100 text-rose-700' :
+                                                sess.mode === 'quiz' ? 'bg-indigo-100 text-indigo-700' :
+                                                    'bg-slate-100 text-slate-600'
+                                                }`}>
+                                                {sess.mode}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 font-medium">
+                                            <span className={
+                                                (sess.cards_correct / sess.cards_studied) >= 0.8 ? 'text-emerald-600' :
+                                                    (sess.cards_correct / sess.cards_studied) >= 0.6 ? 'text-orange-600' : 'text-red-600'
+                                            }>
+                                                {Math.round((sess.cards_correct / sess.cards_studied) * 100)}%
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-slate-500">
+                                            {sess.cards_correct}/{sess.cards_studied} correctas
+                                        </td>
+                                    </tr>
+                                    {/* Expanded Detail Row */}
+                                    {expandedSessionId === sess.id && sess.mode === 'quiz' && (
+                                        <tr>
+                                            <td colSpan={4} className="p-0 border-b border-slate-200 bg-slate-50">
+                                                <div className="p-4">
+                                                    {loadingDetails ? (
+                                                        <div className="flex justify-center p-4">
+                                                            <span className="material-symbols-outlined animate-spin text-slate-400">sync</span>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="space-y-3">
+                                                            <h4 className="font-semibold text-slate-700 text-sm">Detalle de Preguntas</h4>
+                                                            {sessionDetails.map((detail, idx) => (
+                                                                <div key={detail.id || idx} className={`p-3 rounded-lg border ${detail.is_correct ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+                                                                    <div className="flex justify-between items-start gap-4">
+                                                                        <div className="flex-1">
+                                                                            <p className="text-sm font-medium text-slate-800 mb-1">{detail.question_text}</p>
+                                                                            <div className="text-xs space-y-1">
+                                                                                <p className={detail.is_correct ? 'text-emerald-700' : 'text-red-700'}>
+                                                                                    <span className="font-bold">Tu respuesta:</span> {detail.user_answer}
+                                                                                </p>
+                                                                                {!detail.is_correct && (
+                                                                                    <p className="text-emerald-700">
+                                                                                        <span className="font-bold">Correcta:</span> {detail.correct_answer}
+                                                                                    </p>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                        <span className={`material-symbols-outlined text-lg ${detail.is_correct ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                                            {detail.is_correct ? 'check_circle' : 'cancel'}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="mt-2 text-[10px] text-slate-400 uppercase tracking-wider font-bold">
+                                                                        {detail.topic || 'General'}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                            {sessionDetails.length === 0 && (
+                                                                <div className="text-center text-slate-400 py-2 text-sm">No details available</div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
                             ))}
                             {sessionHistory.length === 0 && (
                                 <tr>
