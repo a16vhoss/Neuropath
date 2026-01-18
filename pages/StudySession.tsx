@@ -66,6 +66,8 @@ const StudySession: React.FC = () => {
   const [tutorLoading, setTutorLoading] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [xpEarned, setXpEarned] = useState(0);
+  const [flashcardsComplete, setFlashcardsComplete] = useState(false);
+  const [correctFlashcards, setCorrectFlashcards] = useState(0);
 
   // Quiz state
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(mockQuizQuestions);
@@ -311,12 +313,14 @@ const StudySession: React.FC = () => {
 
 
 
+
   const handleKnow = async () => {
     // Update flashcard progress in Supabase
     if (user && flashcards[currentIndex]?.id) {
       try {
         await updateFlashcardProgress(user.id, flashcards[currentIndex].id, true); // Correct answer
         setXpEarned(prev => prev + 10);
+        setCorrectFlashcards(prev => prev + 1);
       } catch (error) {
         console.error('Error updating progress:', error);
       }
@@ -343,6 +347,9 @@ const StudySession: React.FC = () => {
     setIsFlipped(false);
     if (currentIndex < flashcards.length - 1) {
       setCurrentIndex(currentIndex + 1);
+    } else {
+      // Session complete!
+      setFlashcardsComplete(true);
     }
   };
 
@@ -550,7 +557,7 @@ const StudySession: React.FC = () => {
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 pb-8">
         {/* Flashcards Mode */}
-        {mode === 'flashcards' && (
+        {mode === 'flashcards' && !flashcardsComplete && (
           <>
             <div
               onClick={() => setIsFlipped(!isFlipped)}
@@ -588,6 +595,44 @@ const StudySession: React.FC = () => {
               </button>
             </div>
           </>
+        )}
+
+        {/* Flashcards Complete Screen */}
+        {mode === 'flashcards' && flashcardsComplete && (
+          <div className="w-full max-w-md">
+            <div className="bg-white rounded-3xl shadow-2xl p-8 text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="material-symbols-outlined text-4xl text-white">celebration</span>
+              </div>
+              <h2 className="text-3xl font-black text-slate-900 mb-2">¡Sesión Completada!</h2>
+              <p className="text-slate-500 mb-6">Has terminado todas las flashcards</p>
+
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                <div className="bg-violet-50 rounded-xl p-4">
+                  <div className="text-3xl font-black text-violet-600">+{xpEarned}</div>
+                  <div className="text-xs text-violet-500 font-bold">XP GANADOS</div>
+                </div>
+                <div className="bg-amber-50 rounded-xl p-4">
+                  <div className="text-3xl font-black text-amber-600">{correctFlashcards}/{flashcards.length}</div>
+                  <div className="text-xs text-amber-500 font-bold">CORRECTAS</div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-orange-100 to-red-100 rounded-xl p-4 mb-6">
+                <div className="flex items-center justify-center gap-2">
+                  <span className="material-symbols-outlined text-orange-500">local_fire_department</span>
+                  <span className="text-lg font-bold text-orange-600">Racha activada</span>
+                </div>
+              </div>
+
+              <button
+                onClick={handleEndSession}
+                className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition"
+              >
+                Finalizar y Guardar Progreso
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Quiz Mode */}
