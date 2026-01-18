@@ -97,7 +97,7 @@ const FSRS_PARAMS = {
 
     // Minimum and maximum intervals
     MIN_INTERVAL_MINUTES: 1,
-    MAX_INTERVAL_DAYS: 365,
+    MAX_INTERVAL_DAYS: 60, // Max 2 months between reviews
 
     // Learning steps (in minutes)
     LEARNING_STEPS: [1, 10, 60, 1440], // 1min, 10min, 1hr, 1 day
@@ -108,7 +108,7 @@ const FSRS_PARAMS = {
         2: 5,   // 5 successful reviews  
         3: 10,  // 10 successful reviews with interval > 7 days
         4: 20,  // 20 successful reviews with interval > 21 days
-        5: 35,  // 35 successful reviews with interval > 60 days
+        5: 30,  // 30 successful reviews with interval > 45 days
     }
 };
 
@@ -163,8 +163,8 @@ export function calculateNewStability(
         }
     }
 
-    // Clamp to reasonable range
-    return Math.max(0.1, Math.min(365, newStability));
+    // Clamp to reasonable range (max stability = max interval in days)
+    return Math.max(0.1, Math.min(60, newStability));
 }
 
 /**
@@ -216,7 +216,7 @@ export function calculateMasteryLevel(
 ): number {
     const successfulReps = reps - lapses * 2; // Lapses count against progress
 
-    if (successfulReps >= FSRS_PARAMS.MASTERY_THRESHOLDS[5] && stability >= 60) return 5;
+    if (successfulReps >= FSRS_PARAMS.MASTERY_THRESHOLDS[5] && stability >= 45) return 5;
     if (successfulReps >= FSRS_PARAMS.MASTERY_THRESHOLDS[4] && stability >= 21) return 4;
     if (successfulReps >= FSRS_PARAMS.MASTERY_THRESHOLDS[3] && stability >= 7) return 3;
     if (successfulReps >= FSRS_PARAMS.MASTERY_THRESHOLDS[2]) return 2;
