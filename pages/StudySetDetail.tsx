@@ -11,7 +11,7 @@ import {
     addMaterialToStudySet,
     supabase
 } from '../services/supabaseClient';
-import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials } from '../services/pdfProcessingService';
+import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials, generateMaterialSummary } from '../services/pdfProcessingService';
 
 interface Flashcard {
     id: string;
@@ -27,6 +27,8 @@ interface Material {
     file_url?: string;
     flashcards_generated: number;
     created_at: string;
+    summary?: string;
+    content_text?: string;
 }
 
 interface StudySetFull {
@@ -94,6 +96,8 @@ const StudySetDetail: React.FC = () => {
 
     const [generatingGuide, setGeneratingGuide] = useState(false);
 
+    const [viewContentModal, setViewContentModal] = useState<{ isOpen: boolean; content: string; title: string }>({ isOpen: false, content: '', title: '' });
+
     const regenerateStudyGuide = async (newMaterialText?: string) => {
         if (!studySet) return;
 
@@ -137,6 +141,17 @@ const StudySetDetail: React.FC = () => {
             setIsEditingName(false);
         } catch (error) {
             console.error('Error updating study set:', error);
+        }
+    };
+
+    const addFlashcards = async (setId: string, cards: any[]) => {
+        // Helper to add multiple flashcards
+        for (const card of cards) {
+            await addFlashcardToStudySet(setId, {
+                question: card.question,
+                answer: card.answer,
+                category: card.category
+            });
         }
     };
 
@@ -735,18 +750,19 @@ const StudySetDetail: React.FC = () => {
                                                         {material.type === 'url' ? 'Abrir Enlace' : 'Ver PDF'}
                                                     </a>
                                                 )}
-                                                {material.content_text && (
-                                                    <button
-                                                        className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 bg-white border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition"
-                                                        onClick={() => {
-                                                            // Future: Show full text modal
-                                                            alert('Texto extraído:\n\n' + material.content_text.slice(0, 500) + '...');
-                                                        }}
-                                                    >
-                                                        <span className="material-symbols-outlined text-sm">text_snippet</span>
-                                                        Ver Texto
-                                                    </button>
-                                                )}
+                                                <button
+                                                    className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 bg-white border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition"
+                                                    onClick={() => {
+                                                        setViewContentModal({
+                                                            isOpen: true,
+                                                            content: material.content_text || '',
+                                                            title: material.name
+                                                        });
+                                                    }}
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">text_snippet</span>
+                                                    Ver Texto
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -758,135 +774,174 @@ const StudySetDetail: React.FC = () => {
             </main>
 
             {/* Add Flashcard Modal */}
-            {showAddFlashcard && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-                        <h3 className="text-xl font-bold text-slate-900 mb-4">Nueva Flashcard</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Pregunta</label>
-                                <textarea
-                                    value={newQuestion}
-                                    onChange={(e) => setNewQuestion(e.target.value)}
-                                    className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                                    rows={3}
-                                    placeholder="¿Cuál es la pregunta?"
-                                />
+            {
+                showAddFlashcard && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+                            <h3 className="text-xl font-bold text-slate-900 mb-4">Nueva Flashcard</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Pregunta</label>
+                                    <textarea
+                                        value={newQuestion}
+                                        onChange={(e) => setNewQuestion(e.target.value)}
+                                        className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                        rows={3}
+                                        placeholder="¿Cuál es la pregunta?"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Respuesta</label>
+                                    <textarea
+                                        value={newAnswer}
+                                        onChange={(e) => setNewAnswer(e.target.value)}
+                                        className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                        rows={3}
+                                        placeholder="La respuesta es..."
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Respuesta</label>
-                                <textarea
-                                    value={newAnswer}
-                                    onChange={(e) => setNewAnswer(e.target.value)}
-                                    className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                                    rows={3}
-                                    placeholder="La respuesta es..."
-                                />
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    onClick={() => setShowAddFlashcard(false)}
+                                    className="flex-1 py-3 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 transition"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleAddFlashcard}
+                                    disabled={!newQuestion.trim() || !newAnswer.trim()}
+                                    className="flex-1 py-3 bg-primary text-white font-medium rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
+                                >
+                                    Agregar
+                                </button>
                             </div>
-                        </div>
-                        <div className="flex gap-3 mt-6">
-                            <button
-                                onClick={() => setShowAddFlashcard(false)}
-                                className="flex-1 py-3 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 transition"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleAddFlashcard}
-                                disabled={!newQuestion.trim() || !newAnswer.trim()}
-                                className="flex-1 py-3 bg-primary text-white font-medium rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
-                            >
-                                Agregar
-                            </button>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Paste Text Modal */}
-            {showTextModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl p-6 w-full max-w-lg">
-                        <h3 className="text-xl font-bold text-slate-900 mb-4">Pegar Texto de Estudio</h3>
-                        <p className="text-sm text-slate-500 mb-4">
-                            Pega aquí tus apuntes o resumen. La IA generará flashcards automáticamente.
-                        </p>
-                        <textarea
-                            value={textContent}
-                            onChange={(e) => setTextContent(e.target.value)}
-                            className="w-full p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary min-h-[200px]"
-                            placeholder="Pega tu texto aquí..."
-                        />
-                        <div className="flex gap-3 mt-6">
-                            <button
-                                onClick={() => setShowTextModal(false)}
-                                className="flex-1 py-3 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 transition"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleTextSubmit}
-                                disabled={!textContent.trim() || uploading}
-                                className="flex-1 py-3 bg-orange-500 text-white font-medium rounded-xl hover:bg-orange-600 transition disabled:opacity-50 flex justify-center items-center gap-2"
-                            >
-                                {uploading ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                        Procesando...
-                                    </>
-                                ) : (
-                                    <>
-                                        <span className="material-symbols-outlined">auto_awesome</span>
-                                        Generar Flashcards
-                                    </>
-                                )}
-                            </button>
+            {
+                showTextModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-lg">
+                            <h3 className="text-xl font-bold text-slate-900 mb-4">Pegar Texto de Estudio</h3>
+                            <p className="text-sm text-slate-500 mb-4">
+                                Pega aquí tus apuntes o resumen. La IA generará flashcards automáticamente.
+                            </p>
+                            <textarea
+                                value={textContent}
+                                onChange={(e) => setTextContent(e.target.value)}
+                                className="w-full p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary min-h-[200px]"
+                                placeholder="Pega tu texto aquí..."
+                            />
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    onClick={() => setShowTextModal(false)}
+                                    className="flex-1 py-3 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 transition"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleTextSubmit}
+                                    disabled={!textContent.trim() || uploading}
+                                    className="flex-1 py-3 bg-orange-500 text-white font-medium rounded-xl hover:bg-orange-600 transition disabled:opacity-50 flex justify-center items-center gap-2"
+                                >
+                                    {uploading ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            Procesando...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="material-symbols-outlined">auto_awesome</span>
+                                            Generar Flashcards
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* URL/Video Modal */}
-            {showUrlModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-                        <h3 className="text-xl font-bold text-slate-900 mb-4">
-                            {urlType === 'youtube' ? 'Agregar Video de YouTube' : 'Agregar Enlace Web'}
-                        </h3>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-slate-700 mb-1">URL del {urlType === 'youtube' ? 'Video' : 'Sitio Web'}</label>
-                            <input
-                                type="text"
-                                value={urlInput}
-                                onChange={(e) => setUrlInput(e.target.value)}
-                                className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                                placeholder={urlType === 'youtube' ? 'https://youtube.com/watch?v=...' : 'https://example.com/article'}
-                            />
-                            {urlType === 'youtube' && (
-                                <p className="text-xs text-slate-500 mt-2">
-                                    Se guardará como referencia. Próximamente: Generación automática desde videos.
-                                </p>
-                            )}
-                        </div>
-                        <div className="flex gap-3 mt-6">
-                            <button
-                                onClick={() => setShowUrlModal(false)}
-                                className="flex-1 py-3 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 transition"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleUrlSubmit}
-                                disabled={!urlInput.trim() || uploading}
-                                className="flex-1 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
-                            >
-                                {uploading ? 'Guardando...' : 'Guardar Enlace'}
-                            </button>
+            {
+                showUrlModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+                            <h3 className="text-xl font-bold text-slate-900 mb-4">
+                                {urlType === 'youtube' ? 'Agregar Video de YouTube' : 'Agregar Enlace Web'}
+                            </h3>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-slate-700 mb-1">URL del {urlType === 'youtube' ? 'Video' : 'Sitio Web'}</label>
+                                <input
+                                    type="text"
+                                    value={urlInput}
+                                    onChange={(e) => setUrlInput(e.target.value)}
+                                    className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                    placeholder={urlType === 'youtube' ? 'https://youtube.com/watch?v=...' : 'https://example.com/article'}
+                                />
+                                {urlType === 'youtube' && (
+                                    <p className="text-xs text-slate-500 mt-2">
+                                        Se guardará como referencia. Próximamente: Generación automática desde videos.
+                                    </p>
+                                )}
+                            </div>
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    onClick={() => setShowUrlModal(false)}
+                                    className="flex-1 py-3 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 transition"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleUrlSubmit}
+                                    disabled={!urlInput.trim() || uploading}
+                                    className="flex-1 py-3 bg-primary text-white font-medium rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
+                                >
+                                    {uploading ? 'Agregando...' : 'Agregar'}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )}
+
+            {/* View Content Modal */}
+            {
+                viewContentModal.isOpen && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-xl font-bold text-slate-900 truncate pr-4">
+                                    {viewContentModal.title}
+                                </h3>
+                                <button
+                                    onClick={() => setViewContentModal(prev => ({ ...prev, isOpen: false }))}
+                                    className="text-slate-400 hover:text-slate-600 transition"
+                                >
+                                    <span className="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-4 bg-slate-50 rounded-xl border border-slate-100 font-mono text-sm text-slate-700 whitespace-pre-wrap">
+                                {viewContentModal.content}
+                            </div>
+
+                            <div className="mt-6 flex justify-end">
+                                <button
+                                    onClick={() => setViewContentModal(prev => ({ ...prev, isOpen: false }))}
+                                    className="px-6 py-2.5 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 transition"
+                                >
+                                    Cerrar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 };
 
