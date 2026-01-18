@@ -92,17 +92,23 @@ const StudySetDetail: React.FC = () => {
         }
     };
 
+    const [generatingGuide, setGeneratingGuide] = useState(false);
+
     const regenerateStudyGuide = async (newMaterialText?: string) => {
         if (!studySet) return;
 
         try {
+            setGeneratingGuide(true);
             console.log('Regenerating study guide...');
+
             // Collect existing texts + new one
-            const materials = studySet.materials.filter(m => m.content_text && m.content_text.length > 50).map(m => m.content_text!);
+            // Lowered threshold to 10 chars to be safer
+            const materials = studySet.materials.filter(m => m.content_text && m.content_text.length > 10).map(m => m.content_text!);
             if (newMaterialText) materials.push(newMaterialText);
 
             if (materials.length === 0) {
                 console.log('No materials to generate guide from');
+                alert('No se encontraron materiales con texto suficiente para generar la guía. Sube un PDF o agrega notas.');
                 return;
             }
 
@@ -112,9 +118,14 @@ const StudySetDetail: React.FC = () => {
                 setStudySet(prev => prev ? { ...prev, description: guide } : null);
                 setEditDescription(guide);
                 console.log('Study guide updated');
+            } else {
+                alert('No se pudo generar la guía. Intenta de nuevo.');
             }
         } catch (error) {
             console.error('Error generating guide:', error);
+            alert('Error al generar la guía. Revisa la consola para más detalles.');
+        } finally {
+            setGeneratingGuide(false);
         }
     };
 
@@ -553,11 +564,17 @@ const StudySetDetail: React.FC = () => {
                                 </h3>
                                 <button
                                     onClick={() => regenerateStudyGuide()}
-                                    className="text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-medium"
+                                    disabled={generatingGuide}
+                                    className={`text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-medium ${generatingGuide
+                                            ? 'bg-indigo-50 text-indigo-400 cursor-not-allowed'
+                                            : 'text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50'
+                                        }`}
                                     title="Regenerar buscando nuevo contenido en todos los materiales"
                                 >
-                                    <span className="material-symbols-outlined text-sm">refresh</span>
-                                    Regenerar Guía
+                                    <span className={`material-symbols-outlined text-sm ${generatingGuide ? 'animate-spin' : ''}`}>
+                                        {generatingGuide ? 'sync' : 'refresh'}
+                                    </span>
+                                    {generatingGuide ? 'Generando...' : 'Regenerar Guía'}
                                 </button>
                             </div>
 
