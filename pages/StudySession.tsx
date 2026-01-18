@@ -11,6 +11,7 @@ import NeuroPodcast from '../components/NeuroPodcast';
 import SRSRatingButtons from '../components/SRSRatingButtons';
 import { updateCardAfterReview, Rating, getRatingLabel, getCardsForSession, FlashcardWithSRS } from '../services/AdaptiveLearningService';
 import { handleSessionComplete, handleStrugglingSession, updateConsecutiveCorrect, DIFFICULTY_TIERS } from '../services/DynamicContentService';
+import StudySetStatistics from '../components/StudySetStatistics';
 
 type StudyMode = 'flashcards' | 'quiz' | 'exam' | 'cramming' | 'podcast';
 
@@ -97,6 +98,7 @@ const StudySession: React.FC = () => {
   const [regressionMessage, setRegressionMessage] = useState<string | null>(null);
   const [failedCardIds, setFailedCardIds] = useState<string[]>([]);
   const [noCardsDue, setNoCardsDue] = useState(false);
+  const [showStats, setShowStats] = useState(false);
 
   // Separate exam state
   const [examQuestions, setExamQuestions] = useState<QuizQuestion[]>([]);
@@ -108,30 +110,46 @@ const StudySession: React.FC = () => {
       setLoading(true);
 
 
-      // Handle personal study set or class with Unified Adaptive Logic
+      let sessionCards: Flashcard[] = [];
       try {
         setLoadingSource('db');
+
+        // Determine service mode based on component mode
+        let serviceMode: 'adaptive' | 'review_due' | 'learn_new' | 'cramming' | 'quiz' | 'exam' = 'adaptive';
+
+        switch (mode) {
+          case 'quiz':
+            serviceMode = 'quiz';
+            break;
+          case 'exam':
+            serviceMode = 'exam';
+            break;
+          case 'cramming':
+            serviceMode = 'cramming';
+            break;
+          // default stays adaptive
+        }
 
         // Fetch priority cards using FSRS logic
         const adaptiveCards = await getCardsForSession({
           userId: user.id,
           classId: classId || undefined,
           studySetId: studySetId || undefined,
-          mode: 'adaptive', // Always use adaptive sorting to ensure consistency across modes
+          mode: serviceMode,
           maxNewCards: 20,
-          maxReviewCards: 50
+          maxReviewCards: mode === 'exam' ? 50 : 20
         });
 
         if (adaptiveCards && adaptiveCards.length > 0) {
           // Map FlashcardWithSRS to local Flashcard interface
-          const mappedCards = adaptiveCards.map(c => ({
+          sessionCards = adaptiveCards.map(c => ({
             id: c.id,
             question: c.question,
             answer: c.answer,
             category: c.category || 'General',
             difficulty: c.difficulty || 1,
           }));
-          setFlashcards(mappedCards);
+          setFlashcards(sessionCards);
 
           // If we have a class/set name, try to fetch it separately just for display
           if (studySetId && !className) {
@@ -144,114 +162,76 @@ const StudySession: React.FC = () => {
         } else {
           // No adaptive cards found
           if (studySetId) {
-            // Check if we have archived cards (meaning user has mastered previous content)
+            // Check if we have archived cards
             const { count: archivedCount } = await supabase
               .from('flashcard_srs_data')
               .select('*', { count: 'exact', head: true })
               .eq('user_id', user.id)
               .eq('archived', true);
 
-            // Check total cards in set
             const { count: totalCards } = await supabase
               .from('flashcards')
               .select('*', { count: 'exact', head: true })
               .eq('study_set_id', studySetId);
 
             if (archivedCount && totalCards && archivedCount >= totalCards) {
-              console.log('All cards mastered/archived. Generating next level content...');
+              console.log('All cards mastered. Generating next level content...');
               setGeneratingNewContent(true);
-              // Trigger generation for next tier
-              // We need to determine current tier first, but for now we can rely on handleSessionComplete logic 
-              // or calling generateNewFlashcards directly. 
-              // Better approach: Trigger a "Generation" session type or just Generate immediate.
-
-              // Let's force a generation check
               const result = await handleSessionComplete(user.id, studySetId, { correctRate: 1.0, cardsStudied: 10 });
-
               if (result.newCardsGenerated > 0) {
-                // Reload cards
-                const newCards = await getCardsForSession({
-                  userId: user.id,
-                  studySetId: studySetId,
-                  mode: 'adaptive'
-                });
-
+                const newCards = await getCardsForSession({ userId: user.id, studySetId: studySetId, mode: serviceMode });
                 if (newCards && newCards.length > 0) {
-                  const mapped = newCards.map(c => ({
-                    id: c.id,
-                    question: c.question,
-                    answer: c.answer,
-                    category: c.category || 'General',
-                    difficulty: c.difficulty || 1,
+                  sessionCards = newCards.map(c => ({
+                    id: c.id, question: c.question, answer: c.answer, category: c.category || 'General', difficulty: c.difficulty || 1,
                   }));
-                  setFlashcards(mapped);
-                  setNewContentMessage(`🎉 ¡Increíble! Has dominado todo el contenido anterior. Hemos generado ${result.newCardsGenerated} nuevas preguntas de nivel avanzado.`);
+                  setFlashcards(sessionCards);
+                  setNewContentMessage(`Generated ${result.newCardsGenerated} new questions.`);
                 }
               } else {
-                // Optimization: if no new cards generated (maybe max tier reached), THEN show archived or celebration
-                console.log('Max tier reached or generation failed.');
-                // Fallback to all cards just to show something
+                // Fallback to all cards
                 const { data: allCards } = await supabase.from('flashcards').select('*').eq('study_set_id', studySetId);
-                if (allCards) setFlashcards(allCards.map(c => ({ ...c, difficulty: c.difficulty || 1 })));
+                if (allCards) {
+                  sessionCards = allCards.map(c => ({ ...c, difficulty: c.difficulty || 1 }));
+                  setFlashcards(sessionCards);
+                }
               }
               setGeneratingNewContent(false);
             } else {
-              // Cards exist but none returned by adaptive logic (and not all mastered)
-              // This strictly means they are scheduled for later!
-              // Do NOT show them. Show "Caught Up" screen.
-              if (totalCards && totalCards > 0) {
-                console.log('Cards exist but none due. User is caught up.');
-                setNoCardsDue(true);
-                setLoading(false);
-                return; // Stop here
+              // Really no cards due?
+              // Since we updated logic for quiz/exam, this means ABSOLUTELY NO cards exist or are available.
+              // Try to fallback to ALL cards for quiz/exam if adaptive returned nothing (just safety net)
+              if (mode === 'quiz' || mode === 'exam') {
+                const { data: allCards } = await supabase.from('flashcards').select('*').eq('study_set_id', studySetId).limit(20);
+                if (allCards && allCards.length > 0) {
+                  sessionCards = allCards.map(c => ({ ...c, difficulty: c.difficulty || 1 }));
+                  setFlashcards(sessionCards);
+                } else {
+                  setNoCardsDue(true);
+                }
               } else {
-                // Really empty set (0 cards)
-                // Fallback to mock or empty state
-                setFlashcards(mockFlashcards);
-                setLoadingSource('mock');
+                setNoCardsDue(true);
               }
+              setLoading(false);
+              return;
             }
           } else {
-            setFlashcards(mockFlashcards);
+            sessionCards = mockFlashcards;
+            setFlashcards(sessionCards);
             setLoadingSource('mock');
           }
         }
 
       } catch (error) {
-        console.error('Error fetching adaptive cards:', error);
-        setFlashcards(mockFlashcards);
+        console.error('Error fetching cards:', error);
+        sessionCards = mockFlashcards;
+        setFlashcards(sessionCards);
         setLoadingSource('mock');
       }
 
       setLoading(false);
-
-      // Generate Quiz from loaded flashcards (Just-in-time)
-      const currentCards = loadingSource === 'db' ?
-        (classId ? await getClassFlashcards(classId) : await getStudySetFlashcards(studySetId!))
-        : flashcards; // Logic slightly complex due to state updates, better to use the variable we just used
-
-      // Let's refactor slightly to ensure we have the cards to generate quiz from.
-      // Since state updates are async, we can't rely on 'flashcards' state immediately.
-      // We will define a helper to generate quiz
-      const prepareQuiz = async (cards: Flashcard[]) => {
-        if (!cards || cards.length === 0) return;
-
-        const context = cards.map(c => `Q: ${c.question} A: ${c.answer}`).join('\n');
-        // Only generate if we have API key (checked inside service)
-        const generatedQuiz = await generateQuizQuestions(context);
-
-        if (generatedQuiz && generatedQuiz.length > 0) {
-          setQuizQuestions(generatedQuiz);
-          setExamAnswers(new Array(generatedQuiz.length).fill(null));
-        }
-      };
-
-      // We need to call this with the cards we found.
-      // Since the original code had multiple exit points (return;), we need to inject this call before returns or unify them.
-      // Current structure has returns inside if blocks. I will insert the call before the returns in the original code logic.
-      // BUT replace_file_content needs to be precise.
-      // The original code is a bit scattered.
-      // I will overwrite the `fetchCards` function end to unify the quiz generation.
+      /* Quiz generation will happen in the useEffect dependent on 'flashcards' state, 
+         which we just updated. We don't need to manually call generation here anymore 
+         because we fixed the logic flow. */
     };
     fetchCards();
   }, [classId, studySetId]);
@@ -624,65 +604,77 @@ const StudySession: React.FC = () => {
           <span className="material-symbols-outlined">close</span>
           <span className="hidden md:inline">Finalizar Sesión</span>
         </button>
-        <div className="flex-1 max-w-md mx-8">
-          <div className="flex justify-between text-xs font-bold uppercase tracking-wider mb-1 opacity-80">
-            <span>{className || 'Sesión de Estudio'}</span>
-            <span>{mode === 'quiz' ? `${currentQuizIndex + 1}/${quizQuestions.length}` : `${currentIndex + 1}/${flashcards.length}`}</span>
-          </div>
-          <div className={`w-full h-2 rounded-full overflow-hidden ${mode === 'exam' ? 'bg-slate-200' : 'bg-white/20'}`}>
-            <div
-              className={`h-full rounded-full transition-all ${mode === 'exam' ? 'bg-primary' : 'bg-white'}`}
-              style={{ width: `${mode === 'quiz' ? ((currentQuizIndex + 1) / quizQuestions.length) * 100 : mode === 'exam' ? (score / (examQuestions.length || 1)) * 100 : ((currentIndex + 1) / flashcards.length) * 100}%` }} // Simplified bar for exam
-            ></div>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 rounded-full hover:bg-white/10 transition-colors"
+          >
+            <span className="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div className="flex flex-col">
+            <h1 className="text-xl md:text-2xl font-black tracking-tight">{className}</h1>
+            <p className="text-sm opacity-80 flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm">school</span>
+              Sesión de Estudio
+            </p>
           </div>
         </div>
-        <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${mode === 'exam' ? 'bg-slate-200 text-slate-700' : 'bg-white/20'}`}>
-          {mode === 'exam' ? (
-            <>
-              <span className="material-symbols-outlined text-rose-500">timer</span>
-              <span className="font-black text-xl">{formatTime(examTime)}</span>
-            </>
-          ) : (
-            <>
-              <span className="material-symbols-outlined text-amber-400 fill-1">local_fire_department</span>
-              <span className="font-black">+{xpEarned} XP</span>
-            </>
+
+        <div className="flex items-center gap-3">
+          {studySetId && (
+            <button
+              onClick={() => setShowStats(!showStats)}
+              className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-semibold transition-colors backdrop-blur-md border border-white/20"
+            >
+              <span className="material-symbols-outlined text-sm">analytics</span>
+              Estadísticas
+            </button>
           )}
+
+          <div className="flex items-center gap-2 bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+            <span className="material-symbols-outlined text-yellow-400 text-sm">local_fire_department</span>
+            <span className="font-bold text-sm">{streak}</span>
+          </div>
+          <div className="flex items-center gap-2 bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+            <span className="font-bold text-sm">{profile?.xp || 0} XP</span>
+          </div>
         </div>
       </header>
 
       {/* Mode Selector */}
-      <div className="flex justify-center px-4 mb-6">
-        <div className={`inline-flex p-1 rounded-xl ${mode === 'exam' ? 'bg-slate-200' : 'bg-white/20'}`}>
-          {[
-            { id: 'flashcards', label: 'Flashcards', icon: 'style' },
-            { id: 'quiz', label: 'Quiz', icon: 'quiz' },
-            { id: 'exam', label: 'Examen', icon: 'assignment' },
-            { id: 'cramming', label: 'Cramming', icon: 'bolt' },
-            { id: 'podcast', label: 'Podcast', icon: 'headphones' }
-          ].map((m) => (
-            <button
-              key={m.id}
-              onClick={() => {
-                setMode(m.id as StudyMode);
-                setCurrentIndex(0);
-                setCurrentQuizIndex(0);
-                setQuizComplete(false);
-                setExamSubmitted(false);
-                setExamTime(15 * 60);
-                setScore(0);
-              }}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold text-sm transition-all ${mode === m.id
-                ? (mode === 'exam' ? 'bg-white text-slate-900 shadow-sm' : 'bg-white text-primary shadow-sm')
-                : (mode === 'exam' ? 'text-slate-500' : 'text-white/80')
-                }`}
-            >
-              <span className="material-symbols-outlined text-lg">{m.icon}</span>
-              <span className="hidden sm:inline">{m.label}</span>
-            </button>
-          ))}
+      {mode !== 'exam' && !loading && (
+        <div className="flex justify-center px-4 mb-6">
+          <div className={`inline-flex p-1 rounded-xl ${mode === 'exam' ? 'bg-slate-200' : 'bg-white/20'}`}>
+            {[
+              { id: 'flashcards', label: 'Flashcards', icon: 'style' },
+              { id: 'quiz', label: 'Quiz', icon: 'quiz' },
+              { id: 'exam', label: 'Examen', icon: 'assignment' },
+              { id: 'cramming', label: 'Cramming', icon: 'bolt' },
+              { id: 'podcast', label: 'Podcast', icon: 'headphones' }
+            ].map((m) => (
+              <button
+                key={m.id}
+                onClick={() => {
+                  setMode(m.id as StudyMode);
+                  setCurrentIndex(0);
+                  setCurrentQuizIndex(0);
+                  setQuizComplete(false);
+                  setExamSubmitted(false);
+                  setExamTime(15 * 60);
+                  setScore(0);
+                }}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold text-sm transition-all ${mode === m.id
+                  ? (mode === 'exam' ? 'bg-white text-slate-900 shadow-sm' : 'bg-white text-primary shadow-sm')
+                  : (mode === 'exam' ? 'text-slate-500' : 'text-white/80')
+                  }`}
+              >
+                <span className="material-symbols-outlined text-lg">{m.icon}</span>
+                <span className="hidden sm:inline">{m.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 pb-8">

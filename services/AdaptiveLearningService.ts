@@ -51,7 +51,7 @@ export interface StudySessionConfig {
     userId: string;
     studySetId?: string;
     classId?: string;
-    mode: 'adaptive' | 'review_due' | 'learn_new' | 'cramming';
+    mode: 'adaptive' | 'review_due' | 'learn_new' | 'cramming' | 'quiz' | 'exam';
     maxNewCards?: number;
     maxReviewCards?: number;
 }
@@ -443,58 +443,85 @@ export async function getCardsForSession(
             newCards.push(cardWithSRS);
         } else {
             // For existing cards, check if they are due
-            // In cramming mode, we ignore the due date
+            // In cramming, quiz, or exam mode, we're less strict about due dates
             const isDue = new Date(srs.next_review_at) <= new Date();
 
-            if (mode === 'cramming' || isDue) {
+            if (mode === 'cramming' || mode === 'quiz' || mode === 'exam' || isDue) {
                 if (srs.state === 'learning' || srs.state === 'relearning') {
+                    // Priority 1: Cards currently being learned/relearned (mistakes)
                     learningCards.push(cardWithSRS);
-                } else {
+                } else if (isDue || mode === 'cramming' || mode === 'quiz' || mode === 'exam') {
+                    // Priority 2: Due Review cards (or all reviews in special modes)
                     dueCards.push(cardWithSRS);
                 }
             }
         }
     }
 
-    // Sort due cards by urgency (most overdue first)
-    dueCards.sort((a, b) => {
-        const aDate = a.srs?.next_review_at ? new Date(a.srs.next_review_at) : new Date();
-        const bDate = b.srs?.next_review_at ? new Date(b.srs.next_review_at) : new Date();
-        return aDate.getTime() - bDate.getTime();
+    // Sort appropriately
+    // 1. Learning cards first (struggling items)
+    learningCards.sort((a, b) => {
+        // Sort by how forgotten they are (lower retrievability) or just random
+        return (a.srs?.retrievability || 0) - (b.srs?.retrievability || 0);
     });
 
-    // Build session queue based on mode
-    let sessionCards: FlashcardWithSRS[] = [];
+    // 2. New cards (generated higher difficulty content)
+    // Randomize new cards to avoid predictable order
+    newCards.sort(() => Math.random() - 0.5);
 
-    switch (mode) {
-        case 'review_due':
-            sessionCards = dueCards.slice(0, maxReviewCards);
-            break;
+    // 3. Due cards
+    // Sort by due date (most overdue first)
+    dueCards.sort((a, b) => {
+        const dateA = new Date(a.srs?.next_review_at || 0).getTime();
+        const dateB = new Date(b.srs?.next_review_at || 0).getTime();
+        return dateA - dateB;
+    });
 
-        case 'learn_new':
-            sessionCards = newCards.slice(0, maxNewCards);
-            break;
+    let selectedCards: FlashcardWithSRS[] = [];
 
-        case 'cramming':
-            // Mix all cards, prioritizing low mastery
-            sessionCards = [...dueCards, ...learningCards, ...newCards]
-                .sort((a, b) => (a.srs?.mastery_level || 0) - (b.srs?.mastery_level || 0))
-                .slice(0, maxReviewCards + maxNewCards);
-            break;
+    // Final selection based on mode
+    if (mode === 'quiz' || mode === 'exam') {
+        const needed = maxReviewCards;
 
-        case 'adaptive':
-        default:
-            // Priority: Due > Learning > New (limited)
-            const reviewBatch = dueCards.slice(0, maxReviewCards);
-            const learningBatch = learningCards;
-            const newBatch = newCards.slice(0, maxNewCards);
+        // Take ALL learning cards (mistakes from previous sessions)
+        selectedCards = [...learningCards];
 
-            // Interleave for better learning
-            sessionCards = interleaveCards([...reviewBatch, ...learningBatch], newBatch);
-            break;
+        // Fill with NEW cards (new/advanced content generated)
+        if (selectedCards.length < needed) {
+            const spaceLeft = needed - selectedCards.length;
+            selectedCards = [...selectedCards, ...newCards.slice(0, spaceLeft)];
+        }
+
+        // Fill remaining space with Due/Review cards
+        // Ideally prioritizing ones that haven't been mastered yet, but here we just take available reviews
+        if (selectedCards.length < needed) {
+            const spaceLeft = needed - selectedCards.length;
+            selectedCards = [...selectedCards, ...dueCards.slice(0, spaceLeft)];
+        }
+    } else if (mode === 'cramming') {
+        // Mix all cards, prioritizing low mastery
+        selectedCards = [...dueCards, ...learningCards, ...newCards]
+            .sort((a, b) => (a.srs?.mastery_level || 0) - (b.srs?.mastery_level || 0))
+            .slice(0, maxReviewCards + maxNewCards);
+
+    } else if (mode === 'review_due') {
+        selectedCards = dueCards.slice(0, maxReviewCards);
+
+    } else if (mode === 'learn_new') {
+        selectedCards = newCards.slice(0, maxNewCards);
+
+    } else {
+        // Default / Adaptive Mode
+        // Priority: Due > Learning > New (limited)
+        const reviewBatch = dueCards.slice(0, maxReviewCards);
+        const learningBatch = learningCards;
+        const newBatch = newCards.slice(0, maxNewCards);
+
+        // Interleave for better learning
+        selectedCards = interleaveCards([...reviewBatch, ...learningBatch], newBatch);
     }
 
-    return sessionCards;
+    return selectedCards;
 }
 
 /**
