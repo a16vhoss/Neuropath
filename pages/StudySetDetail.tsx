@@ -476,21 +476,39 @@ const StudySetDetail: React.FC = () => {
                         ) : (
                             <div className="space-y-3">
                                 {studySet.materials.map((material) => (
-                                    <div key={material.id} className="bg-white rounded-xl p-4 border border-slate-100 flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-rose-100 rounded-xl flex items-center justify-center">
-                                            <span className="material-symbols-outlined text-rose-600">picture_as_pdf</span>
+                                    <div
+                                        key={material.id}
+                                        className="bg-white rounded-xl p-4 border border-slate-100 hover:shadow-md transition group"
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 bg-rose-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                                                <span className="material-symbols-outlined text-rose-600">picture_as_pdf</span>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-medium text-slate-900 truncate">{material.name}</p>
+                                                <p className="text-sm text-slate-500">
+                                                    {material.flashcards_generated} flashcards generadas • {new Date(material.created_at).toLocaleDateString()}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {material.file_url && (
+                                                    <a
+                                                        href={material.file_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition font-medium"
+                                                    >
+                                                        <span className="material-symbols-outlined text-sm">visibility</span>
+                                                        Ver PDF
+                                                    </a>
+                                                )}
+                                                {!material.file_url && (
+                                                    <span className="text-xs text-slate-400 bg-slate-100 px-3 py-1 rounded-lg">
+                                                        Archivo local
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="flex-1">
-                                            <p className="font-medium text-slate-900">{material.name}</p>
-                                            <p className="text-sm text-slate-500">
-                                                {material.flashcards_generated} flashcards generadas • {new Date(material.created_at).toLocaleDateString()}
-                                            </p>
-                                        </div>
-                                        {material.file_url && (
-                                            <a href={material.file_url} target="_blank" rel="noopener noreferrer" className="text-primary">
-                                                <span className="material-symbols-outlined">open_in_new</span>
-                                            </a>
-                                        )}
                                     </div>
                                 ))}
                             </div>
