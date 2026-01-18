@@ -223,6 +223,8 @@ export const updateFlashcardProgress = async (studentId: string, flashcardId: st
             repetitions,
             next_review: nextReview.toISOString().split('T')[0],
             last_reviewed: new Date().toISOString()
+        }, {
+            onConflict: 'student_id, flashcard_id'
         })
         .select()
         .single();
