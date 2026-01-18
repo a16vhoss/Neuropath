@@ -442,16 +442,42 @@ export async function getCardsForSession(
             // New card (no SRS data yet)
             newCards.push(cardWithSRS);
         } else {
-            // For existing cards, check if they are due
-            // In cramming, quiz, or exam mode, we're less strict about due dates
+            // Check if card is due
             const isDue = new Date(srs.next_review_at) <= new Date();
 
-            if (mode === 'cramming' || mode === 'quiz' || mode === 'exam' || isDue) {
+            // For quiz/exam: Don't include cards rated "easy" (mastery >= 3) that still have a long 
+            // interval remaining - they should stay on their schedule. But DO include:
+            // 1. Learning/relearning cards (mistakes)
+            // 2. Due cards
+            // 3. Cards that are close to being due (within 50% of their interval)
+            // 4. Low mastery cards that need more practice
+
+            if (mode === 'quiz' || mode === 'exam') {
                 if (srs.state === 'learning' || srs.state === 'relearning') {
                     // Priority 1: Cards currently being learned/relearned (mistakes)
                     learningCards.push(cardWithSRS);
-                } else if (isDue || mode === 'cramming' || mode === 'quiz' || mode === 'exam') {
-                    // Priority 2: Due Review cards (or all reviews in special modes)
+                } else if (isDue) {
+                    // Priority 2: Due cards - definitely include
+                    dueCards.push(cardWithSRS);
+                } else {
+                    // Check if card should be excluded (high mastery and far from due)
+                    const daysUntilDue = (new Date(srs.next_review_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+                    const intervalDays = srs.interval_days || 1;
+                    const closeTodue = daysUntilDue <= intervalDays * 0.5; // Within 50% of interval
+                    const lowMastery = (srs.mastery_level || 0) < 3;
+
+                    // Include if close to due OR low mastery (needs more practice)
+                    if (closeTodue || lowMastery) {
+                        dueCards.push(cardWithSRS);
+                    }
+                    // Otherwise, skip this card - it was rated easy and isn't due yet
+                }
+            } else if (mode === 'cramming' || isDue) {
+                if (srs.state === 'learning' || srs.state === 'relearning') {
+                    // Priority 1: Cards currently being learned/relearned (mistakes)
+                    learningCards.push(cardWithSRS);
+                } else {
+                    // Priority 2: Due Review cards (or all reviews in cramming mode)
                     dueCards.push(cardWithSRS);
                 }
             }

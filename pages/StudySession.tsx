@@ -1097,7 +1097,31 @@ const StudySession: React.FC = () => {
         )}
       </main>
 
-
+      {/* Statistics Modal */}
+      {showStats && studySetId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowStats(false)}
+          />
+          {/* Modal Content */}
+          <div className="relative z-10 w-full max-w-4xl max-h-[90vh] overflow-auto bg-white rounded-2xl shadow-2xl">
+            <div className="sticky top-0 z-20 flex items-center justify-between p-4 bg-white border-b">
+              <h2 className="text-xl font-bold text-slate-800">Estadísticas del Set</h2>
+              <button
+                onClick={() => setShowStats(false)}
+                className="p-2 rounded-full hover:bg-slate-100 transition-colors"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="p-4">
+              <StudySetStatistics studySetId={studySetId} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* AI Tutor Chat - Always visible */}
       {(() => {
