@@ -84,6 +84,7 @@ const StudySession: React.FC = () => {
 
   // Cramming state
   const [crammingIntensity, setCrammingIntensity] = useState<'low' | 'medium' | 'high'>('high');
+  const [crammingComplete, setCrammingComplete] = useState(false);
 
   // Load flashcards from Supabase or generate with AI
   useEffect(() => {
@@ -349,7 +350,11 @@ const StudySession: React.FC = () => {
       setCurrentIndex(currentIndex + 1);
     } else {
       // Session complete!
-      setFlashcardsComplete(true);
+      if (mode === 'cramming') {
+        setCrammingComplete(true);
+      } else {
+        setFlashcardsComplete(true);
+      }
     }
   };
 
@@ -697,13 +702,30 @@ const StudySession: React.FC = () => {
         {mode === 'quiz' && quizComplete && (
           <div className="w-full max-w-md text-center">
             <div className="bg-white rounded-3xl shadow-2xl p-8">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center mx-auto mb-6">
-                <span className="material-symbols-outlined text-5xl text-white">emoji_events</span>
+              <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="material-symbols-outlined text-4xl text-white">emoji_events</span>
               </div>
               <h2 className="text-3xl font-black text-slate-900 mb-2">¡Quiz Completado!</h2>
-              <p className="text-slate-500 mb-6">Has ganado <strong className="text-primary">+{xpEarned} XP</strong></p>
-              <div className="text-6xl font-black text-primary mb-2">{score}/{quizQuestions.length}</div>
-              <p className="text-slate-600 mb-8">respuestas correctas ({Math.round((score / quizQuestions.length) * 100)}%)</p>
+              <p className="text-slate-500 mb-6">Has terminado todas las preguntas</p>
+
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-violet-50 rounded-xl p-4">
+                  <div className="text-3xl font-black text-violet-600">+{xpEarned}</div>
+                  <div className="text-xs text-violet-500 font-bold">XP GANADOS</div>
+                </div>
+                <div className="bg-emerald-50 rounded-xl p-4">
+                  <div className="text-3xl font-black text-emerald-600">{score}/{quizQuestions.length}</div>
+                  <div className="text-xs text-emerald-500 font-bold">CORRECTAS</div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-orange-100 to-red-100 rounded-xl p-4 mb-6">
+                <div className="flex items-center justify-center gap-2">
+                  <span className="material-symbols-outlined text-orange-500">local_fire_department</span>
+                  <span className="text-lg font-bold text-orange-600">Racha activada</span>
+                </div>
+              </div>
+
               <div className="flex gap-4">
                 <button
                   onClick={() => { setQuizComplete(false); setCurrentQuizIndex(0); setScore(0); setXpEarned(0); }}
@@ -713,7 +735,7 @@ const StudySession: React.FC = () => {
                 </button>
                 <button
                   onClick={handleEndSession}
-                  className="flex-1 bg-primary text-white font-bold py-3 rounded-xl hover:bg-blue-700"
+                  className="flex-1 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold py-3 rounded-xl hover:opacity-90"
                 >
                   Finalizar
                 </button>
@@ -772,28 +794,44 @@ const StudySession: React.FC = () => {
         {mode === 'exam' && examSubmitted && (
           <div className="w-full max-w-md text-center">
             <div className="bg-white rounded-3xl shadow-2xl p-8">
-              <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 ${score >= 4 ? 'bg-emerald-100' : 'bg-rose-100'}`}>
-                <span className={`material-symbols-outlined text-5xl ${score >= 4 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                  {score >= 4 ? 'check_circle' : 'cancel'}
+              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${score >= 4 ? 'bg-gradient-to-br from-emerald-400 to-teal-500' : 'bg-gradient-to-br from-rose-400 to-red-500'}`}>
+                <span className="material-symbols-outlined text-4xl text-white">
+                  {score >= 4 ? 'school' : 'psychology'}
                 </span>
               </div>
-              <h2 className="text-3xl font-black text-slate-900 mb-2">Examen Enviado</h2>
-              <p className="text-slate-500 mb-2">{score >= 4 ? '¡Excelente trabajo!' : 'Sigue practicando'}</p>
-              <p className="text-primary font-bold mb-6">+{xpEarned} XP ganados</p>
-              <div className={`text-6xl font-black mb-2 ${score >= 4 ? 'text-emerald-600' : 'text-rose-600'}`}>{score}/{quizQuestions.length}</div>
-              <p className="text-slate-600 mb-8">{Math.round((score / quizQuestions.length) * 100)}%</p>
+              <h2 className="text-3xl font-black text-slate-900 mb-2">¡Examen Completado!</h2>
+              <p className="text-slate-500 mb-6">{score >= 4 ? '¡Excelente trabajo!' : 'Sigue practicando'}</p>
+
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-violet-50 rounded-xl p-4">
+                  <div className="text-3xl font-black text-violet-600">+{xpEarned}</div>
+                  <div className="text-xs text-violet-500 font-bold">XP GANADOS</div>
+                </div>
+                <div className={`rounded-xl p-4 ${score >= 4 ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+                  <div className={`text-3xl font-black ${score >= 4 ? 'text-emerald-600' : 'text-rose-600'}`}>{score}/{quizQuestions.length}</div>
+                  <div className={`text-xs font-bold ${score >= 4 ? 'text-emerald-500' : 'text-rose-500'}`}>{Math.round((score / quizQuestions.length) * 100)}%</div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-orange-100 to-red-100 rounded-xl p-4 mb-6">
+                <div className="flex items-center justify-center gap-2">
+                  <span className="material-symbols-outlined text-orange-500">local_fire_department</span>
+                  <span className="text-lg font-bold text-orange-600">Racha activada</span>
+                </div>
+              </div>
+
               <button
                 onClick={handleEndSession}
-                className="w-full bg-primary text-white font-bold py-3 rounded-xl hover:bg-blue-700"
+                className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition"
               >
-                Volver al Dashboard
+                Finalizar y Guardar Progreso
               </button>
             </div>
           </div>
         )}
 
         {/* Cramming Mode */}
-        {mode === 'cramming' && (
+        {mode === 'cramming' && !crammingComplete && (
           <>
             <div className="text-center text-white mb-8">
               <span className="material-symbols-outlined text-6xl mb-4 animate-pulse">bolt</span>
@@ -832,6 +870,44 @@ const StudySession: React.FC = () => {
               </button>
             </div>
           </>
+        )}
+
+        {/* Cramming Complete Screen */}
+        {mode === 'cramming' && crammingComplete && (
+          <div className="w-full max-w-md">
+            <div className="bg-white rounded-3xl shadow-2xl p-8 text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-rose-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="material-symbols-outlined text-4xl text-white">bolt</span>
+              </div>
+              <h2 className="text-3xl font-black text-slate-900 mb-2">🔥 ¡Cramming Completado!</h2>
+              <p className="text-slate-500 mb-6">Repaso intensivo terminado</p>
+
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-violet-50 rounded-xl p-4">
+                  <div className="text-3xl font-black text-violet-600">+{xpEarned}</div>
+                  <div className="text-xs text-violet-500 font-bold">XP GANADOS</div>
+                </div>
+                <div className="bg-amber-50 rounded-xl p-4">
+                  <div className="text-3xl font-black text-amber-600">{correctFlashcards}/{flashcards.length}</div>
+                  <div className="text-xs text-amber-500 font-bold">DOMINADAS</div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-orange-100 to-red-100 rounded-xl p-4 mb-6">
+                <div className="flex items-center justify-center gap-2">
+                  <span className="material-symbols-outlined text-orange-500">local_fire_department</span>
+                  <span className="text-lg font-bold text-orange-600">Racha activada</span>
+                </div>
+              </div>
+
+              <button
+                onClick={handleEndSession}
+                className="w-full bg-gradient-to-r from-rose-600 to-orange-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition"
+              >
+                Finalizar y Guardar Progreso
+              </button>
+            </div>
+          </div>
         )}
         {mode === 'podcast' && (
           <div className="max-w-4xl mx-auto">
