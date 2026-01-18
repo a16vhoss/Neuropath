@@ -96,6 +96,11 @@ const StudySession: React.FC = () => {
   const [newContentMessage, setNewContentMessage] = useState<string | null>(null);
   const [regressionMessage, setRegressionMessage] = useState<string | null>(null);
   const [failedCardIds, setFailedCardIds] = useState<string[]>([]);
+  const [noCardsDue, setNoCardsDue] = useState(false);
+
+  // Separate exam state
+  const [examQuestions, setExamQuestions] = useState<QuizQuestion[]>([]);
+
 
   // Load flashcards from Supabase or generate with AI
   useEffect(() => {
@@ -191,11 +196,17 @@ const StudySession: React.FC = () => {
               }
               setGeneratingNewContent(false);
             } else {
-              // Just a new set or empty set, try fetching all to be safe or mock
-              const { data: allCards } = await supabase.from('flashcards').select('*').eq('study_set_id', studySetId);
-              if (allCards && allCards.length > 0) {
-                setFlashcards(allCards.map(c => ({ ...c, difficulty: c.difficulty || 1 })));
+              // Cards exist but none returned by adaptive logic (and not all mastered)
+              // This strictly means they are scheduled for later!
+              // Do NOT show them. Show "Caught Up" screen.
+              if (totalCards && totalCards > 0) {
+                console.log('Cards exist but none due. User is caught up.');
+                setNoCardsDue(true);
+                setLoading(false);
+                return; // Stop here
               } else {
+                // Really empty set (0 cards)
+                // Fallback to mock or empty state
                 setFlashcards(mockFlashcards);
                 setLoadingSource('mock');
               }
@@ -249,25 +260,40 @@ const StudySession: React.FC = () => {
   const [quizGenerated, setQuizGenerated] = useState(false);
 
   useEffect(() => {
-    const generateQuiz = async () => {
+    const generateQuizAndExam = async () => {
       // Only generate once when we have real flashcards loaded
       if (flashcards.length > 0 && !quizGenerated && loadingSource !== 'mock') {
         const context = flashcards.slice(0, 15).map(c => `Q: ${c.question} A: ${c.answer}`).join('\n');
         try {
           console.log('Generating quiz from flashcards context...');
-          const generated = await generateQuizQuestions(context);
-          if (generated && generated.length > 0) {
-            setQuizQuestions(generated);
-            setExamAnswers(new Array(generated.length).fill(null));
+          const generatedQuiz = await generateQuizQuestions(context);
+
+          if (generatedQuiz && generatedQuiz.length > 0) {
+            setQuizQuestions(generatedQuiz);
             setQuizGenerated(true);
-            console.log('Quiz generated successfully:', generated.length, 'questions');
+            console.log('Quiz generated successfully:', generatedQuiz.length);
+
+            // Generate separate Exam questions (request a different variation if possible, or just generate again)
+            console.log('Generating exam questions...');
+            // We use a slightly different prompt context or just call again to get variation
+            // (Gemini is non-deterministic enough usually)
+            const generatedExam = await generateQuizQuestions(context + "\nGenera preguntas diferentes a las anteriores.");
+            if (generatedExam && generatedExam.length > 0) {
+              setExamQuestions(generatedExam);
+              setExamAnswers(new Array(generatedExam.length).fill(null));
+              console.log('Exam generated successfully:', generatedExam.length);
+            } else {
+              // Fallback: use same questions shuffled if 2nd gen fails
+              setExamQuestions([...generatedQuiz].sort(() => Math.random() - 0.5));
+              setExamAnswers(new Array(generatedQuiz.length).fill(null));
+            }
           }
         } catch (e) {
-          console.error("Quiz gen error", e);
+          console.error("Quiz/Exam gen error", e);
         }
       }
     }
-    generateQuiz();
+    generateQuizAndExam();
   }, [flashcards, loadingSource, quizGenerated]);
 
 
@@ -606,7 +632,7 @@ const StudySession: React.FC = () => {
           <div className={`w-full h-2 rounded-full overflow-hidden ${mode === 'exam' ? 'bg-slate-200' : 'bg-white/20'}`}>
             <div
               className={`h-full rounded-full transition-all ${mode === 'exam' ? 'bg-primary' : 'bg-white'}`}
-              style={{ width: `${mode === 'quiz' ? ((currentQuizIndex + 1) / quizQuestions.length) * 100 : ((currentIndex + 1) / flashcards.length) * 100}%` }}
+              style={{ width: `${mode === 'quiz' ? ((currentQuizIndex + 1) / quizQuestions.length) * 100 : mode === 'exam' ? (score / (examQuestions.length || 1)) * 100 : ((currentIndex + 1) / flashcards.length) * 100}%` }} // Simplified bar for exam
             ></div>
           </div>
         </div>
@@ -660,8 +686,37 @@ const StudySession: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 pb-8">
+
+        {/* No Cards Due - Caught Up Screen */}
+        {noCardsDue && (
+          <div className="w-full max-w-md text-center animate-fade-in-up">
+            <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/50">
+              <div className="w-24 h-24 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-200">
+                <span className="material-symbols-outlined text-5xl text-white">check_circle</span>
+              </div>
+              <h2 className="text-3xl font-black text-slate-800 mb-3">¡Todo al día!</h2>
+              <p className="text-slate-600 mb-8 leading-relaxed">
+                Has repasado todas tus tarjetas pendientes. El sistema SR (Repetición Espaciada) te avisará cuando sea el momento óptimo para repasar de nuevo.
+              </p>
+
+              <div className="space-y-4">
+                <button
+                  onClick={() => navigate('/classes')}
+                  className="w-full bg-slate-100 text-slate-700 font-bold py-4 rounded-xl hover:bg-slate-200 transition flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined">arrow_back</span>
+                  Volver al inicio
+                </button>
+                <div className="text-xs text-slate-400 mt-4">
+                  ¿Quieres estudiar más? Intenta el modo "Cramming" (aprende sin afectar tu horario)
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Flashcards Mode */}
-        {mode === 'flashcards' && !flashcardsComplete && (
+        {mode === 'flashcards' && !flashcardsComplete && !noCardsDue && (
           <>
             <div
               onClick={() => setIsFlipped(!isFlipped)}
@@ -880,7 +935,7 @@ const StudySession: React.FC = () => {
               </div>
 
               <div className="space-y-6">
-                {quizQuestions.map((q, i) => (
+                {examQuestions.map((q, i) => (
                   <div key={i} className="p-4 bg-slate-50 rounded-xl">
                     <p className="font-bold text-slate-900 mb-3">{i + 1}. {q.question}</p>
                     <div className="grid grid-cols-2 gap-2">
@@ -897,7 +952,11 @@ const StudySession: React.FC = () => {
                             : 'bg-white border border-slate-200 hover:border-primary'
                             }`}
                         >
-                          {String.fromCharCode(65 + j)}. {opt}
+                          <span className={`inline-block w-6 h-6 rounded-full text-center text-xs leading-6 mr-2 ${examAnswers[i] === j ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                            }`}>
+                            {String.fromCharCode(65 + j)}
+                          </span>
+                          {opt}
                         </button>
                       ))}
                     </div>
@@ -918,22 +977,22 @@ const StudySession: React.FC = () => {
         {mode === 'exam' && examSubmitted && (
           <div className="w-full max-w-md text-center">
             <div className="bg-white rounded-3xl shadow-2xl p-8">
-              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${score >= 4 ? 'bg-gradient-to-br from-emerald-400 to-teal-500' : 'bg-gradient-to-br from-rose-400 to-red-500'}`}>
+              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${score >= (examQuestions.length * 0.6) ? 'bg-gradient-to-br from-emerald-400 to-teal-500' : 'bg-gradient-to-br from-rose-400 to-red-500'}`}>
                 <span className="material-symbols-outlined text-4xl text-white">
-                  {score >= 4 ? 'school' : 'psychology'}
+                  {score >= (examQuestions.length * 0.6) ? 'school' : 'psychology'}
                 </span>
               </div>
               <h2 className="text-3xl font-black text-slate-900 mb-2">¡Examen Completado!</h2>
-              <p className="text-slate-500 mb-6">{score >= 4 ? '¡Excelente trabajo!' : 'Sigue practicando'}</p>
+              <p className="text-slate-500 mb-6">{score >= (examQuestions.length * 0.6) ? '¡Excelente trabajo!' : 'Sigue practicando'}</p>
 
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-violet-50 rounded-xl p-4">
                   <div className="text-3xl font-black text-violet-600">+{xpEarned}</div>
                   <div className="text-xs text-violet-500 font-bold">XP GANADOS</div>
                 </div>
-                <div className={`rounded-xl p-4 ${score >= 4 ? 'bg-emerald-50' : 'bg-rose-50'}`}>
-                  <div className={`text-3xl font-black ${score >= 4 ? 'text-emerald-600' : 'text-rose-600'}`}>{score}/{quizQuestions.length}</div>
-                  <div className={`text-xs font-bold ${score >= 4 ? 'text-emerald-500' : 'text-rose-500'}`}>{Math.round((score / quizQuestions.length) * 100)}%</div>
+                <div className={`rounded-xl p-4 ${score >= (examQuestions.length * 0.6) ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+                  <div className={`text-3xl font-black ${score >= (examQuestions.length * 0.6) ? 'text-emerald-600' : 'text-rose-600'}`}>{score}/{examQuestions.length}</div>
+                  <div className={`text-xs font-bold ${score >= (examQuestions.length * 0.6) ? 'text-emerald-500' : 'text-rose-500'}`}>{Math.round((score / (examQuestions.length || 1)) * 100)}%</div>
                 </div>
               </div>
 

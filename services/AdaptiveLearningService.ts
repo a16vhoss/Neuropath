@@ -441,12 +441,18 @@ export async function getCardsForSession(
         if (!srs) {
             // New card (no SRS data yet)
             newCards.push(cardWithSRS);
-        } else if (srs.state === 'learning' || srs.state === 'relearning') {
-            // Card in learning phase
-            learningCards.push(cardWithSRS);
-        } else if (new Date(srs.next_review_at) <= new Date()) {
-            // Due for review
-            dueCards.push(cardWithSRS);
+        } else {
+            // For existing cards, check if they are due
+            // In cramming mode, we ignore the due date
+            const isDue = new Date(srs.next_review_at) <= new Date();
+
+            if (mode === 'cramming' || isDue) {
+                if (srs.state === 'learning' || srs.state === 'relearning') {
+                    learningCards.push(cardWithSRS);
+                } else {
+                    dueCards.push(cardWithSRS);
+                }
+            }
         }
     }
 
