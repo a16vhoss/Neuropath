@@ -39,27 +39,41 @@ const StudySetStatistics: React.FC<{ studySetId: string }> = ({ studySetId }) =>
     const fetchStats = async () => {
         setLoading(true);
         try {
-            // 1. Fetch Flashcards + SRS
-            const { data: cards, error: cardsError } = await supabase
-                .from('flashcards')
-                .select(`
-          id, question, category,
-          flashcard_srs_data!inner(
-            state, next_review_at, mastery_level, difficulty, stability, interval_days
-          )
-        `)
-                .eq('study_set_id', studySetId)
-                .eq('flashcard_srs_data.user_id', user.id); // Inner join ensures we only get ones with SRS data (active)
-
-            // Fallback for cards without SRS data (New)
-            const { data: allCards } = await supabase
+            // 1. Fetch all flashcards for this study set
+            const { data: allCards, error: cardsError } = await supabase
                 .from('flashcards')
                 .select('id, question, category')
                 .eq('study_set_id', studySetId);
 
-            // Merge: if card in `cards` use SRS info, else default to "New"
+            if (cardsError) {
+                console.error('Error fetching flashcards:', cardsError);
+            }
+
+            // 2. Fetch SRS data for this user
+            const flashcardIds = (allCards || []).map(c => c.id);
+
+            let srsDataMap = new Map<string, any>();
+
+            if (flashcardIds.length > 0) {
+                const { data: srsData, error: srsError } = await supabase
+                    .from('flashcard_srs_data')
+                    .select('flashcard_id, state, next_review_at, mastery_level, difficulty, stability, interval_days')
+                    .eq('user_id', user.id)
+                    .in('flashcard_id', flashcardIds);
+
+                if (srsError) {
+                    console.error('Error fetching SRS data:', srsError);
+                }
+
+                // Create a map for quick lookup
+                (srsData || []).forEach(srs => {
+                    srsDataMap.set(srs.flashcard_id, srs);
+                });
+            }
+
+            // 3. Merge flashcards with their SRS data
             const mergedStats: SRSStats[] = (allCards || []).map(c => {
-                const srs = (cards as any[])?.find((k: any) => k.id === c.id)?.flashcard_srs_data;
+                const srs = srsDataMap.get(c.id);
                 return {
                     id: c.id,
                     question: c.question,
@@ -73,7 +87,7 @@ const StudySetStatistics: React.FC<{ studySetId: string }> = ({ studySetId }) =>
 
             setFlashcardStats(mergedStats);
 
-            // 2. Fetch Session History
+            // 4. Fetch Session History
             const { data: sessions, error: sessError } = await supabase
                 .from('adaptive_study_sessions')
                 .select('id, created_at, mode, cards_correct, cards_studied, retention_rate')
