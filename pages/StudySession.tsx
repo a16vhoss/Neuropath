@@ -15,7 +15,7 @@ import { handleSessionComplete, handleStrugglingSession, updateConsecutiveCorrec
 import StudySetStatistics from '../components/StudySetStatistics';
 import { generateAdaptiveQuiz, saveQuizSession, QuizQuestion as AdaptiveQuizQuestion, QuizResult, QuizReport } from '../services/QuizService';
 
-type StudyMode = 'flashcards' | 'quiz' | 'cramming' | 'podcast';
+type StudyMode = 'flashcards' | 'quiz' | 'cramming' | 'podcast' | 'daily';
 
 interface Flashcard {
   id: string;
@@ -109,6 +109,13 @@ const StudySession: React.FC = () => {
   // Mastery level tracking
   const [currentMasteryResult, setCurrentMasteryResult] = useState<MasteryResult | null>(null);
   const [showLevelUp, setShowLevelUp] = useState(false);
+
+  // Daily Session state
+  const [dailySessionTime, setDailySessionTime] = useState(15 * 60); // 15 minutes
+  const [dailySessionActive, setDailySessionActive] = useState(false);
+  const [dailySessionComplete, setDailySessionComplete] = useState(false);
+  const [dailyQuestionsAnswered, setDailyQuestionsAnswered] = useState(0);
+  const DAILY_SESSION_QUESTIONS = 10; // Target 8-12, we'll use 10
 
   // Separate exam state
   const [examQuestions, setExamQuestions] = useState<QuizQuestion[]>([]);
@@ -324,6 +331,29 @@ const StudySession: React.FC = () => {
       handleExamSubmit();
     }
   }, [mode, examTime, examSubmitted]);
+
+  // Daily Session timer
+  useEffect(() => {
+    if (mode === 'daily' && dailySessionActive && !dailySessionComplete && dailySessionTime > 0) {
+      const timer = setInterval(() => {
+        setDailySessionTime((prev) => prev - 1);
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+    if (dailySessionTime === 0 && !dailySessionComplete && mode === 'daily') {
+      setDailySessionComplete(true);
+      setShowConfetti(true);
+    }
+  }, [mode, dailySessionTime, dailySessionActive, dailySessionComplete]);
+
+  // Start daily session when mode changes to daily
+  useEffect(() => {
+    if (mode === 'daily' && !dailySessionActive && !dailySessionComplete) {
+      setDailySessionActive(true);
+      setDailySessionTime(15 * 60);
+      setDailyQuestionsAnswered(0);
+    }
+  }, [mode]);
 
 
   // Initialize timer for first card
@@ -730,6 +760,7 @@ const StudySession: React.FC = () => {
         <div className="flex justify-center px-4 mb-6">
           <div className="inline-flex p-1 rounded-xl bg-white/20">
             {[
+              { id: 'daily', label: 'Diaria', icon: 'event_available' },
               { id: 'flashcards', label: 'Flashcards', icon: 'style' },
               { id: 'quiz', label: 'Quiz', icon: 'quiz' },
               { id: 'cramming', label: 'Cramming', icon: 'bolt' },
@@ -809,6 +840,123 @@ const StudySession: React.FC = () => {
                   Volver al inicio
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Daily Session Mode */}
+        {mode === 'daily' && !dailySessionComplete && (
+          <>
+            {/* Timer and Progress Header */}
+            <div className="w-full max-w-lg mb-6">
+              <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-4 shadow-lg border border-white/50">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-indigo-500">timer</span>
+                    <span className="text-2xl font-black text-slate-900">
+                      {Math.floor(dailySessionTime / 60)}:{(dailySessionTime % 60).toString().padStart(2, '0')}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-slate-500">Pregunta</div>
+                    <div className="text-lg font-bold text-slate-900">{currentIndex + 1} / {Math.min(flashcards.length, DAILY_SESSION_QUESTIONS)}</div>
+                  </div>
+                </div>
+                {/* Progress bar */}
+                <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-300"
+                    style={{ width: `${(dailySessionTime / (15 * 60)) * 100}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Flashcard */}
+            <div
+              onClick={() => setIsFlipped(!isFlipped)}
+              className="w-full max-w-lg aspect-[4/3] cursor-pointer perspective-1000"
+            >
+              <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+                {/* Front */}
+                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="bg-indigo-100 text-indigo-600 text-xs font-bold px-3 py-1 rounded-full uppercase">{flashcards[currentIndex]?.category}</span>
+                    <span className="bg-amber-100 text-amber-600 text-xs font-bold px-2 py-1 rounded-full">Sesión Diaria</span>
+                  </div>
+                  <h2 className="text-2xl md:text-3xl font-black text-center text-slate-900 leading-snug">{flashcards[currentIndex]?.question}</h2>
+                  <p className="text-sm text-slate-400 mt-6 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm">touch_app</span> Toca para girar
+                  </p>
+                </div>
+                {/* Back */}
+                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden rotate-y-180">
+                  <span className="bg-emerald-100 text-emerald-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4">Respuesta</span>
+                  <p className="text-lg md:text-xl text-center text-slate-700 leading-relaxed">{flashcards[currentIndex]?.answer}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Rating Buttons */}
+            {isFlipped && (
+              <div className="mt-8">
+                <SRSRatingButtons
+                  onRate={(rating) => {
+                    handleRate(rating);
+                    setDailyQuestionsAnswered(prev => prev + 1);
+                    // Check if we've reached the target questions or end of cards
+                    if (currentIndex + 1 >= Math.min(flashcards.length, DAILY_SESSION_QUESTIONS)) {
+                      setDailySessionComplete(true);
+                      setShowConfetti(true);
+                    }
+                  }}
+                  disabled={isProcessing}
+                  cardState="new"
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Daily Session Complete */}
+        {mode === 'daily' && dailySessionComplete && (
+          <div className="w-full max-w-md animate-fade-in-up">
+            <div className="bg-white rounded-3xl shadow-2xl p-8 text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="material-symbols-outlined text-4xl text-white">event_available</span>
+              </div>
+              <h2 className="text-3xl font-black text-slate-900 mb-2">¡Sesión Diaria Completada!</h2>
+              <p className="text-slate-500 mb-6">15 minutos de estudio efectivo</p>
+
+              <div className="grid grid-cols-3 gap-3 mb-8">
+                <div className="bg-indigo-50 rounded-xl p-4">
+                  <div className="text-2xl font-black text-indigo-600">{dailyQuestionsAnswered}</div>
+                  <div className="text-xs text-indigo-500 font-bold">PREGUNTAS</div>
+                </div>
+                <div className="bg-emerald-50 rounded-xl p-4">
+                  <div className="text-2xl font-black text-emerald-600">{correctFlashcards}</div>
+                  <div className="text-xs text-emerald-500 font-bold">CORRECTAS</div>
+                </div>
+                <div className="bg-amber-50 rounded-xl p-4">
+                  <div className="text-2xl font-black text-amber-600">+{xpEarned}</div>
+                  <div className="text-xs text-amber-500 font-bold">XP</div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-indigo-100 to-purple-100 rounded-xl p-4 mb-6">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <span className="material-symbols-outlined text-indigo-500">calendar_today</span>
+                  <span className="text-lg font-bold text-indigo-600">Racha mantenida</span>
+                </div>
+                <p className="text-sm text-indigo-500">Vuelve mañana para otra sesión diaria</p>
+              </div>
+
+              <button
+                onClick={handleEndSession}
+                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition shadow-lg"
+              >
+                Finalizar
+              </button>
             </div>
           </div>
         )}
