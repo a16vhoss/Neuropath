@@ -9,6 +9,7 @@ import StudySetManager from '../components/StudySetManager';
 import MagicImportModal from '../components/MagicImportModal';
 import AdaptiveProgressCard from '../components/AdaptiveProgressCard';
 import CumulativeReportsCard from '../components/CumulativeReportsCard';
+import VisualProgressionMap from '../components/VisualProgressionMap';
 
 interface ClassData {
   id: string;
@@ -605,6 +606,9 @@ const StudentDashboard: React.FC = () => {
 
             {/* Cumulative Reports Widget */}
             <CumulativeReportsCard />
+
+            {/* Visual Progression Map */}
+            <VisualProgressionMap studySets={studySets} />
 
           </div>
         </div>
