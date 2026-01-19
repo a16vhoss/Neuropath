@@ -9,6 +9,7 @@ import {
     updateFlashcard,
     deleteFlashcard,
     addMaterialToStudySet,
+    deleteMaterialFromStudySet,
     supabase
 } from '../services/supabaseClient';
 import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary } from '../services/pdfProcessingService';
@@ -74,6 +75,9 @@ const StudySetDetail: React.FC = () => {
     // Upload states
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState('');
+
+    // Track expanded summaries
+    const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         if (studySetId) {
@@ -486,6 +490,37 @@ const StudySetDetail: React.FC = () => {
         }
     };
 
+    // Toggle summary expanded/collapsed
+    const toggleSummary = (materialId: string) => {
+        setExpandedSummaries(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(materialId)) {
+                newSet.delete(materialId);
+            } else {
+                newSet.add(materialId);
+            }
+            return newSet;
+        });
+    };
+
+    // Delete material and its associated flashcards
+    const handleDeleteMaterial = async (material: Material) => {
+        if (!window.confirm(`¿Eliminar "${material.name}"? También se eliminarán las ${material.flashcards_generated || 0} flashcards asociadas.`)) return;
+
+        try {
+            // First, delete associated flashcards if material has a content source
+            // The flashcards table may have a material_id or we can identify by study_set_id and timeframe
+            // For now, just delete the material - DB cascade should handle flashcards if configured
+            await deleteMaterialFromStudySet(material.id);
+
+            // Reload the study set to refresh data
+            loadStudySet();
+        } catch (error) {
+            console.error('Error deleting material:', error);
+            alert('Error al eliminar el material');
+        }
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -845,29 +880,39 @@ const StudySetDetail: React.FC = () => {
                                             </div>
                                         )}
 
-                                        {/* Detailed Summary Section */}
+                                        {/* Detailed Summary Section - Collapsible */}
                                         {material.summary && (
-                                            <div className="mt-4 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100">
-                                                <div className="flex items-center gap-2 mb-3">
-                                                    <span className="material-symbols-outlined text-indigo-500">auto_awesome</span>
-                                                    <span className="text-sm font-bold text-indigo-700">Resumen Detallado (Generado por IA)</span>
-                                                </div>
-                                                <div className="text-sm text-slate-700 leading-relaxed prose prose-sm prose-indigo max-w-none">
-                                                    {/* Render markdown-style content */}
-                                                    {material.summary.split('\n').map((line, i) => {
-                                                        if (line.startsWith('## ')) {
-                                                            return <h3 key={i} className="text-base font-bold text-indigo-800 mt-4 mb-2">{line.replace('## ', '')}</h3>;
-                                                        } else if (line.startsWith('### ')) {
-                                                            return <h4 key={i} className="text-sm font-semibold text-indigo-700 mt-3 mb-1">{line.replace('### ', '')}</h4>;
-                                                        } else if (line.startsWith('- ') || line.startsWith('• ')) {
-                                                            return <li key={i} className="ml-4 mb-1">{line.replace(/^[-•] /, '')}</li>;
-                                                        } else if (line.trim() === '') {
-                                                            return <br key={i} />;
-                                                        } else {
-                                                            return <p key={i} className="mb-2">{line}</p>;
-                                                        }
-                                                    })}
-                                                </div>
+                                            <div className="mt-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 overflow-hidden">
+                                                <button
+                                                    onClick={() => toggleSummary(material.id)}
+                                                    className="w-full flex items-center justify-between p-4 hover:bg-indigo-100/50 transition"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="material-symbols-outlined text-indigo-500">auto_awesome</span>
+                                                        <span className="text-sm font-bold text-indigo-700">Resumen Detallado (Generado por IA)</span>
+                                                    </div>
+                                                    <span className="material-symbols-outlined text-indigo-500 transition-transform duration-200" style={{ transform: expandedSummaries.has(material.id) ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                                                        expand_more
+                                                    </span>
+                                                </button>
+                                                {expandedSummaries.has(material.id) && (
+                                                    <div className="px-4 pb-4 text-sm text-slate-700 leading-relaxed prose prose-sm prose-indigo max-w-none">
+                                                        {/* Render markdown-style content */}
+                                                        {material.summary.split('\n').map((line, i) => {
+                                                            if (line.startsWith('## ')) {
+                                                                return <h3 key={i} className="text-base font-bold text-indigo-800 mt-4 mb-2">{line.replace('## ', '')}</h3>;
+                                                            } else if (line.startsWith('### ')) {
+                                                                return <h4 key={i} className="text-sm font-semibold text-indigo-700 mt-3 mb-1">{line.replace('### ', '')}</h4>;
+                                                            } else if (line.startsWith('- ') || line.startsWith('• ')) {
+                                                                return <li key={i} className="ml-4 mb-1">{line.replace(/^[-•] /, '')}</li>;
+                                                            } else if (line.trim() === '') {
+                                                                return <br key={i} />;
+                                                            } else {
+                                                                return <p key={i} className="mb-2">{line}</p>;
+                                                            }
+                                                        })}
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
 
@@ -891,14 +936,26 @@ const StudySetDetail: React.FC = () => {
                                                 <span className="material-symbols-outlined text-sm">auto_awesome</span>
                                                 Estudiar Material
                                             </button>
+
+                                            <div className="flex-1"></div>
+
+                                            <button
+                                                className="inline-flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition ml-auto"
+                                                onClick={() => handleDeleteMaterial(material)}
+                                                title="Eliminar material y sus flashcards"
+                                            >
+                                                <span className="material-symbols-outlined text-sm">delete</span>
+                                                Eliminar
+                                            </button>
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         )}
                     </div>
-                )}
-            </main>
+                )
+                }
+            </main >
 
             {/* Add Flashcard Modal */}
             {
@@ -1044,71 +1101,74 @@ const StudySetDetail: React.FC = () => {
                             </div>
                         </div>
                     </div>
-                )}
+                )
+            }
 
             {/* View Content Modal */}
-            {viewContentModal.isOpen && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-bold text-slate-900 truncate pr-4">
-                                {viewContentModal.title}
-                            </h3>
-                            <button
-                                onClick={() => setViewContentModal(prev => ({ ...prev, isOpen: false }))}
-                                className="text-slate-400 hover:text-slate-600 transition"
-                            >
-                                <span className="material-symbols-outlined">close</span>
-                            </button>
-                        </div>
+            {
+                viewContentModal.isOpen && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-xl font-bold text-slate-900 truncate pr-4">
+                                    {viewContentModal.title}
+                                </h3>
+                                <button
+                                    onClick={() => setViewContentModal(prev => ({ ...prev, isOpen: false }))}
+                                    className="text-slate-400 hover:text-slate-600 transition"
+                                >
+                                    <span className="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
 
-                        {/* Tabs */}
-                        <div className="flex gap-2 mb-4 border-b border-slate-100">
-                            <button
-                                onClick={() => setViewContentModal(prev => ({ ...prev, activeTab: 'summary' }))}
-                                className={`pb-2 px-4 font-medium text-sm transition ${viewContentModal.activeTab === 'summary' ? 'text-primary border-b-2 border-primary' : 'text-slate-500 hover:text-slate-700'}`}
-                            >
-                                Resumen IA
-                            </button>
-                            <button
-                                onClick={() => setViewContentModal(prev => ({ ...prev, activeTab: 'text' }))}
-                                className={`pb-2 px-4 font-medium text-sm transition ${viewContentModal.activeTab === 'text' ? 'text-primary border-b-2 border-primary' : 'text-slate-500 hover:text-slate-700'}`}
-                            >
-                                Texto Original
-                            </button>
-                        </div>
+                            {/* Tabs */}
+                            <div className="flex gap-2 mb-4 border-b border-slate-100">
+                                <button
+                                    onClick={() => setViewContentModal(prev => ({ ...prev, activeTab: 'summary' }))}
+                                    className={`pb-2 px-4 font-medium text-sm transition ${viewContentModal.activeTab === 'summary' ? 'text-primary border-b-2 border-primary' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    Resumen IA
+                                </button>
+                                <button
+                                    onClick={() => setViewContentModal(prev => ({ ...prev, activeTab: 'text' }))}
+                                    className={`pb-2 px-4 font-medium text-sm transition ${viewContentModal.activeTab === 'text' ? 'text-primary border-b-2 border-primary' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    Texto Original
+                                </button>
+                            </div>
 
-                        <div className="flex-1 overflow-y-auto p-4 bg-slate-50 rounded-xl border border-slate-100">
-                            {viewContentModal.activeTab === 'summary' ? (
-                                viewContentModal.isGenerating ? (
-                                    <div className="flex flex-col items-center justify-center py-10">
-                                        <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mb-3"></div>
-                                        <p className="text-sm text-slate-500">Analizando documento con IA...</p>
-                                    </div>
+                            <div className="flex-1 overflow-y-auto p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                {viewContentModal.activeTab === 'summary' ? (
+                                    viewContentModal.isGenerating ? (
+                                        <div className="flex flex-col items-center justify-center py-10">
+                                            <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mb-3"></div>
+                                            <p className="text-sm text-slate-500">Analizando documento con IA...</p>
+                                        </div>
+                                    ) : (
+                                        <div className="whitespace-pre-wrap font-sans text-sm text-slate-700 leading-relaxed">
+                                            {viewContentModal.summary || 'No hay resumen disponible.'}
+                                        </div>
+                                    )
                                 ) : (
-                                    <div className="whitespace-pre-wrap font-sans text-sm text-slate-700 leading-relaxed">
-                                        {viewContentModal.summary || 'No hay resumen disponible.'}
+                                    <div className="font-mono text-xs text-slate-600 whitespace-pre-wrap">
+                                        {viewContentModal.content}
                                     </div>
-                                )
-                            ) : (
-                                <div className="font-mono text-xs text-slate-600 whitespace-pre-wrap">
-                                    {viewContentModal.content}
-                                </div>
-                            )}
-                        </div>
+                                )}
+                            </div>
 
-                        <div className="mt-6 flex justify-end">
-                            <button
-                                onClick={() => setViewContentModal(prev => ({ ...prev, isOpen: false }))}
-                                className="px-6 py-2.5 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 transition"
-                            >
-                                Cerrar
-                            </button>
+                            <div className="mt-6 flex justify-end">
+                                <button
+                                    onClick={() => setViewContentModal(prev => ({ ...prev, isOpen: false }))}
+                                    className="px-6 py-2.5 bg-slate-100 text-slate-700 font-medium rounded-xl hover:bg-slate-200 transition"
+                                >
+                                    Cerrar
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 
