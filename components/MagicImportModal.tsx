@@ -15,6 +15,8 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<'text' | 'pdf' | 'youtube'>('text');
     const [inputValue, setInputValue] = useState('');
+    const [manualTranscript, setManualTranscript] = useState('');
+    const [youtubeMode, setYoutubeMode] = useState<'auto' | 'manual'>('auto');
     const [name, setName] = useState('');
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState('');
@@ -49,12 +51,20 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
             } else if (activeTab === 'text') {
                 processedContent = inputValue;
             } else if (activeTab === 'youtube') {
-                setStatus('Extrayendo transcripción del video...');
-                try {
-                    processedContent = await getYoutubeTranscript(inputValue);
-                } catch (err) {
-                    console.error('Youtube extraction failed:', err);
-                    throw new Error(`No se pudo extraer la transcripción. ${(err as Error).message}`);
+                if (youtubeMode === 'manual' && manualTranscript.trim()) {
+                    // User pasted transcript manually
+                    processedContent = manualTranscript;
+                } else if (youtubeMode === 'auto' && inputValue.trim()) {
+                    // Try automatic extraction
+                    setStatus('Extrayendo transcripción del video...');
+                    try {
+                        processedContent = await getYoutubeTranscript(inputValue);
+                    } catch (err) {
+                        console.error('Youtube extraction failed:', err);
+                        throw new Error(`No se pudo extraer automáticamente. Cambia a "Pegar texto" y copia la transcripción manualmente desde YouTube.`);
+                    }
+                } else {
+                    throw new Error('Ingresa un enlace de YouTube o pega la transcripción manualmente.');
                 }
             }
 
@@ -226,21 +236,63 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
 
                         {activeTab === 'youtube' && (
                             <div>
-                                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-4 flex items-start gap-2">
-                                    <span className="material-symbols-outlined text-indigo-600 text-lg">auto_awesome</span>
-                                    <p className="text-xs text-indigo-700">
-                                        <strong>Automático:</strong> Pega el enlace del video y extraeremos la transcripción automáticamente para generar tus tarjetas.
-                                    </p>
+                                {/* Mode Toggle */}
+                                <div className="flex gap-2 mb-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setYoutubeMode('auto')}
+                                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${youtubeMode === 'auto' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                    >
+                                        <span className="material-symbols-outlined text-sm align-middle mr-1">auto_awesome</span>
+                                        Automático (URL)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setYoutubeMode('manual')}
+                                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${youtubeMode === 'manual' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                    >
+                                        <span className="material-symbols-outlined text-sm align-middle mr-1">content_paste</span>
+                                        Pegar texto
+                                    </button>
                                 </div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Enlace de YouTube</label>
-                                <input
-                                    type="text"
-                                    placeholder="https://youtube.com/watch?v=... o https://youtu.be/..."
-                                    value={inputValue}
-                                    onChange={(e) => setInputValue(e.target.value)}
-                                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
-                                />
-                                <p className="text-xs text-gray-400 mt-2">El video debe tener subtítulos disponibles (automáticos o manuales).</p>
+
+                                {youtubeMode === 'auto' ? (
+                                    <>
+                                        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-4 flex items-start gap-2">
+                                            <span className="material-symbols-outlined text-indigo-600 text-lg">auto_awesome</span>
+                                            <p className="text-xs text-indigo-700">
+                                                Pega el enlace del video y extraeremos la transcripción automáticamente.
+                                            </p>
+                                        </div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Enlace de YouTube</label>
+                                        <input
+                                            type="text"
+                                            placeholder="https://youtube.com/watch?v=..."
+                                            value={inputValue}
+                                            onChange={(e) => setInputValue(e.target.value)}
+                                            className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                                        />
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                                            <p className="text-xs text-amber-800 font-medium mb-2">📋 Cómo obtener la transcripción:</p>
+                                            <ol className="text-xs text-amber-700 list-decimal list-inside space-y-1">
+                                                <li>Abre el video en YouTube</li>
+                                                <li>Haz clic en <strong>"..."</strong> debajo del video</li>
+                                                <li>Selecciona <strong>"Mostrar transcripción"</strong></li>
+                                                <li>Copia todo el texto y pégalo aquí</li>
+                                            </ol>
+                                        </div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Transcripción del Video</label>
+                                        <textarea
+                                            placeholder="Pega aquí la transcripción..."
+                                            value={manualTranscript}
+                                            onChange={(e) => setManualTranscript(e.target.value)}
+                                            className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all h-40 resize-none"
+                                        ></textarea>
+                                    </>
+                                )}
                             </div>
                         )}
                     </div>
