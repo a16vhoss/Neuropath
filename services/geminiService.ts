@@ -120,6 +120,80 @@ export const generateStudySetFromContext = async (content: string, type: 'text' 
   }
 };
 
+// NEW: Direct YouTube video analysis - Gemini analyzes the video from URL
+export const generateFlashcardsFromYouTubeURL = async (youtubeUrl: string) => {
+  if (!API_KEY || API_KEY === 'PLACEHOLDER_API_KEY') {
+    throw new Error('API key not configured');
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey: API_KEY });
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              fileData: {
+                fileUri: youtubeUrl,
+                mimeType: "video/*"
+              }
+            },
+            {
+              text: `Analiza este video de YouTube y genera 10-15 flashcards educativas de alta calidad en español.
+              
+              Para cada flashcard:
+              - La pregunta debe ser clara y específica sobre un concepto del video
+              - La respuesta debe ser completa pero concisa
+              - La categoría debe reflejar el tema principal
+              
+              Las flashcards deben cubrir los conceptos más importantes del video.`
+            }
+          ]
+        }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              question: { type: Type.STRING },
+              answer: { type: Type.STRING },
+              category: { type: Type.STRING }
+            },
+            required: ["question", "answer", "category"]
+          }
+        }
+      }
+    });
+
+    const cards = JSON.parse(response.text || "[]");
+
+    if (!cards || cards.length === 0) {
+      throw new Error('No se pudieron generar flashcards del video');
+    }
+
+    return cards;
+  } catch (e: any) {
+    console.error("Failed to analyze YouTube video:", e);
+
+    // Provide more helpful error messages
+    if (e.message?.includes('PERMISSION_DENIED')) {
+      throw new Error('El video es privado o tiene restricciones de acceso');
+    } else if (e.message?.includes('NOT_FOUND')) {
+      throw new Error('No se encontró el video. Verifica que el enlace sea correcto');
+    } else if (e.message?.includes('INVALID_ARGUMENT')) {
+      throw new Error('Enlace de YouTube inválido. Usa el formato: youtube.com/watch?v=...');
+    }
+
+    throw new Error(`Error al analizar el video: ${e.message || 'intenta con otro video'}`);
+  }
+};
+
 export const generateQuizQuestions = async (context: string) => {
   if (!API_KEY || API_KEY === 'PLACEHOLDER_API_KEY') {
     return [];

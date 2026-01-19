@@ -1,8 +1,7 @@
 
 import React, { useState } from 'react';
 import { extractTextFromPDF } from '../services/pdfProcessingService';
-import { generateStudySetFromContext } from '../services/geminiService';
-import { getYoutubeTranscript } from '../services/youtubeService';
+import { generateStudySetFromContext, generateFlashcardsFromYouTubeURL } from '../services/geminiService';
 import { useAuth } from '../contexts/AuthContext';
 import { createStudySet, addFlashcardsBatch, addMaterialToStudySet } from '../services/supabaseClient';
 
@@ -15,8 +14,6 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<'text' | 'pdf' | 'youtube'>('text');
     const [inputValue, setInputValue] = useState('');
-    const [manualTranscript, setManualTranscript] = useState('');
-    const [youtubeMode, setYoutubeMode] = useState<'auto' | 'manual'>('auto');
     const [name, setName] = useState('');
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState('');
@@ -41,6 +38,7 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
 
         try {
             let processedContent = '';
+            let cardData: any[] = [];
 
             // 1. Extract content based on source
             if (activeTab === 'pdf' && selectedFile) {
@@ -48,33 +46,34 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
                 const base64File = await fileToBase64(selectedFile);
                 const base64Data = base64File.split(',')[1];
                 processedContent = await extractTextFromPDF(base64Data) || '';
+
+                if (!processedContent) throw new Error("No se pudo extraer texto del PDF.");
+
+                setStatus(`Analizando ${processedContent.length} caracteres con Gemini...`);
+                cardData = await generateStudySetFromContext(processedContent, 'pdf');
+
             } else if (activeTab === 'text') {
                 processedContent = inputValue;
+
+                if (!processedContent.trim()) throw new Error("Escribe o pega el texto a analizar.");
+
+                setStatus(`Analizando ${processedContent.length} caracteres con Gemini...`);
+                cardData = await generateStudySetFromContext(processedContent, 'text');
+
             } else if (activeTab === 'youtube') {
-                if (youtubeMode === 'manual' && manualTranscript.trim()) {
-                    // User pasted transcript manually
-                    processedContent = manualTranscript;
-                } else if (youtubeMode === 'auto' && inputValue.trim()) {
-                    // Try automatic extraction
-                    setStatus('Extrayendo transcripción del video...');
-                    try {
-                        processedContent = await getYoutubeTranscript(inputValue);
-                    } catch (err) {
-                        console.error('Youtube extraction failed:', err);
-                        throw new Error(`No se pudo extraer automáticamente. Cambia a "Pegar texto" y copia la transcripción manualmente desde YouTube.`);
-                    }
-                } else {
-                    throw new Error('Ingresa un enlace de YouTube o pega la transcripción manualmente.');
+                if (!inputValue.trim()) throw new Error("Ingresa un enlace de YouTube.");
+
+                // Validate YouTube URL format
+                const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)/;
+                if (!youtubeRegex.test(inputValue)) {
+                    throw new Error("Enlace de YouTube inválido. Usa el formato: youtube.com/watch?v=...");
                 }
+
+                setStatus('Analizando video con Gemini IA...');
+
+                // Direct Gemini video analysis - no transcript extraction needed!
+                cardData = await generateFlashcardsFromYouTubeURL(inputValue);
             }
-
-            if (!processedContent) throw new Error("No hay contenido para procesar. Asegúrate de subir un archivo o escribir texto.");
-
-            // 2. Generate Metadata & Flashcards via Gemini
-            setStatus(`Analizando ${processedContent.length} caracteres con Gemini...`);
-            // Note: For YouTube derived text, we pass it as 'text' context to Gemini now since it's raw text
-            const sourceType = activeTab === 'youtube' ? 'text' : activeTab;
-            const cardData = await generateStudySetFromContext(processedContent, sourceType);
 
             if (!cardData || cardData.length === 0) {
                 throw new Error("No se pudieron generar flashcards. Intenta con otro contenido.");
@@ -236,63 +235,26 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
 
                         {activeTab === 'youtube' && (
                             <div>
-                                {/* Mode Toggle */}
-                                <div className="flex gap-2 mb-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => setYoutubeMode('auto')}
-                                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${youtubeMode === 'auto' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                                    >
-                                        <span className="material-symbols-outlined text-sm align-middle mr-1">auto_awesome</span>
-                                        Automático (URL)
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setYoutubeMode('manual')}
-                                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${youtubeMode === 'manual' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                                    >
-                                        <span className="material-symbols-outlined text-sm align-middle mr-1">content_paste</span>
-                                        Pegar texto
-                                    </button>
-                                </div>
-
-                                {youtubeMode === 'auto' ? (
-                                    <>
-                                        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mb-4 flex items-start gap-2">
-                                            <span className="material-symbols-outlined text-indigo-600 text-lg">auto_awesome</span>
-                                            <p className="text-xs text-indigo-700">
-                                                Pega el enlace del video y extraeremos la transcripción automáticamente.
+                                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-4 mb-4">
+                                    <div className="flex items-start gap-3">
+                                        <span className="material-symbols-outlined text-indigo-600 text-2xl">smart_toy</span>
+                                        <div>
+                                            <p className="text-sm font-medium text-indigo-800 mb-1">Análisis con IA</p>
+                                            <p className="text-xs text-indigo-600">
+                                                Gemini analizará el contenido del video directamente y creará flashcards automáticamente.
                                             </p>
                                         </div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Enlace de YouTube</label>
-                                        <input
-                                            type="text"
-                                            placeholder="https://youtube.com/watch?v=..."
-                                            value={inputValue}
-                                            onChange={(e) => setInputValue(e.target.value)}
-                                            className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
-                                        />
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-                                            <p className="text-xs text-amber-800 font-medium mb-2">📋 Cómo obtener la transcripción:</p>
-                                            <ol className="text-xs text-amber-700 list-decimal list-inside space-y-1">
-                                                <li>Abre el video en YouTube</li>
-                                                <li>Haz clic en <strong>"..."</strong> debajo del video</li>
-                                                <li>Selecciona <strong>"Mostrar transcripción"</strong></li>
-                                                <li>Copia todo el texto y pégalo aquí</li>
-                                            </ol>
-                                        </div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Transcripción del Video</label>
-                                        <textarea
-                                            placeholder="Pega aquí la transcripción..."
-                                            value={manualTranscript}
-                                            onChange={(e) => setManualTranscript(e.target.value)}
-                                            className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all h-40 resize-none"
-                                        ></textarea>
-                                    </>
-                                )}
+                                    </div>
+                                </div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Enlace de YouTube</label>
+                                <input
+                                    type="text"
+                                    placeholder="https://youtube.com/watch?v=..."
+                                    value={inputValue}
+                                    onChange={(e) => setInputValue(e.target.value)}
+                                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                                />
+                                <p className="text-xs text-gray-400 mt-2">Funciona con videos públicos en cualquier idioma.</p>
                             </div>
                         )}
                     </div>
