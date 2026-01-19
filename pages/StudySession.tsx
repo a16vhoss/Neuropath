@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getClassFlashcards, getStudySetFlashcards, updateFlashcardProgress, supabase } from '../services/supabaseClient';
+import { getClassFlashcards, getStudySetFlashcards, updateFlashcardProgress, supabase, updateFlashcardMastery, MasteryResult, getDifficultyLevelInfo } from '../services/supabaseClient';
+import DifficultyLevelIndicator, { LevelUpNotification } from '../components/DifficultyLevelIndicator';
 import { generateStudyFlashcards, getTutorResponse, generateQuizQuestions } from '../services/geminiService';
 import { GamificationService } from '../services/GamificationService';
 import AITutorChat from '../components/AITutorChat';
@@ -104,6 +105,10 @@ const StudySession: React.FC = () => {
   const [failedCardIds, setFailedCardIds] = useState<string[]>([]);
   const [noCardsDue, setNoCardsDue] = useState(false);
   const [showStats, setShowStats] = useState(false);
+
+  // Mastery level tracking
+  const [currentMasteryResult, setCurrentMasteryResult] = useState<MasteryResult | null>(null);
+  const [showLevelUp, setShowLevelUp] = useState(false);
 
   // Separate exam state
   const [examQuestions, setExamQuestions] = useState<QuizQuestion[]>([]);
@@ -356,8 +361,21 @@ const StudySession: React.FC = () => {
         rating,
         responseTime
       );
+
+      // Update mastery level system
+      const masteryResult = await updateFlashcardMastery(
+        user.id,
+        flashcards[currentIndex].id,
+        rating >= 3 // correct if rating is Good or Easy
+      );
+      setCurrentMasteryResult(masteryResult);
+
+      // Show level up notification if level changed
+      if (masteryResult.level_changed && masteryResult.new_level > masteryResult.previous_level) {
+        setShowLevelUp(true);
+      }
     } catch (error) {
-      console.error('Error updating SRS progress:', error);
+      console.error('Error updating SRS/Mastery progress:', error);
     }
 
     // Move to next
@@ -805,7 +823,17 @@ const StudySession: React.FC = () => {
               <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
                 {/* Front */}
                 <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden">
-                  <span className="bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4">{flashcards[currentIndex]?.category}</span>
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1 rounded-full uppercase">{flashcards[currentIndex]?.category}</span>
+                    {currentMasteryResult && (
+                      <DifficultyLevelIndicator
+                        level={currentMasteryResult.new_level}
+                        masteryPercent={currentMasteryResult.mastery_percent}
+                        size="sm"
+                        showLabel={false}
+                      />
+                    )}
+                  </div>
                   <h2 className="text-2xl md:text-3xl font-black text-center text-slate-900 leading-snug">{flashcards[currentIndex]?.question}</h2>
                   <p className="text-sm text-slate-400 mt-6 flex items-center gap-1">
                     <span className="material-symbols-outlined text-sm">touch_app</span> Toca para girar

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
+import DifficultyLevelIndicator from './DifficultyLevelIndicator';
 
 import { formatInterval } from '../services/AdaptiveLearningService';
 
@@ -274,38 +275,44 @@ const StudySetStatistics: React.FC<{ studySetId: string }> = ({ studySetId }) =>
                                 <th className="p-4 font-semibold">Pregunta</th>
                                 <th className="p-4 font-semibold">Estado</th>
                                 <th className="p-4 font-semibold">Próximo Repaso</th>
-                                <th className="p-4 font-semibold">Nivel Maestría</th>
+                                <th className="p-4 font-semibold">Nivel</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-sm">
-                            {flashcardStats.map(stat => (
-                                <tr key={stat.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-4 text-slate-700 font-medium max-w-xs truncate" title={stat.question}>
-                                        {stat.question}
-                                    </td>
-                                    <td className="p-4">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStateColor(stat.state)}`}>
-                                            {stat.state === 'new' ? 'Nuevo' :
-                                                stat.state === 'learning' ? 'Aprendiendo' :
-                                                    stat.state === 'review' ? 'Repaso' : 'Relearning'}
-                                        </span>
-                                    </td>
-                                    <td className="p-4 text-slate-600">
-                                        {getNextReviewLabel(stat.next_review_at)}
-                                    </td>
-                                    <td className="p-4">
-                                        <div className="flex items-center space-x-2">
-                                            <div className="w-24 bg-slate-200 rounded-full h-2">
-                                                <div
-                                                    className={`h-2 rounded-full ${stat.mastery_level >= 4 ? 'bg-emerald-500' : 'bg-indigo-500'}`}
-                                                    style={{ width: `${Math.min((stat.mastery_level / 5) * 100, 100)}%` }}
-                                                ></div>
-                                            </div>
-                                            <span className="text-xs text-slate-500">{stat.mastery_level}/5</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                            {flashcardStats.map(stat => {
+                                // Map old 0-5 mastery to new 1-4 level system
+                                const difficultyLevel = stat.mastery_level >= 4 ? 4 :
+                                    stat.mastery_level >= 3 ? 3 :
+                                        stat.mastery_level >= 1 ? 2 : 1;
+                                const masteryPercent = Math.round((stat.mastery_level / 5) * 100);
+
+                                return (
+                                    <tr key={stat.id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="p-4 text-slate-700 font-medium max-w-xs truncate" title={stat.question}>
+                                            {stat.question}
+                                        </td>
+                                        <td className="p-4">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStateColor(stat.state)}`}>
+                                                {stat.state === 'new' ? 'Nuevo' :
+                                                    stat.state === 'learning' ? 'Aprendiendo' :
+                                                        stat.state === 'review' ? 'Repaso' : 'Relearning'}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-slate-600">
+                                            {getNextReviewLabel(stat.next_review_at)}
+                                        </td>
+                                        <td className="p-4">
+                                            <DifficultyLevelIndicator
+                                                level={difficultyLevel}
+                                                masteryPercent={masteryPercent}
+                                                size="sm"
+                                                showLabel={false}
+                                                showProgress={false}
+                                            />
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                             {flashcardStats.length === 0 && (
                                 <tr>
                                     <td colSpan={4} className="p-8 text-center text-slate-400">
