@@ -440,6 +440,7 @@ const StudySetDetail: React.FC = () => {
                         study_set_id: studySet.id,
                         material_id: newMaterial.id // Link to material for cascade delete
                     }));
+                    console.log('DEBUG: Inserting flashcards with material_id:', newFlashcards[0]?.material_id);
                     await addFlashcardsBatch(newFlashcards);
                 }
 
