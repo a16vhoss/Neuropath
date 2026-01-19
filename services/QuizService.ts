@@ -11,13 +11,19 @@
 import { supabase } from './supabaseClient';
 import { generateQuizQuestions } from './geminiService';
 
+export type QuestionType = 'true_false' | 'multiple_choice' | 'analysis' | 'design';
+
 export interface QuizQuestion {
     id: string;
     question: string;
+    type: QuestionType;  // Type of question based on difficulty
     options: string[];
     correctIndex: number;
     explanation?: string;
     topic?: string;
+    scenario?: string;       // For analysis questions - provides context/case
+    designPrompt?: string;   // For design questions - what to design/solve
+    evaluationCriteria?: string[]; // For design questions - rubric for AI evaluation
 }
 
 export interface QuizResult {
@@ -50,6 +56,79 @@ export interface QuizReport {
 }
 
 /**
+ * Get user's average mastery level for a study set (1-4 scale)
+ */
+export async function getUserMasteryLevel(
+    studySetId: string,
+    userId: string
+): Promise<number> {
+    try {
+        // Get flashcard IDs in this study set
+        const { data: flashcards } = await supabase
+            .from('flashcards')
+            .select('id')
+            .eq('study_set_id', studySetId);
+
+        if (!flashcards || flashcards.length === 0) return 1;
+
+        const flashcardIds = flashcards.map(f => f.id);
+
+        // Get SRS data for user's progress on these cards
+        const { data: srsData } = await supabase
+            .from('flashcard_srs_data')
+            .select('mastery_level')
+            .eq('user_id', userId)
+            .in('flashcard_id', flashcardIds);
+
+        if (!srsData || srsData.length === 0) return 1;
+
+        // Calculate average mastery (0-5 scale from DB)
+        const avgMastery = srsData.reduce((sum, d) => sum + (d.mastery_level || 0), 0) / srsData.length;
+
+        // Convert to 1-4 level scale
+        if (avgMastery >= 4) return 4;      // Expert
+        if (avgMastery >= 2.5) return 3;    // Advanced
+        if (avgMastery >= 1) return 2;      // Intermediate
+        return 1;                            // Basic
+    } catch (error) {
+        console.error('Error getting user mastery level:', error);
+        return 1;
+    }
+}
+
+/**
+ * Get question type distribution - balanced mix for variety
+ * Independent of user level - all quizzes get a variety of types
+ */
+function getQuestionTypeDistribution(totalQuestions: number): Record<QuestionType, number> {
+    // Balanced distribution for all quizzes:
+    // ~20% True/False, ~40% Multiple Choice, ~25% Analysis, ~15% Design
+    const distribution = {
+        true_false: 0.2,
+        multiple_choice: 0.4,
+        analysis: 0.25,
+        design: 0.15,
+    };
+
+    // Calculate counts, ensuring at least 1 of each type if we have enough questions
+    let counts = {
+        true_false: Math.round(totalQuestions * distribution.true_false),
+        multiple_choice: Math.round(totalQuestions * distribution.multiple_choice),
+        analysis: Math.round(totalQuestions * distribution.analysis),
+        design: Math.round(totalQuestions * distribution.design),
+    };
+
+    // Ensure we have at least 1 of each type for quizzes with 5+ questions
+    if (totalQuestions >= 5) {
+        if (counts.true_false === 0) counts.true_false = 1;
+        if (counts.analysis === 0) counts.analysis = 1;
+        if (counts.design === 0) counts.design = 1;
+    }
+
+    return counts;
+}
+
+/**
  * Generate an adaptive quiz based on study set content and previous performance
  */
 export async function generateAdaptiveQuiz(
@@ -69,62 +148,103 @@ export async function generateAdaptiveQuiz(
             return [];
         }
 
-        // 2. Get weak topics from previous quiz sessions
+        // 2. Get user's mastery level
+        const userLevel = await getUserMasteryLevel(studySetId, userId);
+        console.log(`[Quiz] User level for study set: ${userLevel}`);
+
+        // 3. Get weak topics from previous quiz sessions
         const weakTopics = await getWeakTopics(studySetId, userId);
 
-        // 3. Get previously asked questions to avoid repetition
+        // 4. Get previously asked questions to avoid repetition
         const previousQuestions = await getPreviousQuestions(studySetId, userId);
 
-        // 4. Build context for Gemini
+        // 5. Build context for Gemini
         const contentSummary = flashcards
             .map(f => `Q: ${f.question}\nA: ${f.answer}\nTopic: ${f.category || 'General'}`)
             .join('\n\n');
 
         const weakTopicsContext = weakTopics.length > 0
-            ? `\n\nIMPORTANT: The student has struggled with these topics. Generate MORE questions about them: ${weakTopics.join(', ')}`
+            ? `\n\nIMPORTANT: The student has struggled with these topics. Include questions about them: ${weakTopics.join(', ')}`
             : '';
 
         const avoidContext = previousQuestions.length > 0
-            ? `\n\nAvoid repeating these exact questions (but similar topics are OK):\n${previousQuestions.slice(0, 10).join('\n')}`
+            ? `\n\nAvoid repeating these exact questions:\n${previousQuestions.slice(0, 10).join('\n')}`
             : '';
 
-        const prompt = `Based on this study material, generate ${questionCount} multiple-choice quiz questions.
+        // 6. Get question type distribution (balanced mix for all users)
+        const distribution = getQuestionTypeDistribution(questionCount);
+
+        const typeInstructions = `
+QUESTION TYPE DISTRIBUTION (generate exactly this mix):
+- True/False questions: ${distribution.true_false}
+- Multiple Choice questions (4 options): ${distribution.multiple_choice}
+- Analysis questions (scenario-based): ${distribution.analysis}
+- Design questions (open-ended solutions): ${distribution.design}
+
+QUESTION TYPE FORMATS:
+
+1. TRUE_FALSE TYPE:
+   - Simple statement that is either true or false
+   - Options: ["Verdadero", "Falso"]
+   - correctIndex: 0 for true, 1 for false
+
+2. MULTIPLE_CHOICE TYPE:
+   - Traditional question with 4 options
+   - Options: ["A", "B", "C", "D"]
+   - correctIndex: 0-3
+
+3. ANALYSIS TYPE:
+   - Includes a "scenario" field with a real-world case
+   - Question asks to analyze the scenario
+   - Options: 4 possible interpretations/conclusions
+   - correctIndex: 0-3
+
+4. DESIGN TYPE:
+   - Open-ended problem that requires designing a solution
+   - "designPrompt" field describes what to create
+   - Options: ["Mi solución está lista"] (single option, user will write)
+   - correctIndex: 0
+   - "evaluationCriteria": array of 3 criteria to evaluate the response`;
+
+        const prompt = `Based on this study material, generate a quiz with ${questionCount} questions.
+
+STUDENT LEVEL: ${userLevel}/4 (${['Básico', 'Intermedio', 'Avanzado', 'Experto'][userLevel - 1]})
 
 Study Material:
 ${contentSummary}
 ${weakTopicsContext}
 ${avoidContext}
 
-Requirements:
-- Each question should have 4 options (A, B, C, D)
-- Include the correct answer index (0-3)
-- Add a brief explanation for each answer
-- Include a topic/category for each question
+${typeInstructions}
 
-ADAPTIVE RULES:
-1. For "Weak Topics" listed above: Generate questions that verify the core concept again, but with different phrasing.
-2. For TOPICS NOT LISTED as weak (mastered topics): Generate MORE COMPLEX questions. Move from simple recall to application or analysis scenarios. EVOLVE the difficulty.
-
-Return as JSON array:
+Return as JSON array. IMPORTANT: Include "type" field for each question:
 [{
+  "type": "true_false" | "multiple_choice" | "analysis" | "design",
   "question": "...",
-  "options": ["A", "B", "C", "D"],
+  "options": [...],
   "correctIndex": 0,
   "explanation": "...",
-  "topic": "..."
+  "topic": "...",
+  "scenario": "..." (only for analysis type),
+  "designPrompt": "..." (only for design type),
+  "evaluationCriteria": ["...", "...", "..."] (only for design type)
 }]`;
 
-        // 5. Generate questions with Gemini
+        // 7. Generate questions with Gemini
         const generatedQuestions = await generateQuizQuestions(prompt);
 
         if (generatedQuestions && generatedQuestions.length > 0) {
             return generatedQuestions.map((q: any, i: number) => ({
                 id: `quiz-${Date.now()}-${i}`,
+                type: q.type || 'multiple_choice',
                 question: q.question,
                 options: q.options,
                 correctIndex: q.correctIndex,
                 explanation: q.explanation || '',
-                topic: q.topic || 'General'
+                topic: q.topic || 'General',
+                scenario: q.scenario,
+                designPrompt: q.designPrompt,
+                evaluationCriteria: q.evaluationCriteria,
             }));
         }
 

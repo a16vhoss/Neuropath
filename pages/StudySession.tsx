@@ -13,7 +13,7 @@ import SRSRatingButtons from '../components/SRSRatingButtons';
 import { updateCardAfterReview, Rating, getRatingLabel, getCardsForSession, FlashcardWithSRS } from '../services/AdaptiveLearningService';
 import { handleSessionComplete, handleStrugglingSession, updateConsecutiveCorrect, DIFFICULTY_TIERS } from '../services/DynamicContentService';
 import StudySetStatistics from '../components/StudySetStatistics';
-import { generateAdaptiveQuiz, saveQuizSession, QuizQuestion as AdaptiveQuizQuestion, QuizResult, QuizReport } from '../services/QuizService';
+import { generateAdaptiveQuiz, saveQuizSession, QuizQuestion as AdaptiveQuizQuestion, QuizResult, QuizReport, QuestionType } from '../services/QuizService';
 
 type StudyMode = 'flashcards' | 'quiz' | 'cramming' | 'podcast' | 'daily';
 
@@ -28,9 +28,13 @@ interface Flashcard {
 interface QuizQuestion {
   id: string;
   question: string;
+  type?: QuestionType;  // Question type: true_false, multiple_choice, analysis, design
   options: string[];
   correctIndex: number;
   explanation: string;
+  scenario?: string;       // For analysis questions
+  designPrompt?: string;   // For design questions
+  evaluationCriteria?: string[]; // For design questions
 }
 
 const mockFlashcards: Flashcard[] = [
@@ -88,6 +92,7 @@ const StudySession: React.FC = () => {
   const [quizReport, setQuizReport] = useState<QuizReport | null>(null);
   const [quizLoading, setQuizLoading] = useState(false);
   const [quizStartTime, setQuizStartTime] = useState<number>(Date.now());
+  const [designAnswer, setDesignAnswer] = useState<string>(''); // For design type questions
 
   // Exam state
   const [examTime, setExamTime] = useState(15 * 60); // 15 minutes
@@ -1111,41 +1116,131 @@ const StudySession: React.FC = () => {
               </div>
             ) : (
               <div className="bg-white rounded-3xl shadow-2xl p-8">
-                <div className="mb-6">
-                  <span className="bg-violet-100 text-violet-600 text-xs font-bold px-3 py-1 rounded-full">Pregunta {currentQuizIndex + 1}</span>
+                {/* Question header with type badge */}
+                <div className="mb-6 flex items-center gap-2">
+                  <span className="bg-violet-100 text-violet-600 text-xs font-bold px-3 py-1 rounded-full">
+                    Pregunta {currentQuizIndex + 1}/{quizQuestions.length}
+                  </span>
+                  <span className={`text-xs font-bold px-3 py-1 rounded-full ${quizQuestions[currentQuizIndex]?.type === 'true_false' ? 'bg-emerald-100 text-emerald-600' :
+                      quizQuestions[currentQuizIndex]?.type === 'analysis' ? 'bg-amber-100 text-amber-600' :
+                        quizQuestions[currentQuizIndex]?.type === 'design' ? 'bg-purple-100 text-purple-600' :
+                          'bg-blue-100 text-blue-600'
+                    }`}>
+                    {quizQuestions[currentQuizIndex]?.type === 'true_false' ? '✓✗ V/F' :
+                      quizQuestions[currentQuizIndex]?.type === 'analysis' ? '🔍 Análisis' :
+                        quizQuestions[currentQuizIndex]?.type === 'design' ? '✏️ Diseño' : '📝 Opción Múltiple'}
+                  </span>
                 </div>
+
+                {/* Scenario for analysis questions */}
+                {quizQuestions[currentQuizIndex]?.type === 'analysis' && quizQuestions[currentQuizIndex]?.scenario && (
+                  <div className="mb-6 p-4 bg-amber-50 border-l-4 border-amber-400 rounded-r-xl">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="material-symbols-outlined text-amber-600">cases</span>
+                      <span className="font-bold text-amber-700">Escenario</span>
+                    </div>
+                    <p className="text-slate-700 text-sm leading-relaxed">{quizQuestions[currentQuizIndex].scenario}</p>
+                  </div>
+                )}
+
                 <h2 className="text-2xl font-black text-slate-900 mb-8">{quizQuestions[currentQuizIndex]?.question}</h2>
 
-                <div className="space-y-3">
-                  {quizQuestions[currentQuizIndex]?.options.map((option, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleQuizAnswer(i)}
-                      disabled={showResult}
-                      className={`w-full p-4 rounded-xl text-left font-medium transition-all flex items-center gap-3 ${showResult
-                        ? i === quizQuestions[currentQuizIndex].correctIndex
-                          ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500'
+                {/* TRUE/FALSE TYPE - Large V/F buttons */}
+                {quizQuestions[currentQuizIndex]?.type === 'true_false' ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    {['Verdadero', 'Falso'].map((option, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleQuizAnswer(i)}
+                        disabled={showResult}
+                        className={`p-8 rounded-2xl font-bold text-xl transition-all flex flex-col items-center justify-center gap-3 ${showResult
+                          ? i === quizQuestions[currentQuizIndex].correctIndex
+                            ? 'bg-emerald-100 text-emerald-700 border-4 border-emerald-500 scale-105'
+                            : selectedAnswer === i
+                              ? 'bg-rose-100 text-rose-700 border-4 border-rose-500'
+                              : 'bg-slate-100 text-slate-400'
                           : selectedAnswer === i
-                            ? 'bg-rose-100 text-rose-700 border-2 border-rose-500'
-                            : 'bg-slate-100 text-slate-500'
-                        : selectedAnswer === i
-                          ? 'bg-primary text-white'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                        }`}
-                    >
-                      <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${showResult && i === quizQuestions[currentQuizIndex].correctIndex ? 'bg-emerald-500 text-white' :
-                        showResult && selectedAnswer === i ? 'bg-rose-500 text-white' :
-                          selectedAnswer === i ? 'bg-white/20 text-white' : 'bg-white text-slate-600'
-                        }`}>
-                        {String.fromCharCode(65 + i)}
-                      </span>
-                      {option}
-                      {showResult && i === quizQuestions[currentQuizIndex].correctIndex && (
-                        <span className="material-symbols-outlined ml-auto text-emerald-600">check_circle</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
+                            ? i === 0 ? 'bg-emerald-500 text-white scale-105' : 'bg-rose-500 text-white scale-105'
+                            : i === 0 ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-2 border-emerald-200'
+                              : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border-2 border-rose-200'
+                          }`}
+                      >
+                        <span className="material-symbols-outlined text-4xl">
+                          {i === 0 ? 'check_circle' : 'cancel'}
+                        </span>
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                ) : quizQuestions[currentQuizIndex]?.type === 'design' ? (
+                  /* DESIGN TYPE - Text area for open response */
+                  <div className="space-y-4">
+                    {quizQuestions[currentQuizIndex]?.designPrompt && (
+                      <div className="p-4 bg-purple-50 border-l-4 border-purple-400 rounded-r-xl mb-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="material-symbols-outlined text-purple-600">design_services</span>
+                          <span className="font-bold text-purple-700">Tu Reto</span>
+                        </div>
+                        <p className="text-slate-700 text-sm">{quizQuestions[currentQuizIndex].designPrompt}</p>
+                      </div>
+                    )}
+
+                    {quizQuestions[currentQuizIndex]?.evaluationCriteria && (
+                      <div className="text-xs text-slate-500 mb-2">
+                        <span className="font-semibold">Se evaluará:</span> {quizQuestions[currentQuizIndex].evaluationCriteria?.join(' • ')}
+                      </div>
+                    )}
+
+                    <textarea
+                      value={designAnswer}
+                      onChange={(e) => setDesignAnswer(e.target.value)}
+                      disabled={showResult}
+                      placeholder="Escribe tu solución aquí..."
+                      className="w-full h-40 p-4 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all resize-none text-slate-700"
+                    />
+
+                    {!showResult && designAnswer.length > 10 && (
+                      <button
+                        onClick={() => handleQuizAnswer(0)}
+                        className="w-full py-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition-all"
+                      >
+                        Enviar mi Solución
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  /* MULTIPLE CHOICE / ANALYSIS - Standard options */
+                  <div className="space-y-3">
+                    {quizQuestions[currentQuizIndex]?.options.map((option, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleQuizAnswer(i)}
+                        disabled={showResult}
+                        className={`w-full p-4 rounded-xl text-left font-medium transition-all flex items-center gap-3 ${showResult
+                          ? i === quizQuestions[currentQuizIndex].correctIndex
+                            ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500'
+                            : selectedAnswer === i
+                              ? 'bg-rose-100 text-rose-700 border-2 border-rose-500'
+                              : 'bg-slate-100 text-slate-500'
+                          : selectedAnswer === i
+                            ? 'bg-primary text-white'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                      >
+                        <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${showResult && i === quizQuestions[currentQuizIndex].correctIndex ? 'bg-emerald-500 text-white' :
+                          showResult && selectedAnswer === i ? 'bg-rose-500 text-white' :
+                            selectedAnswer === i ? 'bg-white/20 text-white' : 'bg-white text-slate-600'
+                          }`}>
+                          {String.fromCharCode(65 + i)}
+                        </span>
+                        {option}
+                        {showResult && i === quizQuestions[currentQuizIndex].correctIndex && (
+                          <span className="material-symbols-outlined ml-auto text-emerald-600">check_circle</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {showResult && (
                   <div className="mt-6 p-4 bg-blue-50 rounded-xl text-sm text-blue-700">
@@ -1155,7 +1250,7 @@ const StudySession: React.FC = () => {
 
                 {showResult && (
                   <button
-                    onClick={nextQuizQuestion}
+                    onClick={() => { nextQuizQuestion(); setDesignAnswer(''); }}
                     className="w-full mt-6 bg-primary text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-all"
                   >
                     {currentQuizIndex < quizQuestions.length - 1 ? 'Siguiente Pregunta' : 'Ver Resultados'}

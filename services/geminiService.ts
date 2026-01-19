@@ -424,10 +424,7 @@ export const generateQuizQuestions = async (context: string) => {
     const ai = new GoogleGenAI({ apiKey: API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash",
-      contents: `Generate 5 multiple-choice quiz questions based on the following context.
-      Context: ${context.substring(0, 20000)} ...
-      
-      Return JSON format.`,
+      contents: context.substring(0, 25000),
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -435,15 +432,37 @@ export const generateQuizQuestions = async (context: string) => {
           items: {
             type: Type.OBJECT,
             properties: {
+              type: {
+                type: Type.STRING,
+                description: "Question type: true_false, multiple_choice, analysis, or design"
+              },
               question: { type: Type.STRING },
               options: {
                 type: Type.ARRAY,
-                items: { type: Type.STRING }
+                items: { type: Type.STRING },
+                description: "Answer options. For true_false: ['Verdadero', 'Falso']. For multiple_choice: 4 options. For analysis: 4 interpretations. For design: ['Mi solución está lista']"
               },
-              correctIndex: { type: Type.NUMBER, description: "Index of the correct option (0-3)" },
-              explanation: { type: Type.STRING }
+              correctIndex: {
+                type: Type.NUMBER,
+                description: "Index of the correct option (0-based)"
+              },
+              explanation: { type: Type.STRING },
+              topic: { type: Type.STRING },
+              scenario: {
+                type: Type.STRING,
+                description: "For analysis type: a real-world case or scenario to analyze"
+              },
+              designPrompt: {
+                type: Type.STRING,
+                description: "For design type: what solution to design/create"
+              },
+              evaluationCriteria: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "For design type: 3 criteria to evaluate the response"
+              }
             },
-            required: ["question", "options", "correctIndex", "explanation"]
+            required: ["type", "question", "options", "correctIndex", "explanation", "topic"]
           }
         }
       }
