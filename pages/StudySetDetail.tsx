@@ -12,6 +12,7 @@ import {
     supabase
 } from '../services/supabaseClient';
 import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary } from '../services/pdfProcessingService';
+import { generateFlashcardsFromYouTubeURL } from '../services/geminiService';
 
 interface Flashcard {
     id: string;
@@ -395,33 +396,59 @@ const StudySetDetail: React.FC = () => {
     const handleUrlSubmit = async () => {
         if (!urlInput.trim() || !studySet || !user) return;
         setUploading(true);
-        setUploadProgress('Procesando enlace...');
+        setShowUrlModal(false);
 
         try {
-            let finalType = urlType;
-            let name = urlType === 'youtube' ? 'Video de YouTube' : 'Enlace Web';
-
             if (urlType === 'youtube') {
-                // Simple check if it's a youtube link
+                // Validate YouTube URL
                 if (!urlInput.includes('youtube.com') && !urlInput.includes('youtu.be')) {
                     throw new Error('No parece ser un enlace de YouTube válido');
                 }
-                name = `YouTube: ${urlInput}`;
-            } else {
-                name = `Web: ${urlInput}`;
-            }
 
-            await addMaterialToStudySet({
-                study_set_id: studySet.id,
-                name: name,
-                type: 'url',
-                file_url: urlInput,
-                flashcards_generated: 0
-            });
+                setUploadProgress('Analizando video con Gemini IA...');
+
+                // Use Gemini to analyze YouTube video and generate flashcards + summary
+                const youtubeResult = await generateFlashcardsFromYouTubeURL(urlInput);
+
+                setUploadProgress(`Guardando ${youtubeResult.flashcards.length} flashcards...`);
+
+                // Add flashcards to study set
+                const newFlashcards = youtubeResult.flashcards.map(fc => ({
+                    ...fc,
+                    id: crypto.randomUUID(),
+                    study_set_id: studySet.id
+                }));
+                await addFlashcards(studySet.id, newFlashcards);
+
+                setUploadProgress('Guardando material...');
+
+                // Save material with detailed summary
+                await addMaterialToStudySet({
+                    study_set_id: studySet.id,
+                    name: youtubeResult.videoTitle || 'Video de YouTube',
+                    type: 'url',
+                    file_url: youtubeResult.videoUrl,
+                    content_text: `Canal: ${youtubeResult.channelName}\n\n${youtubeResult.summary}`,
+                    flashcards_generated: youtubeResult.flashcards.length,
+                    summary: youtubeResult.summary
+                });
+
+            } else {
+                // Regular website link (no flashcard generation)
+                setUploadProgress('Guardando enlace...');
+                await addMaterialToStudySet({
+                    study_set_id: studySet.id,
+                    name: `Web: ${urlInput}`,
+                    type: 'url',
+                    file_url: urlInput,
+                    flashcards_generated: 0
+                });
+            }
 
             setUrlInput('');
             setUploadProgress('');
             loadStudySet();
+            setActiveTab('materials'); // Show materials tab to see result
         } catch (error: any) {
             console.error('Error processing URL:', error);
             setUploadProgress(`Error: ${error.message}`);
@@ -965,12 +992,15 @@ const StudySetDetail: React.FC = () => {
                                     className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary"
                                     placeholder={urlType === 'youtube' ? 'https://youtube.com/watch?v=...' : 'https://example.com/article'}
                                 />
-                                {urlType === 'youtube' && (
-                                    <p className="text-xs text-slate-500 mt-2">
-                                        Se guardará como referencia. Próximamente: Generación automática desde videos.
-                                    </p>
-                                )}
                             </div>
+                            {urlType === 'youtube' && (
+                                <div className="p-3 bg-gradient-to-r from-violet-50 to-fuchsia-50 rounded-lg border border-violet-100">
+                                    <div className="flex items-center gap-2 text-violet-700 text-sm font-medium">
+                                        <span className="material-symbols-outlined text-lg">auto_awesome</span>
+                                        IA analizará el video y generará flashcards + resumen detallado
+                                    </div>
+                                </div>
+                            )}
                             <div className="flex gap-3 mt-6">
                                 <button
                                     onClick={() => setShowUrlModal(false)}
