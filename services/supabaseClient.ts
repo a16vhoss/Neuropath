@@ -233,6 +233,121 @@ export const updateFlashcardProgress = async (studentId: string, flashcardId: st
     return data;
 };
 
+// ============================================
+// DIFFICULTY LEVEL & MASTERY SYSTEM
+// ============================================
+
+export interface MasteryResult {
+    student_id: string;
+    flashcard_id: string;
+    previous_level: number;
+    new_level: number;
+    level_changed: boolean;
+    mastery_percent: number;
+    success_rate: number;
+    attempts_at_level: number;
+}
+
+export interface FlashcardWithMastery {
+    id: string;
+    question: string;
+    answer: string;
+    category?: string;
+    difficulty_level: number;
+    mastery_percent: number;
+    correct_at_level: number;
+    attempts_at_level: number;
+}
+
+// Update flashcard mastery and check for level progression
+export const updateFlashcardMastery = async (
+    studentId: string,
+    flashcardId: string,
+    isCorrect: boolean
+): Promise<MasteryResult> => {
+    const { data, error } = await supabase
+        .rpc('update_flashcard_mastery', {
+            p_student_id: studentId,
+            p_flashcard_id: flashcardId,
+            p_is_correct: isCorrect
+        });
+
+    if (error) throw error;
+    return data as MasteryResult;
+};
+
+// Get mastery stats for a study set
+export const getStudySetMasteryStats = async (studentId: string, studySetId: string) => {
+    const { data, error } = await supabase
+        .from('flashcard_progress')
+        .select(`
+            difficulty_level,
+            mastery_percent,
+            correct_at_level,
+            attempts_at_level,
+            flashcard_id,
+            flashcards!inner(
+                id,
+                question,
+                answer,
+                category,
+                study_set_id
+            )
+        `)
+        .eq('student_id', studentId)
+        .eq('flashcards.study_set_id', studySetId);
+
+    if (error) throw error;
+    return data;
+};
+
+// Get flashcards with mastery info for adaptive study
+export const getFlashcardsWithMastery = async (
+    studentId: string,
+    studySetId: string
+): Promise<FlashcardWithMastery[]> => {
+    // Get all flashcards
+    const { data: flashcards, error: flashError } = await supabase
+        .from('flashcards')
+        .select('id, question, answer, category')
+        .eq('study_set_id', studySetId);
+
+    if (flashError) throw flashError;
+
+    // Get progress for these flashcards
+    const flashcardIds = flashcards?.map(f => f.id) || [];
+    const { data: progress, error: progressError } = await supabase
+        .from('flashcard_progress')
+        .select('flashcard_id, difficulty_level, mastery_percent, correct_at_level, attempts_at_level')
+        .eq('student_id', studentId)
+        .in('flashcard_id', flashcardIds);
+
+    if (progressError) throw progressError;
+
+    // Create a map for quick lookup
+    const progressMap = new Map(progress?.map(p => [p.flashcard_id, p]));
+
+    // Merge flashcards with their progress
+    return (flashcards || []).map(fc => ({
+        ...fc,
+        difficulty_level: progressMap.get(fc.id)?.difficulty_level || 1,
+        mastery_percent: progressMap.get(fc.id)?.mastery_percent || 0,
+        correct_at_level: progressMap.get(fc.id)?.correct_at_level || 0,
+        attempts_at_level: progressMap.get(fc.id)?.attempts_at_level || 0
+    }));
+};
+
+// Helper to get level display info
+export const getDifficultyLevelInfo = (level: number) => {
+    const levels = {
+        1: { name: 'Básico', stars: '⭐', color: '#10b981' },
+        2: { name: 'Intermedio', stars: '⭐⭐', color: '#3b82f6' },
+        3: { name: 'Avanzado', stars: '⭐⭐⭐', color: '#8b5cf6' },
+        4: { name: 'Experto', stars: '⭐⭐⭐⭐', color: '#f59e0b' }
+    };
+    return levels[level as keyof typeof levels] || levels[1];
+};
+
 // Quiz helpers
 export const getClassQuizzes = async (classId: string) => {
     const { data, error } = await supabase
