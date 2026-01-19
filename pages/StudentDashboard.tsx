@@ -8,6 +8,7 @@ import { generateFlashcardsFromText, extractTextFromPDF } from '../services/pdfP
 import StudySetManager from '../components/StudySetManager';
 import MagicImportModal from '../components/MagicImportModal';
 import AdaptiveProgressCard from '../components/AdaptiveProgressCard';
+import CumulativeReportsCard from '../components/CumulativeReportsCard';
 
 interface ClassData {
   id: string;
@@ -601,6 +602,9 @@ const StudentDashboard: React.FC = () => {
             <AdaptiveProgressCard
               onStartSession={(mode) => navigate(`/student/adaptive-study?mode=${mode}`)}
             />
+
+            {/* Cumulative Reports Widget */}
+            <CumulativeReportsCard />
 
           </div>
         </div>
