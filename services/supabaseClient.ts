@@ -550,6 +550,30 @@ export const addMaterialToStudySet = async (material: StudySetMaterial) => {
     return data;
 };
 
+export const createMaterialWithFlashcards = async (params: {
+    study_set_id: string;
+    name: string;
+    type: 'pdf' | 'manual' | 'url' | 'notes';
+    content_text?: string;
+    summary?: string;
+    file_url?: string;
+    flashcards: any[];
+}) => {
+    const { data, error } = await supabase
+        .rpc('create_material_with_flashcards', {
+            p_study_set_id: params.study_set_id,
+            p_name: params.name,
+            p_type: params.type,
+            p_content_text: params.content_text || null,
+            p_summary: params.summary || null,
+            p_file_url: params.file_url || null,
+            p_flashcards: params.flashcards
+        });
+
+    if (error) throw error;
+    return data;
+};
+
 export const updateStudySetMaterial = async (materialId: string, updates: Partial<StudySetMaterial>) => {
     const { data, error } = await supabase
         .from('study_set_materials')
