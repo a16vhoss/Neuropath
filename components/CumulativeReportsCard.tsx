@@ -58,7 +58,7 @@ const CumulativeReportsCard: React.FC = () => {
 
             if (quizError) console.error('Quiz sessions error:', quizError);
 
-            // Fetch adaptive study sessions
+            // Fetch adaptive study sessions with duration
             const { data: adaptiveSessions, error: adaptiveError } = await supabase
                 .from('adaptive_study_sessions')
                 .select(`
@@ -68,6 +68,9 @@ const CumulativeReportsCard: React.FC = () => {
                     cards_correct,
                     cards_studied,
                     study_set_id,
+                    started_at,
+                    ended_at,
+                    duration_seconds,
                     study_sets(name)
                 `)
                 .eq('user_id', user!.id)
@@ -76,7 +79,32 @@ const CumulativeReportsCard: React.FC = () => {
 
             if (adaptiveError) console.error('Adaptive sessions error:', adaptiveError);
 
-            // Merge and format sessions
+            // Fetch review_logs for more accurate data (last 7 days)
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+
+            const { data: reviewLogs, error: reviewError } = await supabase
+                .from('review_logs')
+                .select('id, rating, reviewed_at, response_time_ms, session_id')
+                .eq('user_id', user!.id)
+                .gte('reviewed_at', weekAgo.toISOString())
+                .order('reviewed_at', { ascending: false });
+
+            if (reviewError) console.error('Review logs error:', reviewError);
+
+            // Group review logs by session or by day (for flashcard sessions without session_id)
+            const reviewsByDay = new Map<string, { total: number; correct: number; timeMs: number }>();
+
+            (reviewLogs || []).forEach(log => {
+                const dateKey = new Date(log.reviewed_at).toDateString();
+                const existing = reviewsByDay.get(dateKey) || { total: 0, correct: 0, timeMs: 0 };
+                existing.total += 1;
+                existing.correct += (log.rating >= 3) ? 1 : 0;
+                existing.timeMs += log.response_time_ms || 0;
+                reviewsByDay.set(dateKey, existing);
+            });
+
+            // Merge and format sessions from quiz_sessions and adaptive_study_sessions
             const allSessions: SessionSummary[] = [];
 
             if (quizSessions) {
@@ -113,19 +141,54 @@ const CumulativeReportsCard: React.FC = () => {
             allSessions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
             setSessions(allSessions);
 
-            // Calculate weekly stats (last 7 days)
-            const weekAgo = new Date();
-            weekAgo.setDate(weekAgo.getDate() - 7);
+            // Calculate weekly stats using review_logs for accuracy
+            const reviewLogStats = {
+                totalQuestions: (reviewLogs || []).length,
+                totalCorrect: (reviewLogs || []).filter(r => r.rating >= 3).length,
+                totalTimeMs: (reviewLogs || []).reduce((sum, r) => sum + (r.response_time_ms || 0), 0)
+            };
 
+            // Use review_logs data if available, otherwise fallback to session data
             const weeklySessions = allSessions.filter(s => new Date(s.created_at) >= weekAgo);
-            const totalQuestions = weeklySessions.reduce((sum, s) => sum + s.total, 0);
-            const totalCorrect = weeklySessions.reduce((sum, s) => sum + s.score, 0);
+
+            // Calculate total time from adaptive sessions with duration, or estimate from review logs
+            let totalStudyTimeMinutes = 0;
+
+            // First try to get real duration from adaptive sessions
+            (adaptiveSessions || []).forEach(s => {
+                if (new Date(s.created_at) >= weekAgo) {
+                    if (s.duration_seconds) {
+                        totalStudyTimeMinutes += s.duration_seconds / 60;
+                    } else if (s.started_at && s.ended_at) {
+                        const duration = (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 1000 / 60;
+                        totalStudyTimeMinutes += Math.min(duration, 60); // Cap at 60 min per session
+                    }
+                }
+            });
+
+            // If no duration data, estimate from review logs (avg 15 sec per question)
+            if (totalStudyTimeMinutes === 0 && reviewLogStats.totalQuestions > 0) {
+                totalStudyTimeMinutes = Math.max(1, Math.round(reviewLogStats.totalTimeMs / 1000 / 60));
+                // Fallback: if response times weren't tracked, estimate 15 sec per question
+                if (totalStudyTimeMinutes === 0) {
+                    totalStudyTimeMinutes = Math.round(reviewLogStats.totalQuestions * 0.25); // 15 sec per question
+                }
+            }
+
+            // Use the better data source for questions/accuracy
+            const finalTotalQuestions = reviewLogStats.totalQuestions > 0
+                ? reviewLogStats.totalQuestions
+                : weeklySessions.reduce((sum, s) => sum + s.total, 0);
+
+            const finalTotalCorrect = reviewLogStats.totalQuestions > 0
+                ? reviewLogStats.totalCorrect
+                : weeklySessions.reduce((sum, s) => sum + s.score, 0);
 
             setWeeklyStats({
-                totalSessions: weeklySessions.length,
-                totalQuestions,
-                avgAccuracy: totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0,
-                studyTime: weeklySessions.length * 5 // Estimated 5 min per session
+                totalSessions: weeklySessions.length || (reviewLogStats.totalQuestions > 0 ? 1 : 0),
+                totalQuestions: finalTotalQuestions,
+                avgAccuracy: finalTotalQuestions > 0 ? Math.round((finalTotalCorrect / finalTotalQuestions) * 100) : 0,
+                studyTime: Math.max(1, Math.round(totalStudyTimeMinutes))
             });
 
         } catch (error) {
