@@ -144,8 +144,14 @@ const StudySession: React.FC = () => {
           case 'cramming':
             serviceMode = 'cramming';
             break;
+          case 'daily':
+            serviceMode = 'adaptive'; // Daily uses adaptive mode
+            break;
           // default stays adaptive
         }
+
+        // For daily mode, limit to 10 cards
+        const maxCards = mode === 'daily' ? DAILY_SESSION_QUESTIONS : 20;
 
         // Fetch priority cards using FSRS logic
         const adaptiveCards = await getCardsForSession({
@@ -153,8 +159,8 @@ const StudySession: React.FC = () => {
           classId: classId || undefined,
           studySetId: studySetId || undefined,
           mode: serviceMode,
-          maxNewCards: 20,
-          maxReviewCards: mode === 'exam' ? 50 : 20
+          maxNewCards: maxCards,
+          maxReviewCards: mode === 'exam' ? 50 : maxCards
         });
 
         if (adaptiveCards && adaptiveCards.length > 0) {
@@ -179,13 +185,14 @@ const StudySession: React.FC = () => {
         } else {
           // No adaptive cards found
           if (studySetId) {
-            // For quiz/exam modes, ALWAYS get all cards - no SRS restriction
-            if (mode === 'quiz' || mode === 'exam' || mode === 'cramming') {
+            // For quiz/exam/cramming/daily modes, get all cards - no SRS restriction
+            if (mode === 'quiz' || mode === 'exam' || mode === 'cramming' || mode === 'daily') {
+              const cardLimit = mode === 'daily' ? DAILY_SESSION_QUESTIONS : (mode === 'exam' ? 50 : 20);
               const { data: allCards } = await supabase
                 .from('flashcards')
                 .select('*')
                 .eq('study_set_id', studySetId)
-                .limit(mode === 'exam' ? 50 : 20);
+                .limit(cardLimit);
 
               if (allCards && allCards.length > 0) {
                 sessionCards = allCards.map(c => ({
