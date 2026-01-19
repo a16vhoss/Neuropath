@@ -563,6 +563,18 @@ export const updateStudySetMaterial = async (materialId: string, updates: Partia
 };
 
 export const deleteMaterialFromStudySet = async (materialId: string) => {
+    // First, explicitly delete all flashcards associated with this material
+    const { error: flashcardsError } = await supabase
+        .from('flashcards')
+        .delete()
+        .eq('material_id', materialId);
+
+    if (flashcardsError) {
+        console.error('Error deleting flashcards for material:', flashcardsError);
+        // Continue anyway to delete the material
+    }
+
+    // Then delete the material itself
     const { error } = await supabase
         .from('study_set_materials')
         .delete()
