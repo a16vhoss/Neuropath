@@ -2,68 +2,49 @@
 /**
  * YoutubeService.ts
  * 
- * Extracts transcripts from YouTube videos using multiple strategies.
+ * Extracts transcripts from YouTube videos.
+ * Uses serverless API in production for better reliability.
  */
-
-// Helper to route requests through the correct proxy
-const fetchViaProxy = async (targetUrl: string) => {
-    if (import.meta.env.PROD) {
-        const proxyUrl = `/api/youtube-proxy?url=${encodeURIComponent(targetUrl)}`;
-        const res = await fetch(proxyUrl);
-        if (!res.ok) {
-            const err = await res.text();
-            throw new Error(`Proxy error (${res.status}): ${err}`);
-        }
-        return res;
-    }
-
-    // In Development (Vite), use local proxy from vite.config.ts
-    let localUrl = targetUrl;
-    if (targetUrl.includes('youtube.com')) {
-        localUrl = targetUrl.replace(/https:\/\/(www\.)?youtube\.com/, '/youtube-proxy');
-    }
-    return fetch(localUrl);
-};
 
 export const getYoutubeTranscript = async (url: string): Promise<string> => {
     const videoId = extractVideoID(url);
     if (!videoId) throw new Error('ID de video inválido');
 
-    // Strategy 1: Try fetching transcript directly from timedtext API
-    // This is the most reliable method as it doesn't require parsing HTML
-    try {
-        const transcript = await fetchTranscriptDirect(videoId);
-        if (transcript && transcript.length > 50) {
-            return transcript;
+    // In Production: Use the serverless API which has better success rate
+    if (import.meta.env.PROD) {
+        try {
+            const response = await fetch(`/api/youtube-proxy?videoId=${videoId}`);
+            const data = await response.json();
+
+            if (data.success && data.transcript) {
+                return data.transcript;
+            } else {
+                throw new Error(data.error || 'No se pudo obtener la transcripción');
+            }
+        } catch (error: any) {
+            console.error('YouTube API Error:', error);
+            throw new Error(error.message || 'Error al obtener la transcripción del video');
         }
-    } catch (e) {
-        console.warn('Direct transcript fetch failed:', e);
     }
 
-    // Strategy 2: Try via YouTube page parsing
+    // In Development: Use the Vite proxy
     try {
-        const transcript = await fetchTranscriptViaPage(videoId);
-        if (transcript && transcript.length > 50) {
-            return transcript;
-        }
-    } catch (e) {
-        console.warn('Page-based transcript fetch failed:', e);
+        return await fetchTranscriptViaDev(videoId);
+    } catch (error: any) {
+        console.error('Dev transcript error:', error);
+        throw new Error(error.message || 'No se pudo obtener la transcripción');
     }
-
-    // If all strategies fail
-    throw new Error('No se pudo obtener la transcripción. El video puede no tener subtítulos disponibles o YouTube bloqueó la solicitud.');
 };
 
-// Strategy 1: Direct timedtext API
-async function fetchTranscriptDirect(videoId: string): Promise<string> {
-    // Try common language codes
+// Development mode: Use Vite proxy
+async function fetchTranscriptViaDev(videoId: string): Promise<string> {
+    // Try direct timedtext API first
     const languages = ['es', 'en', 'es-419', 'en-US'];
 
     for (const lang of languages) {
         try {
-            // This URL format sometimes works for auto-generated captions
-            const timedTextUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}&fmt=srv3`;
-            const response = await fetchViaProxy(timedTextUrl);
+            const timedTextUrl = `/youtube-proxy/api/timedtext?v=${videoId}&lang=${lang}&fmt=srv3`;
+            const response = await fetch(timedTextUrl);
             const xml = await response.text();
 
             if (xml && xml.includes('<text')) {
@@ -74,75 +55,47 @@ async function fetchTranscriptDirect(videoId: string): Promise<string> {
         }
     }
 
-    throw new Error('No transcript available via direct API');
-}
-
-// Strategy 2: Parse from YouTube watch page
-async function fetchTranscriptViaPage(videoId: string): Promise<string> {
-    const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const response = await fetchViaProxy(watchUrl);
+    // Try fetching the watch page
+    const watchUrl = `/youtube-proxy/watch?v=${videoId}`;
+    const response = await fetch(watchUrl);
     const html = await response.text();
 
-    // Try multiple patterns to find caption tracks
-    let captionTracks = null;
+    // Look for caption tracks
+    let captionTracks: any[] = [];
 
-    // Pattern 1: Direct captionTracks in page
-    const pattern1 = /"captionTracks":\s*(\[.*?\])/;
-    const match1 = html.match(pattern1);
-    if (match1) {
+    const captionMatch = html.match(/"captionTracks":(\[.*?\])/s);
+    if (captionMatch) {
         try {
-            captionTracks = JSON.parse(match1[1]);
+            captionTracks = JSON.parse(captionMatch[1]);
         } catch (e) { }
     }
 
-    // Pattern 2: ytInitialPlayerResponse
-    if (!captionTracks) {
-        const pattern2 = /ytInitialPlayerResponse\s*=\s*(\{.+?\});/;
-        const match2 = html.match(pattern2);
-        if (match2) {
+    if (!captionMatch) {
+        const playerMatch = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\});/s);
+        if (playerMatch) {
             try {
-                const playerResponse = JSON.parse(match2[1]);
-                captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+                const playerResponse = JSON.parse(playerMatch[1]);
+                captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
             } catch (e) { }
         }
     }
 
-    // Pattern 3: Look in embedded JSON
-    if (!captionTracks) {
-        const pattern3 = /\\"captionTracks\\":\s*(\[.*?\])/;
-        const match3 = html.match(pattern3);
-        if (match3) {
-            try {
-                // Unescape the JSON
-                const unescaped = match3[1].replace(/\\"/g, '"');
-                captionTracks = JSON.parse(unescaped);
-            } catch (e) { }
+    if (captionTracks.length > 0) {
+        const track = captionTracks.find((t: any) => t.languageCode === 'es')
+            || captionTracks.find((t: any) => t.languageCode === 'en')
+            || captionTracks[0];
+
+        if (track?.baseUrl) {
+            let transcriptUrl = track.baseUrl.replace(/https:\/\/(www\.)?youtube\.com/, '/youtube-proxy');
+            const transcriptResponse = await fetch(transcriptUrl);
+            const xml = await transcriptResponse.text();
+            return parseTranscriptXml(xml);
         }
     }
 
-    if (!captionTracks || captionTracks.length === 0) {
-        console.error('No caption tracks found. HTML preview:', html.substring(0, 1000));
-        throw new Error('No se encontraron subtítulos en la página');
-    }
-
-    // Prioritize Spanish, then English
-    const track = captionTracks.find((t: any) => t.languageCode === 'es')
-        || captionTracks.find((t: any) => t.languageCode === 'en')
-        || captionTracks.find((t: any) => t.languageCode?.startsWith('es'))
-        || captionTracks.find((t: any) => t.languageCode?.startsWith('en'))
-        || captionTracks[0];
-
-    if (!track?.baseUrl) {
-        throw new Error('No se encontró URL de subtítulos');
-    }
-
-    const transcriptResponse = await fetchViaProxy(track.baseUrl);
-    const transcriptXml = await transcriptResponse.text();
-
-    return parseTranscriptXml(transcriptXml);
+    throw new Error('No se encontraron subtítulos disponibles');
 }
 
-// Parse transcript XML to plain text
 function parseTranscriptXml(xml: string): string {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xml, "text/xml");
@@ -151,8 +104,8 @@ function parseTranscriptXml(xml: string): string {
     let fullText = '';
     for (let i = 0; i < texts.length; i++) {
         let text = texts[i].textContent || '';
-        // Decode HTML entities
-        text = text.replace(/&amp;/g, '&')
+        text = text
+            .replace(/&amp;/g, '&')
             .replace(/&lt;/g, '<')
             .replace(/&gt;/g, '>')
             .replace(/&quot;/g, '"')
@@ -175,7 +128,7 @@ const extractVideoID = (url: string): string | null => {
         if (match) return match[1];
     }
 
-    // Fallback to original regex
+    // Fallback regex
     const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
     const match = url.match(regExp);
     return (match && match[7]?.length === 11) ? match[7] : null;
