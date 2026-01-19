@@ -419,9 +419,12 @@ export async function getCardsForSession(
     // First, get all flashcards for this study set or class
     let flashcardsQuery = supabase.from('flashcards').select('*');
 
-    // Note: studySetId would need to be linked via study_set_materials
-    // For now, we'll focus on class-based flashcards
-    if (classId) {
+    // IMPORTANT: Filter by study set first (most specific), then by class
+    if (studySetId) {
+        // Filter flashcards by study_set_id - this ensures data isolation per set
+        flashcardsQuery = flashcardsQuery.eq('study_set_id', studySetId);
+    } else if (classId) {
+        // Only filter by class if no study set specified
         flashcardsQuery = flashcardsQuery.eq('class_id', classId);
     }
 
