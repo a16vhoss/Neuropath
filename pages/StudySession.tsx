@@ -274,7 +274,7 @@ const StudySession: React.FC = () => {
          because we fixed the logic flow. */
     };
     fetchCards();
-  }, [classId, studySetId]);
+  }, [classId, studySetId, mode]);
 
   // Effect to generate quiz when flashcards change (and are not empty)
   const [quizGenerated, setQuizGenerated] = useState(false);
