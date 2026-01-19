@@ -28,13 +28,14 @@ interface Flashcard {
 interface QuizQuestion {
   id: string;
   question: string;
-  type?: QuestionType;  // Question type: true_false, multiple_choice, analysis, design
+  type?: QuestionType;  // Question type: true_false, multiple_choice, analysis, design, practical
   options: string[];
   correctIndex: number;
   explanation: string;
   scenario?: string;       // For analysis questions
   designPrompt?: string;   // For design questions
   evaluationCriteria?: string[]; // For design questions
+  realWorldExample?: string; // For practical questions - real-world application
 }
 
 const mockFlashcards: Flashcard[] = [
@@ -1124,11 +1125,13 @@ const StudySession: React.FC = () => {
                   <span className={`text-xs font-bold px-3 py-1 rounded-full ${quizQuestions[currentQuizIndex]?.type === 'true_false' ? 'bg-emerald-100 text-emerald-600' :
                       quizQuestions[currentQuizIndex]?.type === 'analysis' ? 'bg-amber-100 text-amber-600' :
                         quizQuestions[currentQuizIndex]?.type === 'design' ? 'bg-purple-100 text-purple-600' :
-                          'bg-blue-100 text-blue-600'
+                          quizQuestions[currentQuizIndex]?.type === 'practical' ? 'bg-cyan-100 text-cyan-600' :
+                            'bg-blue-100 text-blue-600'
                     }`}>
                     {quizQuestions[currentQuizIndex]?.type === 'true_false' ? '✓✗ V/F' :
                       quizQuestions[currentQuizIndex]?.type === 'analysis' ? '🔍 Análisis' :
-                        quizQuestions[currentQuizIndex]?.type === 'design' ? '✏️ Diseño' : '📝 Opción Múltiple'}
+                        quizQuestions[currentQuizIndex]?.type === 'design' ? '✏️ Diseño' :
+                          quizQuestions[currentQuizIndex]?.type === 'practical' ? '🚀 Aplicación' : '📝 Opción Múltiple'}
                   </span>
                 </div>
 
@@ -1140,6 +1143,17 @@ const StudySession: React.FC = () => {
                       <span className="font-bold text-amber-700">Escenario</span>
                     </div>
                     <p className="text-slate-700 text-sm leading-relaxed">{quizQuestions[currentQuizIndex].scenario}</p>
+                  </div>
+                )}
+
+                {/* Real-world example for practical questions */}
+                {quizQuestions[currentQuizIndex]?.type === 'practical' && quizQuestions[currentQuizIndex]?.realWorldExample && (
+                  <div className="mb-6 p-4 bg-cyan-50 border-l-4 border-cyan-400 rounded-r-xl">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="material-symbols-outlined text-cyan-600">public</span>
+                      <span className="font-bold text-cyan-700">Ejemplo del Mundo Real</span>
+                    </div>
+                    <p className="text-slate-700 text-sm leading-relaxed">{quizQuestions[currentQuizIndex].realWorldExample}</p>
                   </div>
                 )}
 

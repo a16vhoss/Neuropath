@@ -434,13 +434,13 @@ export const generateQuizQuestions = async (context: string) => {
             properties: {
               type: {
                 type: Type.STRING,
-                description: "Question type: true_false, multiple_choice, analysis, or design"
+                description: "Question type: true_false, multiple_choice, analysis, design, or practical"
               },
               question: { type: Type.STRING },
               options: {
                 type: Type.ARRAY,
                 items: { type: Type.STRING },
-                description: "Answer options. For true_false: ['Verdadero', 'Falso']. For multiple_choice: 4 options. For analysis: 4 interpretations. For design: ['Mi solución está lista']"
+                description: "Answer options. For true_false: ['Verdadero', 'Falso']. For multiple_choice/analysis/practical: 4 options. For design: ['Mi solución está lista']"
               },
               correctIndex: {
                 type: Type.NUMBER,
@@ -460,6 +460,10 @@ export const generateQuizQuestions = async (context: string) => {
                 type: Type.ARRAY,
                 items: { type: Type.STRING },
                 description: "For design type: 3 criteria to evaluate the response"
+              },
+              realWorldExample: {
+                type: Type.STRING,
+                description: "For practical type: a concrete, relatable example from daily life or industry showing how the concept is applied"
               }
             },
             required: ["type", "question", "options", "correctIndex", "explanation", "topic"]

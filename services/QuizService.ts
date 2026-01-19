@@ -11,7 +11,7 @@
 import { supabase } from './supabaseClient';
 import { generateQuizQuestions } from './geminiService';
 
-export type QuestionType = 'true_false' | 'multiple_choice' | 'analysis' | 'design';
+export type QuestionType = 'true_false' | 'multiple_choice' | 'analysis' | 'design' | 'practical';
 
 export interface QuizQuestion {
     id: string;
@@ -24,6 +24,7 @@ export interface QuizQuestion {
     scenario?: string;       // For analysis questions - provides context/case
     designPrompt?: string;   // For design questions - what to design/solve
     evaluationCriteria?: string[]; // For design questions - rubric for AI evaluation
+    realWorldExample?: string;  // For practical questions - real-world application example
 }
 
 export interface QuizResult {
@@ -102,27 +103,29 @@ export async function getUserMasteryLevel(
  */
 function getQuestionTypeDistribution(totalQuestions: number): Record<QuestionType, number> {
     // Balanced distribution for all quizzes:
-    // ~20% True/False, ~40% Multiple Choice, ~25% Analysis, ~15% Design
+    // ~15% True/False, ~30% Multiple Choice, ~20% Analysis, ~15% Design, ~20% Practical
     const distribution = {
-        true_false: 0.2,
-        multiple_choice: 0.4,
-        analysis: 0.25,
+        true_false: 0.15,
+        multiple_choice: 0.30,
+        analysis: 0.20,
         design: 0.15,
+        practical: 0.20,  // Real-world application examples
     };
 
-    // Calculate counts, ensuring at least 1 of each type if we have enough questions
+    // Calculate counts
     let counts = {
         true_false: Math.round(totalQuestions * distribution.true_false),
         multiple_choice: Math.round(totalQuestions * distribution.multiple_choice),
         analysis: Math.round(totalQuestions * distribution.analysis),
         design: Math.round(totalQuestions * distribution.design),
+        practical: Math.round(totalQuestions * distribution.practical),
     };
 
-    // Ensure we have at least 1 of each type for quizzes with 5+ questions
+    // Ensure we have at least 1 of each main type for quizzes with 5+ questions
     if (totalQuestions >= 5) {
         if (counts.true_false === 0) counts.true_false = 1;
         if (counts.analysis === 0) counts.analysis = 1;
-        if (counts.design === 0) counts.design = 1;
+        if (counts.practical === 0) counts.practical = 1;
     }
 
     return counts;
@@ -180,6 +183,7 @@ QUESTION TYPE DISTRIBUTION (generate exactly this mix):
 - Multiple Choice questions (4 options): ${distribution.multiple_choice}
 - Analysis questions (scenario-based): ${distribution.analysis}
 - Design questions (open-ended solutions): ${distribution.design}
+- Practical Application questions: ${distribution.practical}
 
 QUESTION TYPE FORMATS:
 
@@ -204,7 +208,14 @@ QUESTION TYPE FORMATS:
    - "designPrompt" field describes what to create
    - Options: ["Mi solución está lista"] (single option, user will write)
    - correctIndex: 0
-   - "evaluationCriteria": array of 3 criteria to evaluate the response`;
+   - "evaluationCriteria": array of 3 criteria to evaluate the response
+
+5. PRACTICAL TYPE:
+   - Question about applying concepts to real-world situations
+   - "realWorldExample" field: A concrete, relatable example from daily life, work, or industry showing how the concept is used in practice
+   - Options: 4 application scenarios
+   - correctIndex: 0-3
+   - The example should make the abstract concept tangible and memorable`;
 
         const prompt = `Based on this study material, generate a quiz with ${questionCount} questions.
 
@@ -219,7 +230,7 @@ ${typeInstructions}
 
 Return as JSON array. IMPORTANT: Include "type" field for each question:
 [{
-  "type": "true_false" | "multiple_choice" | "analysis" | "design",
+  "type": "true_false" | "multiple_choice" | "analysis" | "design" | "practical",
   "question": "...",
   "options": [...],
   "correctIndex": 0,
@@ -227,7 +238,8 @@ Return as JSON array. IMPORTANT: Include "type" field for each question:
   "topic": "...",
   "scenario": "..." (only for analysis type),
   "designPrompt": "..." (only for design type),
-  "evaluationCriteria": ["...", "...", "..."] (only for design type)
+  "evaluationCriteria": ["...", "...", "..."] (only for design type),
+  "realWorldExample": "..." (only for practical type - concrete real-world application)
 }]`;
 
         // 7. Generate questions with Gemini
@@ -245,6 +257,7 @@ Return as JSON array. IMPORTANT: Include "type" field for each question:
                 scenario: q.scenario,
                 designPrompt: q.designPrompt,
                 evaluationCriteria: q.evaluationCriteria,
+                realWorldExample: q.realWorldExample,
             }));
         }
 
