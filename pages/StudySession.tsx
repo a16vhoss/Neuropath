@@ -767,7 +767,6 @@ const StudySession: React.FC = () => {
         <div className="flex justify-center px-4 mb-6">
           <div className="inline-flex p-1 rounded-xl bg-white/20">
             {[
-              { id: 'daily', label: 'Diaria', icon: 'event_available' },
               { id: 'flashcards', label: 'Flashcards', icon: 'style' },
               { id: 'quiz', label: 'Quiz', icon: 'quiz' },
               { id: 'cramming', label: 'Cramming', icon: 'bolt' },
