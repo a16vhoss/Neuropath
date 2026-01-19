@@ -757,65 +757,95 @@ const StudySetDetail: React.FC = () => {
                         ) : (
                             <div className="space-y-3">
                                 {studySet.materials.map((material) => (
-                                    <div key={material.id} className="group relative flex items-start gap-4 p-4 rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-sm transition bg-white">
-                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${material.type === 'pdf' ? 'bg-rose-50 text-rose-500' :
-                                            material.type === 'url' ? 'bg-blue-50 text-blue-500' :
-                                                'bg-orange-50 text-orange-500'
-                                            }`}>
-                                            <span className="material-symbols-outlined">
-                                                {material.type === 'pdf' ? 'picture_as_pdf' :
-                                                    material.type === 'url' ? 'link' : 'description'}
-                                            </span>
+                                    <div key={material.id} className="group relative flex flex-col p-4 rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-sm transition bg-white">
+                                        {/* Header with icon and name */}
+                                        <div className="flex items-start gap-4">
+                                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${material.type === 'pdf' ? 'bg-rose-50 text-rose-500' :
+                                                material.type === 'url' ? 'bg-red-50 text-red-500' :
+                                                    'bg-orange-50 text-orange-500'
+                                                }`}>
+                                                <span className="material-symbols-outlined">
+                                                    {material.type === 'pdf' ? 'picture_as_pdf' :
+                                                        material.type === 'url' ? 'play_circle' : 'description'}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <h4 className="font-medium text-slate-900 truncate pr-4">{material.name}</h4>
+                                                        <p className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
+                                                            <span>{material.flashcards_generated || 0} flashcards generadas</span>
+                                                            <span>•</span>
+                                                            <span>{new Date(material.created_at || Date.now()).toLocaleDateString()}</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
 
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <h4 className="font-medium text-slate-900 truncate pr-4">{material.name}</h4>
-                                                    <p className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
-                                                        <span>{material.flashcards_generated || 0} flashcards generadas</span>
-                                                        <span>•</span>
-                                                        <span>{new Date(material.created_at || Date.now()).toLocaleDateString()}</span>
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            {/* Material Summary Section */}
-                                            {material.summary && (
-                                                <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                                    <div className="flex items-center gap-1.5 mb-1.5">
-                                                        <span className="material-symbols-outlined text-xs text-indigo-500">auto_awesome</span>
-                                                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Micro-Resumen</span>
-                                                    </div>
-                                                    <div className="text-sm text-slate-600 leading-relaxed text-left markdown-summary">
-                                                        {/* Simple split for bullet points if they exist, or just text */}
-                                                        {material.summary.split('\n').map((line, i) => (
-                                                            <p key={i} className="mb-0.5">{line}</p>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            <div className="flex items-center gap-3 mt-3">
-                                                {material.file_url && (
-                                                    <a
-                                                        href={material.file_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition"
-                                                    >
-                                                        <span className="material-symbols-outlined text-sm">visibility</span>
-                                                        {material.type === 'url' ? 'Abrir Enlace' : 'Ver PDF'}
-                                                    </a>
-                                                )}
-                                                <button
-                                                    className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 bg-white border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition"
-                                                    onClick={() => handleOpenMaterial(material)}
+                                        {/* YouTube Link Button (prominent) */}
+                                        {material.type === 'url' && material.file_url && material.file_url.includes('youtu') && (
+                                            <div className="mt-4 flex items-center gap-3">
+                                                <a
+                                                    href={material.file_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white font-medium px-4 py-2 rounded-lg transition"
                                                 >
-                                                    <span className="material-symbols-outlined text-sm">auto_awesome</span>
-                                                    Estudiar Material
-                                                </button>
+                                                    <span className="material-symbols-outlined text-lg">play_circle</span>
+                                                    Ver Video en YouTube
+                                                </a>
+                                                <span className="text-xs text-slate-400 truncate flex-1">{material.file_url}</span>
                                             </div>
+                                        )}
+
+                                        {/* Detailed Summary Section */}
+                                        {material.summary && (
+                                            <div className="mt-4 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <span className="material-symbols-outlined text-indigo-500">auto_awesome</span>
+                                                    <span className="text-sm font-bold text-indigo-700">Resumen Detallado (Generado por IA)</span>
+                                                </div>
+                                                <div className="text-sm text-slate-700 leading-relaxed prose prose-sm prose-indigo max-w-none">
+                                                    {/* Render markdown-style content */}
+                                                    {material.summary.split('\n').map((line, i) => {
+                                                        if (line.startsWith('## ')) {
+                                                            return <h3 key={i} className="text-base font-bold text-indigo-800 mt-4 mb-2">{line.replace('## ', '')}</h3>;
+                                                        } else if (line.startsWith('### ')) {
+                                                            return <h4 key={i} className="text-sm font-semibold text-indigo-700 mt-3 mb-1">{line.replace('### ', '')}</h4>;
+                                                        } else if (line.startsWith('- ') || line.startsWith('• ')) {
+                                                            return <li key={i} className="ml-4 mb-1">{line.replace(/^[-•] /, '')}</li>;
+                                                        } else if (line.trim() === '') {
+                                                            return <br key={i} />;
+                                                        } else {
+                                                            return <p key={i} className="mb-2">{line}</p>;
+                                                        }
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Action buttons */}
+                                        <div className="flex items-center gap-3 mt-4">
+                                            {material.file_url && material.type !== 'url' && (
+                                                <a
+                                                    href={material.file_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition"
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">visibility</span>
+                                                    Ver PDF
+                                                </a>
+                                            )}
+                                            <button
+                                                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 bg-white border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition"
+                                                onClick={() => handleOpenMaterial(material)}
+                                            >
+                                                <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                                                Estudiar Material
+                                            </button>
                                         </div>
                                     </div>
                                 ))}

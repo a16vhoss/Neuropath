@@ -121,7 +121,15 @@ export const generateStudySetFromContext = async (content: string, type: 'text' 
 };
 
 // NEW: YouTube video analysis using oEmbed metadata
-export const generateFlashcardsFromYouTubeURL = async (youtubeUrl: string) => {
+export interface YouTubeAnalysisResult {
+  flashcards: Array<{ question: string; answer: string; category: string }>;
+  summary: string;
+  videoTitle: string;
+  channelName: string;
+  videoUrl: string;
+}
+
+export const generateFlashcardsFromYouTubeURL = async (youtubeUrl: string): Promise<YouTubeAnalysisResult> => {
   if (!API_KEY || API_KEY === 'PLACEHOLDER_API_KEY') {
     throw new Error('API key not configured');
   }
@@ -148,21 +156,30 @@ export const generateFlashcardsFromYouTubeURL = async (youtubeUrl: string) => {
 
     console.log('YouTube metadata:', { videoTitle, channelName });
 
-    // Use Gemini to generate educational flashcards based on the video topic
+    // Use Gemini to generate educational flashcards AND detailed summary
     const ai = new GoogleGenAI({ apiKey: API_KEY });
 
-    const prompt = `Eres un experto educador. Basándote en el siguiente video de YouTube, genera 10-15 flashcards educativas en español.
+    const prompt = `Eres un experto educador. Analiza el siguiente video de YouTube y genera:
+1. Un RESUMEN ULTRA DETALLADO, EXTENSO Y ESPECÍFICO del contenido del video (mínimo 500 palabras)
+2. 10-15 flashcards educativas en español
 
 Video: "${videoTitle}"
 Canal: ${channelName}
 URL: ${youtubeUrl}
 
-IMPORTANTE: 
-- Usa tu conocimiento sobre este tema para crear flashcards con información REAL y PRECISA
-- Si conoces el contenido del video o el tema, úsalo para crear preguntas específicas
-- Las flashcards deben cubrir los conceptos más importantes relacionados con el título del video
-- Cada pregunta debe ser clara y la respuesta debe ser educativa y concisa
-- La categoría debe reflejar el tema principal del video`;
+PARA EL RESUMEN:
+- Escribe un análisis profundo y exhaustivo del tema del video
+- Incluye todos los conceptos clave, teorías, metodologías mencionadas
+- Explica cada subtema en detalle con ejemplos
+- Organiza el contenido con subtítulos claros usando formato markdown (##, ###)
+- Incluye puntos importantes, estadísticas, y datos relevantes
+- El resumen debe servir como material de estudio completo
+- MÍNIMO 500 palabras, idealmente más
+
+PARA LAS FLASHCARDS:
+- Cubre los conceptos más importantes del tema
+- Preguntas claras y respuestas educativas concisas
+- Categoría que refleje el tema principal`;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash",
@@ -170,27 +187,43 @@ IMPORTANTE:
       config: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              question: { type: Type.STRING },
-              answer: { type: Type.STRING },
-              category: { type: Type.STRING }
+          type: Type.OBJECT,
+          properties: {
+            summary: {
+              type: Type.STRING,
+              description: "Ultra detailed summary of the video content in Spanish, formatted with markdown"
             },
-            required: ["question", "answer", "category"]
-          }
+            flashcards: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  question: { type: Type.STRING },
+                  answer: { type: Type.STRING },
+                  category: { type: Type.STRING }
+                },
+                required: ["question", "answer", "category"]
+              }
+            }
+          },
+          required: ["summary", "flashcards"]
         }
       }
     });
 
-    const cards = JSON.parse(response.text || "[]");
+    const result = JSON.parse(response.text || "{}");
 
-    if (!cards || cards.length === 0) {
+    if (!result.flashcards || result.flashcards.length === 0) {
       throw new Error('No se pudieron generar flashcards. Intenta con otro video.');
     }
 
-    return cards;
+    return {
+      flashcards: result.flashcards,
+      summary: result.summary || `Resumen del video: ${videoTitle}`,
+      videoTitle,
+      channelName,
+      videoUrl: youtubeUrl
+    };
   } catch (e: any) {
     console.error("Failed to analyze YouTube video:", e);
 

@@ -71,8 +71,17 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
 
                 setStatus('Analizando video con Gemini IA...');
 
-                // Direct Gemini video analysis - no transcript extraction needed!
-                cardData = await generateFlashcardsFromYouTubeURL(inputValue);
+                // Direct Gemini video analysis - returns flashcards + detailed summary
+                const youtubeResult = await generateFlashcardsFromYouTubeURL(inputValue);
+                cardData = youtubeResult.flashcards;
+
+                // Store YouTube data for material creation
+                (window as any).__youtubeAnalysis = {
+                    summary: youtubeResult.summary,
+                    videoTitle: youtubeResult.videoTitle,
+                    channelName: youtubeResult.channelName,
+                    videoUrl: youtubeResult.videoUrl
+                };
             }
 
             if (!cardData || cardData.length === 0) {
@@ -108,23 +117,38 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
 
                 await addFlashcardsBatch(flashcardsToInsert);
 
-                // 4. Save the source material
-                if (processedContent) {
-                    setStatus('Guardando material original...');
-                    try {
+                // 4. Save the source material with detailed summary for YouTube
+                setStatus('Guardando material original...');
+                try {
+                    // Get YouTube analysis data if available
+                    const youtubeAnalysis = (window as any).__youtubeAnalysis;
+
+                    if (activeTab === 'youtube' && youtubeAnalysis) {
+                        await addMaterialToStudySet({
+                            study_set_id: newSet.id,
+                            name: youtubeAnalysis.videoTitle || 'Video de YouTube',
+                            type: 'url',
+                            file_url: youtubeAnalysis.videoUrl,
+                            content_text: `Canal: ${youtubeAnalysis.channelName}\n\n${youtubeAnalysis.summary}`,
+                            flashcards_generated: cardData.length,
+                            summary: youtubeAnalysis.summary
+                        });
+                        // Clean up
+                        delete (window as any).__youtubeAnalysis;
+                    } else if (processedContent) {
                         await addMaterialToStudySet({
                             study_set_id: newSet.id,
                             name: activeTab === 'pdf' && selectedFile ? selectedFile.name : `Material Original (${activeTab})`,
-                            type: activeTab === 'pdf' ? 'pdf' : (activeTab === 'youtube' ? 'url' : 'notes'),
-                            file_url: activeTab === 'youtube' ? inputValue : '', // Save URL if youtube
+                            type: activeTab === 'pdf' ? 'pdf' : 'notes',
+                            file_url: '',
                             content_text: processedContent,
                             flashcards_generated: cardData.length,
                             summary: `Material importado automáticamente desde ${activeTab}`
                         });
-                    } catch (matError) {
-                        console.error('Error saving material:', matError);
-                        // Don't fail the whole process if material save fails
                     }
+                } catch (matError) {
+                    console.error('Error saving material:', matError);
+                    // Don't fail the whole process if material save fails
                 }
 
                 return newSet;
