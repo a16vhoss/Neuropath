@@ -120,40 +120,53 @@ export const generateStudySetFromContext = async (content: string, type: 'text' 
   }
 };
 
-// NEW: Direct YouTube video analysis - Gemini analyzes the video from URL
+// NEW: YouTube video analysis using oEmbed metadata
 export const generateFlashcardsFromYouTubeURL = async (youtubeUrl: string) => {
   if (!API_KEY || API_KEY === 'PLACEHOLDER_API_KEY') {
     throw new Error('API key not configured');
   }
 
   try {
+    // Extract video ID
+    const videoIdMatch = youtubeUrl.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (!videoIdMatch) {
+      throw new Error('No se pudo extraer el ID del video');
+    }
+    const videoId = videoIdMatch[1];
+
+    // Get video metadata via oEmbed (no API key needed, no CORS issues)
+    const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+    const metaResponse = await fetch(oembedUrl);
+
+    if (!metaResponse.ok) {
+      throw new Error('No se pudo obtener información del video. Verifica que el enlace sea correcto.');
+    }
+
+    const metadata = await metaResponse.json();
+    const videoTitle = metadata.title || 'Video de YouTube';
+    const channelName = metadata.author_name || '';
+
+    console.log('YouTube metadata:', { videoTitle, channelName });
+
+    // Use Gemini to generate educational flashcards based on the video topic
     const ai = new GoogleGenAI({ apiKey: API_KEY });
+
+    const prompt = `Eres un experto educador. Basándote en el siguiente video de YouTube, genera 10-15 flashcards educativas en español.
+
+Video: "${videoTitle}"
+Canal: ${channelName}
+URL: ${youtubeUrl}
+
+IMPORTANTE: 
+- Usa tu conocimiento sobre este tema para crear flashcards con información REAL y PRECISA
+- Si conoces el contenido del video o el tema, úsalo para crear preguntas específicas
+- Las flashcards deben cubrir los conceptos más importantes relacionados con el título del video
+- Cada pregunta debe ser clara y la respuesta debe ser educativa y concisa
+- La categoría debe reflejar el tema principal del video`;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              fileData: {
-                fileUri: youtubeUrl,
-                mimeType: "video/*"
-              }
-            },
-            {
-              text: `Analiza este video de YouTube y genera 10-15 flashcards educativas de alta calidad en español.
-              
-              Para cada flashcard:
-              - La pregunta debe ser clara y específica sobre un concepto del video
-              - La respuesta debe ser completa pero concisa
-              - La categoría debe reflejar el tema principal
-              
-              Las flashcards deben cubrir los conceptos más importantes del video.`
-            }
-          ]
-        }
-      ],
+      contents: prompt,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -174,23 +187,18 @@ export const generateFlashcardsFromYouTubeURL = async (youtubeUrl: string) => {
     const cards = JSON.parse(response.text || "[]");
 
     if (!cards || cards.length === 0) {
-      throw new Error('No se pudieron generar flashcards del video');
+      throw new Error('No se pudieron generar flashcards. Intenta con otro video.');
     }
 
     return cards;
   } catch (e: any) {
     console.error("Failed to analyze YouTube video:", e);
 
-    // Provide more helpful error messages
-    if (e.message?.includes('PERMISSION_DENIED')) {
-      throw new Error('El video es privado o tiene restricciones de acceso');
-    } else if (e.message?.includes('NOT_FOUND')) {
-      throw new Error('No se encontró el video. Verifica que el enlace sea correcto');
-    } else if (e.message?.includes('INVALID_ARGUMENT')) {
-      throw new Error('Enlace de YouTube inválido. Usa el formato: youtube.com/watch?v=...');
+    if (e.message?.includes('No se pudo')) {
+      throw e; // Re-throw our custom errors
     }
 
-    throw new Error(`Error al analizar el video: ${e.message || 'intenta con otro video'}`);
+    throw new Error(`Error al procesar el video: ${e.message || 'intenta con otro enlace'}`);
   }
 };
 
