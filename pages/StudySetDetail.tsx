@@ -12,7 +12,7 @@ import {
     supabase
 } from '../services/supabaseClient';
 import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary } from '../services/pdfProcessingService';
-import { generateFlashcardsFromYouTubeURL } from '../services/geminiService';
+import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL } from '../services/geminiService';
 
 interface Flashcard {
     id: string;
@@ -434,14 +434,32 @@ const StudySetDetail: React.FC = () => {
                 });
 
             } else {
-                // Regular website link (no flashcard generation)
-                setUploadProgress('Guardando enlace...');
+                // Website link - analyze with Gemini and generate flashcards
+                setUploadProgress('Analizando página web con IA...');
+
+                const webResult = await generateFlashcardsFromWebURL(urlInput);
+
+                setUploadProgress(`Guardando ${webResult.flashcards.length} flashcards...`);
+
+                // Add flashcards to study set
+                const newFlashcards = webResult.flashcards.map(fc => ({
+                    ...fc,
+                    id: crypto.randomUUID(),
+                    study_set_id: studySet.id
+                }));
+                await addFlashcards(studySet.id, newFlashcards);
+
+                setUploadProgress('Guardando material...');
+
+                // Save material with detailed summary
                 await addMaterialToStudySet({
                     study_set_id: studySet.id,
-                    name: `Web: ${urlInput}`,
+                    name: webResult.pageTitle || 'Enlace Web',
                     type: 'url',
-                    file_url: urlInput,
-                    flashcards_generated: 0
+                    file_url: webResult.sourceUrl,
+                    content_text: webResult.summary,
+                    flashcards_generated: webResult.flashcards.length,
+                    summary: webResult.summary
                 });
             }
 
@@ -998,6 +1016,14 @@ const StudySetDetail: React.FC = () => {
                                     <div className="flex items-center gap-2 text-violet-700 text-sm font-medium">
                                         <span className="material-symbols-outlined text-lg">auto_awesome</span>
                                         IA analizará el video y generará flashcards + resumen detallado
+                                    </div>
+                                </div>
+                            )}
+                            {urlType === 'website' && (
+                                <div className="p-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-100">
+                                    <div className="flex items-center gap-2 text-blue-700 text-sm font-medium">
+                                        <span className="material-symbols-outlined text-lg">auto_awesome</span>
+                                        IA extraerá el contenido y generará flashcards + resumen detallado
                                     </div>
                                 </div>
                             )}

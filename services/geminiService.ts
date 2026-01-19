@@ -235,6 +235,186 @@ PARA LAS FLASHCARDS:
   }
 };
 
+// Web URL analysis result interface
+export interface WebAnalysisResult {
+  flashcards: Array<{ question: string; answer: string; category: string }>;
+  summary: string;
+  pageTitle: string;
+  sourceUrl: string;
+}
+
+// Generate flashcards and summary from a web URL
+export const generateFlashcardsFromWebURL = async (webUrl: string): Promise<WebAnalysisResult> => {
+  if (!API_KEY) {
+    throw new Error("No se encontró la API key de Gemini.");
+  }
+
+  try {
+    // Fetch the webpage content
+    const response = await fetch(webUrl);
+    if (!response.ok) {
+      throw new Error('No se pudo acceder a la página web. Verifica el enlace.');
+    }
+
+    const html = await response.text();
+
+    // Extract text content from HTML (simple extraction)
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+
+    // Remove scripts and styles
+    tempDiv.querySelectorAll('script, style, nav, header, footer, aside').forEach(el => el.remove());
+
+    // Get text content
+    let textContent = tempDiv.textContent || tempDiv.innerText || '';
+    textContent = textContent.replace(/\s+/g, ' ').trim();
+
+    // Get page title
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const pageTitle = titleMatch ? titleMatch[1].trim() : 'Página Web';
+
+    // Limit content length for API
+    const maxLength = 15000;
+    if (textContent.length > maxLength) {
+      textContent = textContent.substring(0, maxLength) + '...';
+    }
+
+    if (textContent.length < 100) {
+      throw new Error('No se pudo extraer suficiente contenido de la página. Intenta con otro enlace.');
+    }
+
+    console.log('Web content extracted:', { pageTitle, contentLength: textContent.length });
+
+    const ai = new GoogleGenAI({ apiKey: API_KEY });
+
+    const prompt = `Eres un experto educador. Analiza el siguiente contenido de una página web y genera:
+
+1. UN RESUMEN ULTRA DETALLADO Y EXTENSO en español (mínimo 400 palabras):
+   - Cubre TODOS los conceptos importantes
+   - Usa formato markdown con secciones (##), puntos clave, y listas
+   - El resumen debe ser educativo y completo
+
+2. 10-15 FLASHCARDS EDUCATIVAS en español:
+   - Preguntas claras y específicas
+   - Respuestas concisas pero completas
+   - Categoría temática para cada flashcard
+
+TÍTULO DE LA PÁGINA: "${pageTitle}"
+URL: ${webUrl}
+
+CONTENIDO:
+${textContent}`;
+
+    const apiResponse = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            summary: {
+              type: Type.STRING,
+              description: "Ultra detailed summary of the page content in Spanish, formatted with markdown"
+            },
+            flashcards: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  question: { type: Type.STRING },
+                  answer: { type: Type.STRING },
+                  category: { type: Type.STRING }
+                },
+                required: ["question", "answer", "category"]
+              }
+            }
+          },
+          required: ["summary", "flashcards"]
+        }
+      }
+    });
+
+    const result = JSON.parse(apiResponse.text || "{}");
+
+    if (!result.flashcards || result.flashcards.length === 0) {
+      throw new Error('No se pudieron generar flashcards. Intenta con otro enlace.');
+    }
+
+    return {
+      flashcards: result.flashcards,
+      summary: result.summary || `Resumen de: ${pageTitle}`,
+      pageTitle,
+      sourceUrl: webUrl
+    };
+  } catch (e: any) {
+    console.error("Failed to analyze web URL:", e);
+
+    if (e.message?.includes('No se pudo') || e.message?.includes('No se encontró')) {
+      throw e;
+    }
+
+    // If direct fetch fails, try using Gemini's knowledge about the topic
+    try {
+      console.log('Direct fetch failed, using Gemini knowledge...');
+      const ai = new GoogleGenAI({ apiKey: API_KEY });
+
+      // Extract domain/topic from URL
+      const urlParts = webUrl.split('/');
+      const domain = urlParts[2] || webUrl;
+      const pathParts = urlParts.slice(3).join(' ').replace(/[-_]/g, ' ');
+
+      const fallbackPrompt = `Eres un experto educador. Basándote en la URL "${webUrl}" y lo que sabes sobre el tema, genera:
+
+1. UN RESUMEN ULTRA DETALLADO en español (mínimo 400 palabras) sobre el tema probable de esta página
+2. 10-15 FLASHCARDS EDUCATIVAS en español
+
+Dominio: ${domain}
+Ruta: ${pathParts}
+
+Usa tu conocimiento para crear contenido educativo relevante.`;
+
+      const fallbackResponse = await ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: fallbackPrompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              summary: { type: Type.STRING },
+              flashcards: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    question: { type: Type.STRING },
+                    answer: { type: Type.STRING },
+                    category: { type: Type.STRING }
+                  },
+                  required: ["question", "answer", "category"]
+                }
+              }
+            },
+            required: ["summary", "flashcards"]
+          }
+        }
+      });
+
+      const fallbackResult = JSON.parse(fallbackResponse.text || "{}");
+
+      return {
+        flashcards: fallbackResult.flashcards || [],
+        summary: fallbackResult.summary || 'Contenido generado desde la URL',
+        pageTitle: pathParts || domain,
+        sourceUrl: webUrl
+      };
+    } catch (fallbackError) {
+      throw new Error(`Error al procesar el enlace: ${e.message || 'intenta con otro enlace'}`);
+    }
+  }
+};
+
 export const generateQuizQuestions = async (context: string) => {
   if (!API_KEY || API_KEY === 'PLACEHOLDER_API_KEY') {
     return [];
