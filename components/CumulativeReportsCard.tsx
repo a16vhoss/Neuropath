@@ -186,8 +186,8 @@ const CumulativeReportsCard: React.FC = () => {
                     <button
                         onClick={() => setViewMode('overview')}
                         className={`px-3 py-1 text-xs font-semibold rounded-md transition ${viewMode === 'overview'
-                                ? 'bg-white text-violet-600 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700'
+                            ? 'bg-white text-violet-600 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'
                             }`}
                     >
                         Resumen
@@ -195,8 +195,8 @@ const CumulativeReportsCard: React.FC = () => {
                     <button
                         onClick={() => setViewMode('history')}
                         className={`px-3 py-1 text-xs font-semibold rounded-md transition ${viewMode === 'history'
-                                ? 'bg-white text-violet-600 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700'
+                            ? 'bg-white text-violet-600 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'
                             }`}
                     >
                         Historial
@@ -208,39 +208,23 @@ const CumulativeReportsCard: React.FC = () => {
             <div className="p-4">
                 {viewMode === 'overview' && (
                     <div className="space-y-4">
-                        {/* Weekly Stats Grid */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-xl p-4 border border-violet-100">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="material-symbols-outlined text-violet-500 text-lg">calendar_today</span>
-                                    <span className="text-xs text-violet-600 font-medium">Esta Semana</span>
-                                </div>
-                                <div className="text-2xl font-black text-violet-700">{weeklyStats.totalSessions}</div>
-                                <div className="text-xs text-violet-500">sesiones</div>
+                        {/* Weekly Stats Grid - 2x2 for sidebar */}
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="bg-violet-50 rounded-xl p-3 text-center">
+                                <div className="text-2xl font-black text-violet-600">{weeklyStats.totalSessions}</div>
+                                <div className="text-[10px] text-violet-500 font-medium uppercase">Sesiones</div>
                             </div>
-                            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="material-symbols-outlined text-blue-500 text-lg">help</span>
-                                    <span className="text-xs text-blue-600 font-medium">Preguntas</span>
-                                </div>
-                                <div className="text-2xl font-black text-blue-700">{weeklyStats.totalQuestions}</div>
-                                <div className="text-xs text-blue-500">respondidas</div>
+                            <div className="bg-blue-50 rounded-xl p-3 text-center">
+                                <div className="text-2xl font-black text-blue-600">{weeklyStats.totalQuestions}</div>
+                                <div className="text-[10px] text-blue-500 font-medium uppercase">Preguntas</div>
                             </div>
-                            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-100">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="material-symbols-outlined text-emerald-500 text-lg">check_circle</span>
-                                    <span className="text-xs text-emerald-600 font-medium">Precisión</span>
-                                </div>
-                                <div className="text-2xl font-black text-emerald-700">{weeklyStats.avgAccuracy}%</div>
-                                <div className="text-xs text-emerald-500">promedio</div>
+                            <div className="bg-emerald-50 rounded-xl p-3 text-center">
+                                <div className="text-2xl font-black text-emerald-600">{weeklyStats.avgAccuracy}%</div>
+                                <div className="text-[10px] text-emerald-500 font-medium uppercase">Precisión</div>
                             </div>
-                            <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-100">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="material-symbols-outlined text-amber-500 text-lg">timer</span>
-                                    <span className="text-xs text-amber-600 font-medium">Tiempo</span>
-                                </div>
-                                <div className="text-2xl font-black text-amber-700">{weeklyStats.studyTime}</div>
-                                <div className="text-xs text-amber-500">minutos</div>
+                            <div className="bg-amber-50 rounded-xl p-3 text-center">
+                                <div className="text-2xl font-black text-amber-600">{weeklyStats.studyTime}m</div>
+                                <div className="text-[10px] text-amber-500 font-medium uppercase">Tiempo</div>
                             </div>
                         </div>
 
@@ -252,8 +236,8 @@ const CumulativeReportsCard: React.FC = () => {
                                     <div key={session.id} className="flex items-center justify-between bg-slate-50 rounded-lg p-3">
                                         <div className="flex items-center gap-3">
                                             <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${session.mode === 'quiz' ? 'bg-indigo-100 text-indigo-600' :
-                                                    session.mode === 'exam' ? 'bg-rose-100 text-rose-600' :
-                                                        'bg-slate-200 text-slate-600'
+                                                session.mode === 'exam' ? 'bg-rose-100 text-rose-600' :
+                                                    'bg-slate-200 text-slate-600'
                                                 }`}>
                                                 <span className="material-symbols-outlined text-sm">{getModeIcon(session.mode)}</span>
                                             </div>
@@ -263,8 +247,8 @@ const CumulativeReportsCard: React.FC = () => {
                                             </div>
                                         </div>
                                         <div className={`text-sm font-bold ${session.accuracy >= 80 ? 'text-emerald-600' :
-                                                session.accuracy >= 60 ? 'text-amber-600' :
-                                                    'text-red-500'
+                                            session.accuracy >= 60 ? 'text-amber-600' :
+                                                'text-red-500'
                                             }`}>
                                             {session.accuracy}%
                                         </div>
@@ -300,16 +284,16 @@ const CumulativeReportsCard: React.FC = () => {
                                         </td>
                                         <td className="py-2 px-2">
                                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${session.mode === 'quiz' ? 'bg-indigo-100 text-indigo-700' :
-                                                    session.mode === 'exam' ? 'bg-rose-100 text-rose-700' :
-                                                        'bg-slate-100 text-slate-600'
+                                                session.mode === 'exam' ? 'bg-rose-100 text-rose-700' :
+                                                    'bg-slate-100 text-slate-600'
                                                 }`}>
                                                 {getModeLabel(session.mode)}
                                             </span>
                                         </td>
                                         <td className="py-2 px-2 text-right">
                                             <span className={`font-bold ${session.accuracy >= 80 ? 'text-emerald-600' :
-                                                    session.accuracy >= 60 ? 'text-amber-600' :
-                                                        'text-red-500'
+                                                session.accuracy >= 60 ? 'text-amber-600' :
+                                                    'text-red-500'
                                                 }`}>
                                                 {session.score}/{session.total}
                                             </span>
