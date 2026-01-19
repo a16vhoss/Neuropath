@@ -1,5 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+// Version 4 - Fixed parameter handling
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { videoId } = req.query;
 
