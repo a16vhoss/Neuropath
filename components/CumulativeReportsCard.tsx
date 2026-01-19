@@ -41,38 +41,20 @@ const CumulativeReportsCard: React.FC = () => {
     const fetchReports = async () => {
         setLoading(true);
         try {
-            // Fetch quiz sessions with study set names
+            // Fetch quiz sessions WITHOUT join (avoid PGRST200 error)
             const { data: quizSessions, error: quizError } = await supabase
                 .from('quiz_sessions')
-                .select(`
-                    id,
-                    created_at,
-                    score,
-                    total_questions,
-                    study_set_id,
-                    study_sets(name)
-                `)
+                .select('id, created_at, score, total_questions, study_set_id')
                 .eq('user_id', user!.id)
                 .order('created_at', { ascending: false })
                 .limit(50);
 
             if (quizError) console.error('Quiz sessions error:', quizError);
 
-            // Fetch adaptive study sessions with duration
+            // Fetch adaptive study sessions WITHOUT join (avoid PGRST200 error)
             const { data: adaptiveSessions, error: adaptiveError } = await supabase
                 .from('adaptive_study_sessions')
-                .select(`
-                    id,
-                    created_at,
-                    mode,
-                    cards_correct,
-                    cards_studied,
-                    study_set_id,
-                    started_at,
-                    ended_at,
-                    duration_seconds,
-                    study_sets(name)
-                `)
+                .select('id, created_at, mode, cards_correct, cards_studied, study_set_id, started_at, ended_at, duration_seconds')
                 .eq('user_id', user!.id)
                 .order('created_at', { ascending: false })
                 .limit(50);
@@ -104,6 +86,22 @@ const CumulativeReportsCard: React.FC = () => {
                 reviewsByDay.set(dateKey, existing);
             });
 
+            // Collect all unique study_set_ids to fetch names separately
+            const studySetIds = new Set<string>();
+            (quizSessions || []).forEach(s => s.study_set_id && studySetIds.add(s.study_set_id));
+            (adaptiveSessions || []).forEach(s => s.study_set_id && studySetIds.add(s.study_set_id));
+
+            // Fetch study set names separately (avoid PGRST200 join errors)
+            const studySetNames = new Map<string, string>();
+            if (studySetIds.size > 0) {
+                const { data: studySets } = await supabase
+                    .from('study_sets')
+                    .select('id, name')
+                    .in('id', Array.from(studySetIds));
+
+                (studySets || []).forEach(s => studySetNames.set(s.id, s.name));
+            }
+
             // Merge and format sessions from quiz_sessions and adaptive_study_sessions
             const allSessions: SessionSummary[] = [];
 
@@ -112,7 +110,7 @@ const CumulativeReportsCard: React.FC = () => {
                     allSessions.push({
                         id: s.id,
                         created_at: s.created_at,
-                        study_set_name: (s.study_sets as any)?.name || 'Set Desconocido',
+                        study_set_name: studySetNames.get(s.study_set_id) || 'Set Desconocido',
                         study_set_id: s.study_set_id,
                         mode: 'quiz',
                         score: s.score || 0,
@@ -127,7 +125,7 @@ const CumulativeReportsCard: React.FC = () => {
                     allSessions.push({
                         id: s.id,
                         created_at: s.created_at,
-                        study_set_name: (s.study_sets as any)?.name || 'Set Desconocido',
+                        study_set_name: studySetNames.get(s.study_set_id) || 'Set Desconocido',
                         study_set_id: s.study_set_id,
                         mode: s.mode || 'flashcards',
                         score: s.cards_correct || 0,
