@@ -302,24 +302,11 @@ const StudySetDetail: React.FC = () => {
             }
             console.log('Generated flashcards:', flashcards.length);
 
-            setUploadProgress(`Guardando ${flashcards.length} flashcards...`);
+            setUploadProgress('Guardando material...');
 
-            // Generate unique IDs for flashcards and add study_set_id
-            const newFlashcards = flashcards.map(fc => ({
-                ...fc,
-                id: crypto.randomUUID(),
-                study_set_id: studySet.id
-            }));
-
-            // Duplicate upload logic removed
-
-
-            // Save flashcards
-            await addFlashcards(studySet.id, newFlashcards);
-
-            // Track material
+            // Track material FIRST to get ID
             try {
-                await addMaterialToStudySet({
+                const newMaterial = await addMaterialToStudySet({
                     study_set_id: studySet.id,
                     name: file.name,
                     type: 'pdf',
@@ -329,8 +316,24 @@ const StudySetDetail: React.FC = () => {
                     summary: summary
                 });
 
+                if (newMaterial && newMaterial.id) {
+                    setUploadProgress(`Guardando ${flashcards.length} flashcards...`);
+                    // Generate unique IDs for flashcards and add study_set_id AND material_id
+                    const newFlashcards = flashcards.map(fc => ({
+                        ...fc,
+                        id: crypto.randomUUID(),
+                        study_set_id: studySet.id,
+                        material_id: newMaterial.id // Link to material for cascade delete
+                    }));
+
+                    // Save flashcards
+                    await addFlashcards(studySet.id, newFlashcards);
+                }
+
                 // Regenerate guide with new text
                 await regenerateStudyGuide(extractedText);
+
+
 
             } catch (matError: any) {
                 console.error('Materials tracking skipped:', matError);
@@ -363,21 +366,29 @@ const StudySetDetail: React.FC = () => {
             const summary = await generateMaterialSummary(textContent, 'text');
 
             if (flashcards && flashcards.length > 0) {
-                const newFlashcards = flashcards.map(fc => ({
-                    ...fc,
-                    id: crypto.randomUUID(),
-                    study_set_id: studySet.id
-                }));
-                await addFlashcards(studySet.id, newFlashcards);
+                setUploadProgress('Guardando notas...');
 
-                await addMaterialToStudySet({
+                // Create material FIRST
+                const newMaterial = await addMaterialToStudySet({
                     study_set_id: studySet.id,
                     name: `Notas: ${textContent.slice(0, 20)}...`,
                     type: 'notes',
                     content_text: textContent,
-                    flashcards_generated: newFlashcards.length,
+                    flashcards_generated: flashcards.length,
                     summary: summary
                 });
+
+                if (newMaterial && newMaterial.id) {
+                    setUploadProgress(`Guardando ${flashcards.length} flashcards...`);
+
+                    const newFlashcards = flashcards.map(fc => ({
+                        ...fc,
+                        id: crypto.randomUUID(),
+                        study_set_id: studySet.id,
+                        material_id: newMaterial.id
+                    }));
+                    await addFlashcards(studySet.id, newFlashcards);
+                }
 
                 // Regenerate guide with new text
                 await regenerateStudyGuide(textContent);
@@ -414,20 +425,10 @@ const StudySetDetail: React.FC = () => {
                 // Use Gemini to analyze YouTube video and generate flashcards + summary
                 const youtubeResult = await generateFlashcardsFromYouTubeURL(urlInput);
 
-                setUploadProgress(`Guardando ${youtubeResult.flashcards.length} flashcards...`);
-
-                // Add flashcards to study set
-                const newFlashcards = youtubeResult.flashcards.map(fc => ({
-                    ...fc,
-                    id: crypto.randomUUID(),
-                    study_set_id: studySet.id
-                }));
-                await addFlashcards(studySet.id, newFlashcards);
-
                 setUploadProgress('Guardando material...');
 
-                // Save material with detailed summary
-                await addMaterialToStudySet({
+                // Save material with detailed summary FIRST to get ID
+                const newMaterial = await addMaterialToStudySet({
                     study_set_id: studySet.id,
                     name: youtubeResult.videoTitle || 'Video de YouTube',
                     type: 'url',
@@ -437,26 +438,29 @@ const StudySetDetail: React.FC = () => {
                     summary: youtubeResult.summary
                 });
 
+                if (newMaterial && newMaterial.id) {
+                    setUploadProgress(`Guardando ${youtubeResult.flashcards.length} flashcards...`);
+
+                    // Add flashcards to study set LINKED to material
+                    const newFlashcards = youtubeResult.flashcards.map(fc => ({
+                        ...fc,
+                        id: crypto.randomUUID(),
+                        study_set_id: studySet.id,
+                        material_id: newMaterial.id // Link to material for cascade delete
+                    }));
+                    await addFlashcards(studySet.id, newFlashcards);
+                }
+
             } else {
                 // Website link - analyze with Gemini and generate flashcards
                 setUploadProgress('Analizando página web con IA...');
 
                 const webResult = await generateFlashcardsFromWebURL(urlInput);
 
-                setUploadProgress(`Guardando ${webResult.flashcards.length} flashcards...`);
-
-                // Add flashcards to study set
-                const newFlashcards = webResult.flashcards.map(fc => ({
-                    ...fc,
-                    id: crypto.randomUUID(),
-                    study_set_id: studySet.id
-                }));
-                await addFlashcards(studySet.id, newFlashcards);
-
                 setUploadProgress('Guardando material...');
 
-                // Save material with detailed summary
-                await addMaterialToStudySet({
+                // Save material with detailed summary FIRST
+                const newMaterial = await addMaterialToStudySet({
                     study_set_id: studySet.id,
                     name: webResult.pageTitle || 'Enlace Web',
                     type: 'url',
@@ -465,6 +469,19 @@ const StudySetDetail: React.FC = () => {
                     flashcards_generated: webResult.flashcards.length,
                     summary: webResult.summary
                 });
+
+                if (newMaterial && newMaterial.id) {
+                    setUploadProgress(`Guardando ${webResult.flashcards.length} flashcards...`);
+
+                    // Add flashcards to study set LINKED to material
+                    const newFlashcards = webResult.flashcards.map(fc => ({
+                        ...fc,
+                        id: crypto.randomUUID(),
+                        study_set_id: studySet.id,
+                        material_id: newMaterial.id // Link to material for cascade delete
+                    }));
+                    await addFlashcards(studySet.id, newFlashcards);
+                }
             }
 
             setUrlInput('');
