@@ -10,6 +10,7 @@ import {
     deleteFlashcard,
     addMaterialToStudySet,
     deleteMaterialFromStudySet,
+    addFlashcardsBatch,
     supabase
 } from '../services/supabaseClient';
 import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary } from '../services/pdfProcessingService';
@@ -199,16 +200,7 @@ const StudySetDetail: React.FC = () => {
         }
     };
 
-    const addFlashcards = async (setId: string, cards: any[]) => {
-        // Helper to add multiple flashcards
-        for (const card of cards) {
-            await addFlashcardToStudySet(setId, {
-                question: card.question,
-                answer: card.answer,
-                category: card.category
-            });
-        }
-    };
+
 
     const handleAddFlashcard = async () => {
         if (!studySet || !newQuestion.trim() || !newAnswer.trim()) return;
@@ -327,7 +319,7 @@ const StudySetDetail: React.FC = () => {
                     }));
 
                     // Save flashcards
-                    await addFlashcards(studySet.id, newFlashcards);
+                    await addFlashcardsBatch(newFlashcards);
                 }
 
                 // Regenerate guide with new text
@@ -387,7 +379,7 @@ const StudySetDetail: React.FC = () => {
                         study_set_id: studySet.id,
                         material_id: newMaterial.id
                     }));
-                    await addFlashcards(studySet.id, newFlashcards);
+                    await addFlashcardsBatch(newFlashcards);
                 }
 
                 // Regenerate guide with new text
@@ -448,7 +440,7 @@ const StudySetDetail: React.FC = () => {
                         study_set_id: studySet.id,
                         material_id: newMaterial.id // Link to material for cascade delete
                     }));
-                    await addFlashcards(studySet.id, newFlashcards);
+                    await addFlashcardsBatch(newFlashcards);
                 }
 
             } else {
@@ -480,7 +472,7 @@ const StudySetDetail: React.FC = () => {
                         study_set_id: studySet.id,
                         material_id: newMaterial.id // Link to material for cascade delete
                     }));
-                    await addFlashcards(studySet.id, newFlashcards);
+                    await addFlashcardsBatch(newFlashcards);
                 }
             }
 
