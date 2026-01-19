@@ -1123,14 +1123,14 @@ const StudySession: React.FC = () => {
                     Pregunta {currentQuizIndex + 1}/{quizQuestions.length}
                   </span>
                   <span className={`text-xs font-bold px-3 py-1 rounded-full ${quizQuestions[currentQuizIndex]?.type === 'true_false' ? 'bg-emerald-100 text-emerald-600' :
-                      quizQuestions[currentQuizIndex]?.type === 'analysis' ? 'bg-amber-100 text-amber-600' :
-                        quizQuestions[currentQuizIndex]?.type === 'design' ? 'bg-purple-100 text-purple-600' :
-                          quizQuestions[currentQuizIndex]?.type === 'practical' ? 'bg-cyan-100 text-cyan-600' :
-                            'bg-blue-100 text-blue-600'
+                    quizQuestions[currentQuizIndex]?.type === 'analysis' ? 'bg-amber-100 text-amber-600' :
+                      (quizQuestions[currentQuizIndex]?.type === 'design' || quizQuestions[currentQuizIndex]?.options?.[0]?.includes('solución')) ? 'bg-purple-100 text-purple-600' :
+                        quizQuestions[currentQuizIndex]?.type === 'practical' ? 'bg-cyan-100 text-cyan-600' :
+                          'bg-blue-100 text-blue-600'
                     }`}>
                     {quizQuestions[currentQuizIndex]?.type === 'true_false' ? '✓✗ V/F' :
                       quizQuestions[currentQuizIndex]?.type === 'analysis' ? '🔍 Análisis' :
-                        quizQuestions[currentQuizIndex]?.type === 'design' ? '✏️ Diseño' :
+                        (quizQuestions[currentQuizIndex]?.type === 'design' || quizQuestions[currentQuizIndex]?.options?.[0]?.includes('solución')) ? '✏️ Diseño' :
                           quizQuestions[currentQuizIndex]?.type === 'practical' ? '🚀 Aplicación' : '📝 Opción Múltiple'}
                   </span>
                 </div>
@@ -1186,7 +1186,7 @@ const StudySession: React.FC = () => {
                       </button>
                     ))}
                   </div>
-                ) : quizQuestions[currentQuizIndex]?.type === 'design' ? (
+                ) : (quizQuestions[currentQuizIndex]?.type === 'design' || quizQuestions[currentQuizIndex]?.options?.[0]?.includes('solución')) ? (
                   /* DESIGN TYPE - Text area for open response */
                   <div className="space-y-4">
                     {quizQuestions[currentQuizIndex]?.designPrompt && (
