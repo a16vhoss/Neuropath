@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, getClassMaterials, getClassEnrollments, uploadMaterial } from '../services/supabaseClient';
@@ -8,6 +8,7 @@ import StudentProgressModal from '../components/StudentProgressModal';
 import AnnouncementCard from '../components/AnnouncementCard';
 import AssignmentCard from '../components/AssignmentCard';
 import ExamScheduler from '../components/ExamScheduler';
+import GradeBookTable from '../components/GradeBookTable';
 import {
     getClassAnnouncements,
     createAnnouncement,
@@ -65,7 +66,7 @@ const TeacherClassDetail: React.FC = () => {
     const { user } = useAuth();
 
     const [classData, setClassData] = useState<ClassData | null>(null);
-    const [activeTab, setActiveTab] = useState<'home' | 'announcements' | 'modules' | 'discussions' | 'grades' | 'people' | 'evaluation' | 'attendance'>('home');
+    const [activeTab, setActiveTab] = useState<'home' | 'announcements' | 'modules' | 'assignments' | 'discussions' | 'grades' | 'people' | 'evaluation' | 'attendance'>('home');
     const [showUploadModal, setShowUploadModal] = useState(false);
     const [showExamModal, setShowExamModal] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
@@ -87,6 +88,14 @@ const TeacherClassDetail: React.FC = () => {
 
     // Announcements state
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+    const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+    const [newAssignment, setNewAssignment] = useState({
+        title: '',
+        description: '',
+        points: 100,
+        due_date: ''
+    });
+
     const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
     const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
     const [newAnnouncementContent, setNewAnnouncementContent] = useState('');
@@ -206,21 +215,22 @@ const TeacherClassDetail: React.FC = () => {
     }, [classId]);
 
     // Load announcements
-    useEffect(() => {
-        const loadAnnouncements = async () => {
-            if (!classId) return;
-            setLoadingAnnouncements(true);
-            try {
-                const data = await getClassAnnouncements(classId);
-                setAnnouncements(data);
-            } catch (error) {
-                console.error('Error loading announcements:', error);
-            } finally {
-                setLoadingAnnouncements(false);
-            }
-        };
-        loadAnnouncements();
+    const loadAnnouncements = useCallback(async () => {
+        if (!classId) return;
+        setLoadingAnnouncements(true);
+        try {
+            const data = await getClassAnnouncements(classId);
+            setAnnouncements(data);
+        } catch (error) {
+            console.error('Error loading announcements:', error);
+        } finally {
+            setLoadingAnnouncements(false);
+        }
     }, [classId]);
+
+    useEffect(() => {
+        loadAnnouncements();
+    }, [loadAnnouncements]);
 
     // Load assignments and submissions
     useEffect(() => {
@@ -296,6 +306,18 @@ const TeacherClassDetail: React.FC = () => {
         }
     };
 
+    // Prepare GradeBook Data
+    const submissionsMap = useMemo(() => {
+        const map = new Map<string, Map<string, AssignmentSubmission>>();
+        submissions.forEach(sub => {
+            if (!map.has(sub.student_id)) {
+                map.set(sub.student_id, new Map());
+            }
+            map.get(sub.student_id)!.set(sub.assignment_id, sub);
+        });
+        return map;
+    }, [submissions]);
+
     // Create announcement handler
     const handleCreateAnnouncement = async () => {
         if (!classId || !user || !newAnnouncementContent.trim()) return;
@@ -331,6 +353,27 @@ const TeacherClassDetail: React.FC = () => {
             setAssignments(prev => prev.filter(a => a.id !== id));
         } catch (error) {
             console.error('Error deleting assignment:', error);
+        }
+    };
+
+    // Create assignment handler
+    const handleCreateAssignment = async () => {
+        if (!classId || !newAssignment.title || !newAssignment.due_date) return;
+        try {
+            const assignment = await createAssignment({
+                class_id: classId,
+                title: newAssignment.title,
+                description: newAssignment.description,
+                points: newAssignment.points,
+                due_date: newAssignment.due_date,
+                topic_id: null // Optional: Add topic support later
+            });
+
+            setAssignments(prev => [assignment, ...prev]);
+            setShowAssignmentModal(false);
+            setNewAssignment({ title: '', description: '', points: 100, due_date: '' });
+        } catch (error) {
+            console.error('Error creating assignment:', error);
         }
     };
 
@@ -595,6 +638,7 @@ const TeacherClassDetail: React.FC = () => {
                         { id: 'home', icon: 'home', label: 'Inicio' },
                         { id: 'announcements', icon: 'campaign', label: 'Anuncios' },
                         { id: 'modules', icon: 'folder_open', label: 'Módulos' },
+                        { id: 'assignments', icon: 'task', label: 'Tareas' },
                         { id: 'discussions', icon: 'forum', label: 'Discusiones' },
                         { id: 'grades', icon: 'grade', label: 'Calificaciones', badge: atRiskCount > 0 ? atRiskCount : undefined },
                         { id: 'people', icon: 'groups', label: 'Personas' },
@@ -792,6 +836,46 @@ const TeacherClassDetail: React.FC = () => {
                     </div>
                 )}
 
+                {/* Assignments Tab */}
+                {activeTab === 'assignments' && (
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-xl font-bold">Tareas y Actividades</h2>
+                            <button
+                                onClick={() => setShowAssignmentModal(true)}
+                                className="bg-primary text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
+                            >
+                                <span className="material-symbols-outlined text-lg">add</span> Nueva Tarea
+                            </button>
+                        </div>
+
+                        {assignments.length > 0 ? (
+                            <div className="grid gap-4">
+                                {assignments.map((assignment) => (
+                                    <AssignmentCard
+                                        key={assignment.id}
+                                        assignment={assignment}
+                                        isTeacher={true}
+                                        onDelete={() => handleDeleteAssignment(assignment.id)}
+                                        onEdit={() => { /* Implement edit */ }}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="bg-slate-50 p-12 rounded-2xl text-center">
+                                <span className="material-symbols-outlined text-4xl text-slate-300 mb-4">task</span>
+                                <p className="text-slate-500 mb-4">No hay tareas asignadas</p>
+                                <button
+                                    onClick={() => setShowAssignmentModal(true)}
+                                    className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700"
+                                >
+                                    Crear Primera Tarea
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* People Tab (Students) */}
                 {activeTab === 'people' && (
                     <div className="space-y-6">
@@ -887,63 +971,118 @@ const TeacherClassDetail: React.FC = () => {
 
                 {/* Evaluation Tab (Exams) */}
                 {activeTab === 'evaluation' && (
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-xl font-bold">Gestión de Exámenes</h2>
-                            <button
-                                onClick={() => setShowExamModal(true)}
-                                className="bg-primary text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
-                            >
-                                <span className="material-symbols-outlined text-lg">add</span> Crear Examen
-                            </button>
-                        </div>
-
-                        {loadingExams ? (
-                            <div className="grid gap-4">
-                                {[1, 2].map((i) => (
-                                    <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm animate-pulse">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-xl bg-slate-200"></div>
-                                            <div className="flex-1">
-                                                <div className="h-5 bg-slate-200 rounded w-3/4 mb-2"></div>
-                                                <div className="h-3 bg-slate-100 rounded w-1/2"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : exams.length > 0 ? (
-                            <div className="grid gap-4">
-                                {exams.map((exam) => (
-                                    <div key={exam.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center">
-                                            <span className="material-symbols-outlined text-2xl">assignment</span>
-                                        </div>
-                                        <div className="flex-1">
-                                            <h3 className="font-bold text-slate-900">{exam.title}</h3>
-                                            <p className="text-sm text-slate-500">Creado: {exam.created_at}</p>
-                                            <p className="text-xs text-violet-600 mt-1">{exam.question_count} preguntas</p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="bg-violet-100 text-violet-600 text-xs font-bold px-3 py-1 rounded-full capitalize">
-                                                {exam.type}
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="bg-slate-50 p-12 rounded-2xl text-center">
-                                <span className="material-symbols-outlined text-4xl text-slate-300 mb-4">assignment</span>
-                                <p className="text-slate-500 mb-4">No hay exámenes creados aún</p>
+                    <div className="space-y-8">
+                        {/* Scheduled Exams Section */}
+                        <div>
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-bold">Exámenes Programados</h2>
                                 <button
-                                    onClick={() => setShowExamModal(true)}
-                                    className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700"
+                                    onClick={() => setShowExamScheduler(true)}
+                                    className="bg-primary text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
                                 >
-                                    Crear Primer Examen
+                                    <span className="material-symbols-outlined text-lg">event</span> Programar Examen
                                 </button>
                             </div>
-                        )}
+
+                            {scheduledExams.length > 0 ? (
+                                <div className="grid gap-4">
+                                    {scheduledExams.map((exam) => (
+                                        <div key={exam.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center">
+                                                <span className="material-symbols-outlined text-2xl">event_available</span>
+                                            </div>
+                                            <div className="flex-1">
+                                                <h3 className="font-bold text-slate-900">{exam.title}</h3>
+                                                <div className="flex items-center gap-4 text-sm text-slate-500 mt-1">
+                                                    <span className="flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-base">calendar_today</span>
+                                                        {new Date(exam.start_time).toLocaleDateString()}
+                                                    </span>
+                                                    <span className="flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-base">schedule</span>
+                                                        {new Date(exam.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -
+                                                        {new Date(exam.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-xs font-bold px-3 py-1 rounded-full ${new Date() < new Date(exam.start_time) ? 'bg-amber-100 text-amber-600' : new Date() > new Date(exam.end_time) ? 'bg-slate-100 text-slate-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                                                    {new Date() < new Date(exam.start_time) ? 'Programado' : new Date() > new Date(exam.end_time) ? 'Finalizado' : 'En curso'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="bg-slate-50 p-6 rounded-2xl text-center mb-6">
+                                    <p className="text-slate-500">No hay exámenes programados próximamente</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Exam Templates Section */}
+                        <div>
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-bold">Plantillas de Quiz ({exams.length})</h2>
+                                <button
+                                    onClick={() => setShowExamModal(true)}
+                                    className="bg-white border border-slate-200 text-slate-700 font-bold px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50"
+                                >
+                                    <span className="material-symbols-outlined text-lg">add</span> Crear Plantilla
+                                </button>
+                            </div>
+
+                            {loadingExams ? (
+                                <div className="grid gap-4">
+                                    {[1, 2].map((i) => (
+                                        <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm animate-pulse">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-xl bg-slate-200"></div>
+                                                <div className="flex-1">
+                                                    <div className="h-5 bg-slate-200 rounded w-3/4 mb-2"></div>
+                                                    <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : exams.length > 0 ? (
+                                <div className="grid gap-4">
+                                    {exams.map((exam) => (
+                                        <div key={exam.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center">
+                                                <span className="material-symbols-outlined text-2xl">description</span>
+                                            </div>
+                                            <div className="flex-1">
+                                                <h3 className="font-bold text-slate-900">{exam.title}</h3>
+                                                <p className="text-sm text-slate-500">Creado: {exam.created_at}</p>
+                                                <p className="text-xs text-violet-600 mt-1">{exam.question_count} preguntas</p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => setShowExamScheduler(true)} // In future could pre-select this quiz
+                                                    className="p-2 text-primary hover:bg-primary/10 rounded-full"
+                                                    title="Programar este examen"
+                                                >
+                                                    <span className="material-symbols-outlined">event</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="bg-slate-50 p-12 rounded-2xl text-center">
+                                    <span className="material-symbols-outlined text-4xl text-slate-300 mb-4">assignment</span>
+                                    <p className="text-slate-500 mb-4">No hay plantillas de examen creadas</p>
+                                    <button
+                                        onClick={() => setShowExamModal(true)}
+                                        className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700"
+                                    >
+                                        Crear Primera Plantilla
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
 
@@ -968,32 +1107,12 @@ const TeacherClassDetail: React.FC = () => {
                         ) : announcements.length > 0 ? (
                             <div className="space-y-4">
                                 {announcements.map((announcement) => (
-                                    <div key={announcement.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                                                    {announcement.teacher?.full_name?.charAt(0) || 'P'}
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-slate-900">{announcement.teacher?.full_name || 'Profesor'}</p>
-                                                    <p className="text-xs text-slate-500">{new Date(announcement.created_at).toLocaleDateString('es-MX', { dateStyle: 'medium' })}</p>
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={() => handleDeleteAnnouncement(announcement.id)}
-                                                className="text-slate-400 hover:text-rose-500 transition"
-                                            >
-                                                <span className="material-symbols-outlined">delete</span>
-                                            </button>
-                                        </div>
-                                        {announcement.title && <h3 className="font-bold text-lg mb-2">{announcement.title}</h3>}
-                                        <p className="text-slate-700 whitespace-pre-wrap">{announcement.content}</p>
-                                        {announcement.pinned && (
-                                            <span className="inline-flex items-center gap-1 mt-3 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
-                                                <span className="material-symbols-outlined text-sm">push_pin</span> Fijado
-                                            </span>
-                                        )}
-                                    </div>
+                                    <AnnouncementCard
+                                        key={announcement.id}
+                                        announcement={announcement}
+                                        isTeacher={true}
+                                        onUpdate={loadAnnouncements}
+                                    />
                                 ))}
                             </div>
                         ) : (
@@ -1071,58 +1190,16 @@ const TeacherClassDetail: React.FC = () => {
                             </div>
                         </div>
 
-                        {students.length > 0 ? (
-                            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                                <table className="w-full">
-                                    <thead className="bg-slate-50 border-b border-slate-100">
-                                        <tr>
-                                            <th className="text-left p-4 font-bold text-slate-700">Estudiante</th>
-                                            <th className="text-center p-4 font-bold text-slate-700">Progreso</th>
-                                            <th className="text-center p-4 font-bold text-slate-700">Tareas</th>
-                                            <th className="text-center p-4 font-bold text-slate-700">Exámenes</th>
-                                            <th className="text-center p-4 font-bold text-slate-700">Promedio</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {students.map((student) => (
-                                            <tr key={student.id} className="border-b border-slate-50 hover:bg-slate-50">
-                                                <td className="p-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                                                            {student.name.charAt(0)}
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-medium text-slate-900">{student.name}</p>
-                                                            <p className="text-xs text-slate-500">{student.email}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="text-center p-4">
-                                                    <span className={`font-bold ${student.progress >= 70 ? 'text-emerald-600' : student.progress >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>
-                                                        {student.progress}%
-                                                    </span>
-                                                </td>
-                                                <td className="text-center p-4 text-slate-600">-</td>
-                                                <td className="text-center p-4 text-slate-600">-</td>
-                                                <td className="text-center p-4">
-                                                    <span className={`font-bold ${student.progress >= 70 ? 'text-emerald-600' : student.progress >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>
-                                                        {student.progress >= 70 ? 'A' : student.progress >= 50 ? 'B' : 'C'}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        ) : (
-                            <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm text-center">
-                                <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                    <span className="material-symbols-outlined text-3xl text-amber-600">grade</span>
-                                </div>
-                                <h3 className="font-bold text-slate-900 mb-2 text-lg">Sin estudiantes aún</h3>
-                                <p className="text-slate-500">Las calificaciones aparecerán cuando haya estudiantes inscritos</p>
-                            </div>
-                        )}
+                        <GradeBookTable
+                            assignments={assignments.map(a => ({ id: a.id, title: a.title, points: a.points || 100 }))}
+                            students={students.map(s => ({
+                                id: s.id,
+                                full_name: s.name,
+                                email: s.email,
+                                avatar_url: s.avatar
+                            }))}
+                            submissions={submissionsMap}
+                        />
                     </div>
                 )}
 
@@ -1347,6 +1424,112 @@ const TeacherClassDetail: React.FC = () => {
                     studentEmail={selectedStudent.email}
                     onClose={() => setSelectedStudent(null)}
                 />
+            )}
+
+            {/* Create Announcement Modal */}
+            {showAnnouncementModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+                        <div className="p-8">
+                            <h2 className="text-2xl font-black text-slate-900 mb-6">Nuevo Anuncio</h2>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-2">Contenido del Anuncio</label>
+                                    <textarea
+                                        placeholder="Escribe tu anuncio aquí..."
+                                        value={newAnnouncementContent}
+                                        onChange={(e) => setNewAnnouncementContent(e.target.value)}
+                                        rows={5}
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 p-4 flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowAnnouncementModal(false)}
+                                className="px-4 py-2 text-slate-600 font-medium hover:text-slate-800"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleCreateAnnouncement}
+                                disabled={!newAnnouncementContent.trim()}
+                                className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            >
+                                Publicar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Create Assignment Modal */}
+            {showAssignmentModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+                        <div className="p-8">
+                            <h2 className="text-2xl font-black text-slate-900 mb-6">Nueva Tarea</h2>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-2">Título *</label>
+                                    <input
+                                        type="text"
+                                        value={newAssignment.title}
+                                        onChange={(e) => setNewAssignment(prev => ({ ...prev, title: e.target.value }))}
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                        placeholder="Ej: Ensayo sobre el Sistema Solar"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-2">Descripción</label>
+                                    <textarea
+                                        value={newAssignment.description}
+                                        onChange={(e) => setNewAssignment(prev => ({ ...prev, description: e.target.value }))}
+                                        rows={3}
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none"
+                                        placeholder="Instrucciones para la tarea..."
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Puntos</label>
+                                        <input
+                                            type="number"
+                                            value={newAssignment.points}
+                                            onChange={(e) => setNewAssignment(prev => ({ ...prev, points: parseInt(e.target.value) || 0 }))}
+                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Fecha de Entrega *</label>
+                                        <input
+                                            type="date"
+                                            value={newAssignment.due_date}
+                                            onChange={(e) => setNewAssignment(prev => ({ ...prev, due_date: e.target.value }))}
+                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 p-4 flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowAssignmentModal(false)}
+                                className="px-4 py-2 text-slate-600 font-medium hover:text-slate-800"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleCreateAssignment}
+                                disabled={!newAssignment.title || !newAssignment.due_date}
+                                className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            >
+                                Crear Tarea
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
