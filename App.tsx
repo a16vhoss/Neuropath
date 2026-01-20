@@ -9,6 +9,7 @@ import TeacherAnalytics from './pages/TeacherAnalytics';
 import TeacherClassDetail from './pages/TeacherClassDetail';
 import StudentDashboard from './pages/StudentDashboard';
 import StudentClassDetail from './pages/StudentClassDetail';
+import ClassItemDetail from './pages/ClassItemDetail';
 import StudentAchievements from './pages/StudentAchievements';
 import StudySetDetail from './pages/StudySetDetail';
 import StudyBattles from './pages/StudyBattles';
@@ -155,6 +156,11 @@ const AppRoutes: React.FC = () => {
           <StudentClassDetail />
         </ProtectedRoute>
       } />
+      <Route path="/student/class/:classId/item/:itemId" element={
+        <ProtectedRoute allowedRole="student">
+          <ClassItemDetail />
+        </ProtectedRoute>
+      } />
 
       {/* Teacher Routes */}
       <Route path="/teacher" element={
@@ -165,6 +171,11 @@ const AppRoutes: React.FC = () => {
       <Route path="/teacher/class/:classId" element={
         <ProtectedRoute allowedRole="teacher">
           <TeacherClassDetail />
+        </ProtectedRoute>
+      } />
+      <Route path="/teacher/class/:classId/item/:itemId" element={
+        <ProtectedRoute allowedRole="teacher">
+          <ClassItemDetail />
         </ProtectedRoute>
       } />
       <Route path="/teacher/analytics/:classId" element={

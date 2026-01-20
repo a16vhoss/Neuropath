@@ -298,10 +298,7 @@ const StudentClassDetail: React.FC = () => {
                                         topic={topic}
                                         assignments={assignments.filter(a => a.topic_id === topic.id)}
                                         isTeacher={false}
-                                        onAssignmentClick={(assignment) => {
-                                            // Optional: Handle click if you want a specific view for students
-                                            // The AssignmentCard inside TopicSection might handle basic interaction
-                                        }}
+                                        onAssignmentClick={(assignment) => navigate(`/student/class/${classId}/item/${assignment.id}`)}
                                     />
                                 ))}
                             </div>

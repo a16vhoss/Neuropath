@@ -455,6 +455,7 @@ const TeacherClassDetail: React.FC = () => {
                 due_date: newAssignment.due_date,
                 topic_id: newAssignment.topic_id || undefined,
                 type: newAssignment.type,
+                published: true, // AUTO PUBLISH
                 attachments: attachments.length > 0 ? attachments : undefined
             });
 
@@ -921,7 +922,7 @@ const TeacherClassDetail: React.FC = () => {
                                         topic={topic}
                                         assignments={assignments.filter(a => a.topic_id === topic.id)}
                                         isTeacher={true}
-                                        onAssignmentClick={(assignment) => setViewingAssignment(assignment)}
+                                        onAssignmentClick={(assignment) => navigate(`/teacher/class/${classId}/item/${assignment.id}`)}
                                         onEditAssignment={(assignment) => {
                                             setNewAssignment(assignment);
                                             setShowAssignmentModal(true);
@@ -1823,99 +1824,11 @@ const TeacherClassDetail: React.FC = () => {
                 </div>
             )}
 
-            {/* View Assignment Details Modal */}
-            {viewingAssignment && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in zoom-in-50 duration-200">
-                        <div className="p-6 border-b border-slate-100 flex justify-between items-start sticky top-0 bg-white z-10">
-                            <div>
-                                <h2 className="text-2xl font-bold text-slate-900">{viewingAssignment.title}</h2>
-                                <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase mt-2 inline-block ${viewingAssignment.type === 'exam' ? 'bg-purple-100 text-purple-700' :
-                                    viewingAssignment.type === 'material' ? 'bg-blue-100 text-blue-700' :
-                                        'bg-orange-100 text-orange-700'
-                                    }`}>
-                                    {viewingAssignment.type === 'exam' ? 'Examen' :
-                                        viewingAssignment.type === 'material' ? 'Material / Info' : 'Tarea'}
-                                </span>
-                            </div>
-                            <button
-                                onClick={() => setViewingAssignment(null)}
-                                className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition"
-                            >
-                                <span className="material-symbols-outlined">close</span>
-                            </button>
-                        </div>
-
-                        <div className="p-6 space-y-6">
-                            {/* Description */}
-                            <div className="prose prose-slate max-w-none">
-                                <h3 className="font-bold text-slate-900 mb-2">Descripción</h3>
-                                <p className="whitespace-pre-wrap text-slate-600">
-                                    {viewingAssignment.description || 'Sin descripción'}
-                                </p>
-                            </div>
-
-                            {/* Details Grid */}
-                            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                {viewingAssignment.due_date && (
-                                    <div>
-                                        <p className="text-sm text-slate-500 mb-1">Fecha de Entrega</p>
-                                        <p className="font-bold text-slate-900">
-                                            {new Date(viewingAssignment.due_date).toLocaleString()}
-                                        </p>
-                                    </div>
-                                )}
-                                {viewingAssignment.points && viewingAssignment.type === 'assignment' && (
-                                    <div>
-                                        <p className="text-sm text-slate-500 mb-1">Puntos</p>
-                                        <p className="font-bold text-slate-900">{viewingAssignment.points}</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Attachments */}
-                            {viewingAssignment.attachments && viewingAssignment.attachments.length > 0 && (
-                                <div>
-                                    <h3 className="font-bold text-slate-900 mb-3">Adjuntos</h3>
-                                    <div className="space-y-2">
-                                        {viewingAssignment.attachments.map((att: any, idx: number) => (
-                                            <a
-                                                key={idx}
-                                                href={supabase.storage.from('materials').getPublicUrl(att.url).data.publicUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition group"
-                                            >
-                                                <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center group-hover:bg-blue-100 transition">
-                                                    <span className="material-symbols-outlined">
-                                                        {att.type === 'link' ? 'link' : 'description'}
-                                                    </span>
-                                                </div>
-                                                <div className="flex-1">
-                                                    <p className="font-medium text-slate-900">{att.title}</p>
-                                                    <p className="text-xs text-slate-400">{att.type}</p>
-                                                </div>
-                                                <span className="material-symbols-outlined text-slate-400">open_in_new</span>
-                                            </a>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 rounded-b-2xl">
-                            <button
-                                onClick={() => setViewingAssignment(null)}
-                                className="px-6 py-2 bg-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-300 transition"
-                            >
-                                Cerrar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* View Assignment Details Modal - Removed in favor of Full Page View */}
+            {/* Modal removed. Interaction is now via Full Page Item View */}
         </div>
-    );
-};
+    )
+}
+
 
 export default TeacherClassDetail;
