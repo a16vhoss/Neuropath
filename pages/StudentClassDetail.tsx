@@ -20,6 +20,7 @@ import {
 } from '../services/ClassroomService';
 import AnnouncementCard from '../components/AnnouncementCard';
 import AssignmentCard from '../components/AssignmentCard';
+import TopicSection from '../components/TopicSection';
 
 interface ClassData {
     id: string;
@@ -284,51 +285,31 @@ const StudentClassDetail: React.FC = () => {
 
                 {/* Modules/Materials Tab */}
                 {activeTab === 'modules' && (
-                    <div className="max-w-4xl mx-auto">
-                        <h2 className="text-2xl font-bold text-slate-900 mb-6">Materiales de Clase</h2>
+                    <div className="max-w-4xl mx-auto space-y-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-2xl font-bold text-slate-900">Materiales de Clase</h2>
+                        </div>
 
-                        {materials.length > 0 ? (
-                            <div className="grid md:grid-cols-2 gap-4">
-                                {materials.map((material) => (
-                                    <div key={material.id} className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all flex items-start gap-4">
-                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${material.type === 'pdf' ? 'bg-red-50 text-red-600' :
-                                                material.type === 'video' ? 'bg-blue-50 text-blue-600' :
-                                                    'bg-slate-50 text-slate-600'
-                                            }`}>
-                                            <span className="material-symbols-outlined text-2xl">
-                                                {material.type === 'pdf' ? 'picture_as_pdf' :
-                                                    material.type === 'video' ? 'play_circle' : 'article'}
-                                            </span>
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className="font-bold text-slate-900 truncate">{material.name}</h3>
-                                            <p className="text-xs text-slate-500 mb-3">Subido el {new Date(material.created_at).toLocaleDateString()}</p>
-
-                                            <div className="flex gap-2">
-                                                <a
-                                                    href={supabase.storage.from('materials').getPublicUrl(material.file_url).data.publicUrl}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-xs font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors"
-                                                >
-                                                    Abrir
-                                                </a>
-                                                <button
-                                                    onClick={() => navigate(`/student/study/${classId}`)}
-                                                    className="text-xs font-bold text-violet-600 bg-violet-50 px-3 py-1.5 rounded-lg hover:bg-violet-100 transition-colors"
-                                                >
-                                                    Estudiar
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
+                        {topics.length > 0 ? (
+                            <div className="space-y-4">
+                                {topics.map(topic => (
+                                    <TopicSection
+                                        key={topic.id}
+                                        topic={topic}
+                                        assignments={assignments.filter(a => a.topic_id === topic.id)}
+                                        isTeacher={false}
+                                        onAssignmentClick={(assignment) => {
+                                            // Optional: Handle click if you want a specific view for students
+                                            // The AssignmentCard inside TopicSection might handle basic interaction
+                                        }}
+                                    />
                                 ))}
                             </div>
                         ) : (
                             <div className="text-center py-12 bg-white rounded-2xl border border-slate-100">
-                                <span className="material-symbols-outlined text-5xl text-slate-200 mb-4">folder_open</span>
-                                <h3 className="text-lg font-bold text-slate-900">Carpeta vacía</h3>
-                                <p className="text-slate-500">No hay materiales compartidos en esta clase.</p>
+                                <span className="material-symbols-outlined text-5xl text-slate-200 mb-4">folder_off</span>
+                                <h3 className="text-lg font-bold text-slate-900">Sin materiales</h3>
+                                <p className="text-slate-500">Aún no se han organizado materiales por módulos.</p>
                             </div>
                         )}
                     </div>
@@ -391,9 +372,9 @@ const StudentClassDetail: React.FC = () => {
                                                 </td>
                                                 <td className="p-4">
                                                     <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${status === 'graded' ? 'bg-emerald-100 text-emerald-700' :
-                                                            status === 'turned_in' ? 'bg-blue-100 text-blue-700' :
-                                                                status === 'missing' ? 'bg-rose-100 text-rose-700' :
-                                                                    'bg-slate-100 text-slate-600'
+                                                        status === 'turned_in' ? 'bg-blue-100 text-blue-700' :
+                                                            status === 'missing' ? 'bg-rose-100 text-rose-700' :
+                                                                'bg-slate-100 text-slate-600'
                                                         }`}>
                                                         {status === 'graded' ? 'Calificado' :
                                                             status === 'turned_in' ? 'Entregado' :
