@@ -16,6 +16,7 @@ import StudySession from './pages/StudySession';
 import AdaptiveStudySession from './pages/AdaptiveStudySession';
 import MockExamPage from './pages/MockExamPage';
 import CreateAssignment from './pages/CreateAssignment';
+import TeacherSettings from './pages/TeacherSettings';
 import { UserRole } from './types';
 
 // Protected Route component
@@ -168,6 +169,11 @@ const AppRoutes: React.FC = () => {
       <Route path="/teacher/class/:classId/assignment/new" element={
         <ProtectedRoute allowedRole="teacher">
           <CreateAssignment />
+        </ProtectedRoute>
+      } />
+      <Route path="/teacher/settings" element={
+        <ProtectedRoute allowedRole="teacher">
+          <TeacherSettings />
         </ProtectedRoute>
       } />
 

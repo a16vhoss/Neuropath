@@ -159,7 +159,7 @@ const TeacherDashboard: React.FC = () => {
             <span className="material-symbols-outlined">folder</span> Materiales
           </div>
           <div
-            onClick={() => alert('Configuración próximamente')}
+            onClick={() => navigate('/teacher/settings')}
             className="text-slate-600 p-3 rounded-lg flex items-center gap-3 font-medium hover:bg-slate-50 cursor-pointer"
           >
             <span className="material-symbols-outlined">settings</span> Configuración
