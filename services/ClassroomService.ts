@@ -148,6 +148,22 @@ export interface StudentGroup {
 }
 
 // ============================================
+// CLASS MATERIALS
+// ============================================
+
+export async function getClassMaterials(classId: string): Promise<any[]> {
+    const { data, error } = await supabase
+        .from('materials')
+        .select('*')
+        .eq('class_id', classId)
+        .neq('status', 'error')
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+}
+
+// ============================================
 // CLASS TOPICS
 // ============================================
 
@@ -411,7 +427,9 @@ export async function submitAssignment(submissionId: string, submission: {
         .eq('id', submissionId)
         .single();
 
-    const isLate = sub?.assignment?.due_date && new Date(sub.assignment.due_date) < new Date();
+    const assignment: any = sub?.assignment;
+    const dueDate = Array.isArray(assignment) ? assignment[0]?.due_date : assignment?.due_date;
+    const isLate = dueDate && new Date(dueDate) < new Date();
 
     const { data, error } = await supabase
         .from('assignment_submissions')

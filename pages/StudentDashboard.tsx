@@ -426,7 +426,7 @@ const StudentDashboard: React.FC = () => {
                         return (
                           <div
                             key={course.id}
-                            onClick={() => navigate(`/student/study/${course.id}`)}
+                            onClick={() => navigate(`/student/class/${course.id}`)}
                             className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
                           >
                             <div className="flex items-center gap-4 mb-4">

@@ -8,6 +8,7 @@ import TeacherDashboard from './pages/TeacherDashboard';
 import TeacherAnalytics from './pages/TeacherAnalytics';
 import TeacherClassDetail from './pages/TeacherClassDetail';
 import StudentDashboard from './pages/StudentDashboard';
+import StudentClassDetail from './pages/StudentClassDetail';
 import StudentAchievements from './pages/StudentAchievements';
 import StudySetDetail from './pages/StudySetDetail';
 import StudyBattles from './pages/StudyBattles';
@@ -147,6 +148,11 @@ const AppRoutes: React.FC = () => {
       <Route path="/student/study/adaptive/set/:studySetId" element={
         <ProtectedRoute allowedRole="student">
           <AdaptiveStudySession />
+        </ProtectedRoute>
+      } />
+      <Route path="/student/class/:classId" element={
+        <ProtectedRoute allowedRole="student">
+          <StudentClassDetail />
         </ProtectedRoute>
       } />
 
