@@ -9,6 +9,7 @@ import AnnouncementCard from '../components/AnnouncementCard';
 import AssignmentCard from '../components/AssignmentCard';
 import ExamScheduler from '../components/ExamScheduler';
 import GradeBookTable from '../components/GradeBookTable';
+import TopicSection from '../components/TopicSection';
 import {
     getClassAnnouncements,
     createAnnouncement,
@@ -20,10 +21,16 @@ import {
     gradeSubmission,
     getClassExams,
     scheduleExam,
+    getClassTopics,
+    createTopic,
+    updateTopic,
+    deleteTopic,
+    reorderTopics,
     Announcement,
     Assignment,
     AssignmentSubmission,
-    ScheduledExam
+    ScheduledExam,
+    ClassTopic
 } from '../services/ClassroomService';
 
 interface Material {
@@ -100,6 +107,13 @@ const TeacherClassDetail: React.FC = () => {
     const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
     const [newAnnouncementContent, setNewAnnouncementContent] = useState('');
 
+    // Topics state
+    const [topics, setTopics] = useState<ClassTopic[]>([]);
+    const [loadingTopics, setLoadingTopics] = useState(true);
+    const [showTopicModal, setShowTopicModal] = useState(false);
+    const [editingTopic, setEditingTopic] = useState<ClassTopic | null>(null);
+    const [newTopicName, setNewTopicName] = useState('');
+
     // Assignments/Grades state
     const [assignments, setAssignments] = useState<Assignment[]>([]);
     const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
@@ -129,6 +143,12 @@ const TeacherClassDetail: React.FC = () => {
                 if (cls) {
                     setClassData(cls);
                 }
+
+                // Get topics
+                setLoadingTopics(true);
+                const classTopics = await getClassTopics(classId);
+                setTopics(classTopics);
+                setLoadingTopics(false);
 
                 // Get materials
                 setLoadingMaterials(true);
@@ -366,14 +386,43 @@ const TeacherClassDetail: React.FC = () => {
                 description: newAssignment.description,
                 points: newAssignment.points,
                 due_date: newAssignment.due_date,
-                topic_id: null // Optional: Add topic support later
+                topic_id: newAssignment.topic_id || undefined
             });
 
             setAssignments(prev => [assignment, ...prev]);
             setShowAssignmentModal(false);
-            setNewAssignment({ title: '', description: '', points: 100, due_date: '' });
+            setNewAssignment({ title: '', description: '', points: 100, due_date: '', topic_id: '' });
         } catch (error) {
             console.error('Error creating assignment:', error);
+        }
+    };
+
+    // Topic handlers
+    const handleCreateTopic = async () => {
+        if (!classId || !newTopicName.trim()) return;
+        try {
+            if (editingTopic) {
+                const updated = await updateTopic(editingTopic.id, { name: newTopicName });
+                setTopics(prev => prev.map(t => t.id === updated.id ? updated : t));
+            } else {
+                const newTopic = await createTopic(classId, newTopicName);
+                setTopics(prev => [...prev, newTopic]);
+            }
+            setShowTopicModal(false);
+            setNewTopicName('');
+            setEditingTopic(null);
+        } catch (error) {
+            console.error('Error saving topic:', error);
+        }
+    };
+
+    const handleDeleteTopic = async (topicId: string) => {
+        if (!window.confirm('¿Estás seguro de eliminar este módulo? Las tareas asociadas perderán su agrupación.')) return;
+        try {
+            await deleteTopic(topicId);
+            setTopics(prev => prev.filter(t => t.id !== topicId));
+        } catch (error) {
+            console.error('Error deleting topic:', error);
         }
     };
 
@@ -757,80 +806,65 @@ const TeacherClassDetail: React.FC = () => {
                     </div>
                 )}
 
-                {/* Modules Tab (Materials) */}
+                {/* Modules Tab (Topics & Materials) */}
                 {activeTab === 'modules' && (
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
-                            <h2 className="text-xl font-bold">Materiales del Curso</h2>
+                            <h2 className="text-xl font-bold">Módulos del Curso</h2>
                             <button
-                                onClick={() => setShowUploadModal(true)}
+                                onClick={() => {
+                                    setEditingTopic(null);
+                                    setNewTopicName('');
+                                    setShowTopicModal(true);
+                                }}
                                 className="bg-primary text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
                             >
-                                <span className="material-symbols-outlined text-lg">upload</span> Subir Material
+                                <span className="material-symbols-outlined text-lg">add</span> Nuevo Módulo
                             </button>
                         </div>
 
-                        {loadingMaterials ? (
-                            <div className="grid gap-4">
-                                {[1, 2].map((i) => (
-                                    <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm animate-pulse">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-xl bg-slate-200"></div>
-                                            <div className="flex-1">
-                                                <div className="h-5 bg-slate-200 rounded w-3/4 mb-2"></div>
-                                                <div className="h-3 bg-slate-100 rounded w-1/2"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : materials.length > 0 ? (
-                            <div className="grid gap-4">
-                                {materials.map((material) => (
-                                    <div key={material.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${material.type === 'pdf' ? 'bg-rose-100 text-rose-600' :
-                                            material.type === 'video' ? 'bg-violet-100 text-violet-600' :
-                                                'bg-amber-100 text-amber-600'
-                                            }`}>
-                                            <span className="material-symbols-outlined text-2xl">
-                                                {material.type === 'pdf' ? 'picture_as_pdf' : material.type === 'video' ? 'videocam' : 'slideshow'}
-                                            </span>
-                                        </div>
-                                        <div className="flex-1">
-                                            <h3 className="font-bold text-slate-900">{material.name}</h3>
-                                            <p className="text-sm text-slate-500">Subido: {material.uploadedAt}</p>
-                                            {material.status === 'ready' && (
-                                                <div className="flex gap-4 mt-2 text-xs">
-                                                    <span className="text-blue-600">{material.generatedContent.flashcards} flashcards</span>
-                                                    <span className="text-violet-600">{material.generatedContent.quizzes} quizzes</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            {material.status === 'processing' ? (
-                                                <div className="flex items-center gap-2 text-amber-600">
-                                                    <div className="w-4 h-4 border-2 border-amber-600 border-t-transparent rounded-full animate-spin"></div>
-                                                    <span className="text-sm font-medium">Procesando...</span>
-                                                </div>
-                                            ) : material.status === 'ready' ? (
-                                                <span className="bg-emerald-100 text-emerald-600 text-xs font-bold px-3 py-1 rounded-full">Listo</span>
-                                            ) : (
-                                                <span className="bg-rose-100 text-rose-600 text-xs font-bold px-3 py-1 rounded-full">Error</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
+                        {loadingTopics ? (
+                            <div className="animate-pulse space-y-4">
+                                <div className="h-12 bg-slate-200 rounded-lg w-full"></div>
+                                <div className="h-12 bg-slate-200 rounded-lg w-full"></div>
                             </div>
                         ) : (
-                            <div className="bg-slate-50 p-12 rounded-2xl text-center">
-                                <span className="material-symbols-outlined text-4xl text-slate-300 mb-4">folder_open</span>
-                                <p className="text-slate-500 mb-4">No hay materiales subidos aún</p>
-                                <button
-                                    onClick={() => setShowUploadModal(true)}
-                                    className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700"
-                                >
-                                    Subir Primer Material
-                                </button>
+                            <div className="space-y-4">
+                                {topics.map((topic) => (
+                                    <TopicSection
+                                        key={topic.id}
+                                        topic={topic}
+                                        assignments={assignments.filter(a => a.topic_id === topic.id)}
+                                        isTeacher={true}
+                                        onEditTopic={() => {
+                                            setEditingTopic(topic);
+                                            setNewTopicName(topic.name);
+                                            setShowTopicModal(true);
+                                        }}
+                                        onDeleteTopic={() => handleDeleteTopic(topic.id)}
+                                        onDeleteAssignment={(assignment) => handleDeleteAssignment(assignment.id)}
+                                        onAddAssignment={() => {
+                                            setNewAssignment(prev => ({ ...prev, topic_id: topic.id }));
+                                            setShowAssignmentModal(true);
+                                        }}
+                                    />
+                                ))}
+
+                                {/* Unassigned Items */}
+                                {assignments.filter(a => !a.topic_id).length > 0 && (
+                                    <div className="mt-8 border-t border-slate-200 pt-8">
+                                        <h3 className="text-lg font-bold text-slate-700 mb-4">Sin Asignar</h3>
+                                        <div className="space-y-2">
+                                            {assignments.filter(a => !a.topic_id).map(assignment => (
+                                                <AssignmentCard
+                                                    key={assignment.id}
+                                                    assignment={assignment}
+                                                    isTeacher={true}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -1526,6 +1560,51 @@ const TeacherClassDetail: React.FC = () => {
                                 className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                             >
                                 Crear Tarea
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Create Topic Modal */}
+            {showTopicModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
+                        <div className="p-8">
+                            <h2 className="text-2xl font-black text-slate-900 mb-6">
+                                {editingTopic ? 'Editar Módulo' : 'Nuevo Módulo'}
+                            </h2>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-2">Nombre del Módulo</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: Unidad 1: Introducción"
+                                        value={newTopicName}
+                                        onChange={(e) => setNewTopicName(e.target.value)}
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                        autoFocus
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 p-4 flex justify-end gap-3">
+                            <button
+                                onClick={() => {
+                                    setShowTopicModal(false);
+                                    setEditingTopic(null);
+                                    setNewTopicName('');
+                                }}
+                                className="px-4 py-2 text-slate-600 font-medium hover:text-slate-800"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleCreateTopic}
+                                disabled={!newTopicName.trim()}
+                                className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            >
+                                Guardar
                             </button>
                         </div>
                     </div>
