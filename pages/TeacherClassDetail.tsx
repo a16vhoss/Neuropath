@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, getClassMaterials, getClassEnrollments, uploadMaterial } from '../services/supabaseClient';
-import { generateFlashcardsFromText, generateQuizFromText, extractTextFromPDF } from '../services/pdfProcessingService';
+import { generateFlashcardsFromText, generateQuizFromText, extractTextFromPDF, generateStudySummary } from '../services/pdfProcessingService';
 import StudentProgressModal from '../components/StudentProgressModal';
 import AnnouncementCard from '../components/AnnouncementCard';
 import AssignmentCard from '../components/AssignmentCard';
@@ -101,8 +101,11 @@ const TeacherClassDetail: React.FC = () => {
         description: '',
         points: 100,
         due_date: '',
-        type: 'assignment'
+        type: 'assignment',
+        topic_id: ''
     });
+    const [assignmentFile, setAssignmentFile] = useState<File | null>(null);
+
 
     // Upload state additions
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -385,24 +388,81 @@ const TeacherClassDetail: React.FC = () => {
     };
 
     // Create assignment handler
+    // Create assignment handler
     const handleCreateAssignment = async () => {
-        if (!classId || !newAssignment.title || !newAssignment.due_date) return;
+        if (!classId || !newAssignment.title || (newAssignment.type === 'assignment' && !newAssignment.due_date)) return;
+
+        // Show loading state (reuse existing or add local if needed, for now just reuse)
+        setIsUploading(true);
+
         try {
+            let finalDescription = newAssignment.description || '';
+            let attachments = [];
+
+            if (assignmentFile) {
+                // 1. Upload File
+                const fileExt = assignmentFile.name.split('.').pop();
+                const fileName = `${classId}/assignments/${Date.now()}_${assignmentFile.name}`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('materials')
+                    .upload(fileName, assignmentFile);
+
+                if (uploadError) throw uploadError;
+
+                // 2. AI Processing for PDF
+                if (assignmentFile.type.includes('pdf')) {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(assignmentFile);
+
+                    await new Promise<void>((resolve) => {
+                        reader.onload = async (e) => {
+                            try {
+                                const base64 = (e.target?.result as string)?.split(',')[1];
+                                if (base64) {
+                                    const text = await extractTextFromPDF(base64);
+                                    if (text) {
+                                        const summary = await generateStudySummary(text, newAssignment.title || 'General');
+                                        if (summary) {
+                                            finalDescription += `\n\n--- 🤖 Resumen IA ---\n${summary}`;
+                                        }
+                                    }
+                                }
+                            } catch (err) {
+                                console.error('AI Summary failed', err);
+                            } finally {
+                                resolve();
+                            }
+                        };
+                    });
+                }
+
+                attachments.push({
+                    type: 'file',
+                    title: assignmentFile.name,
+                    url: uploadData?.path,
+                    mime_type: assignmentFile.type
+                });
+            }
+
             const assignment = await createAssignment({
                 class_id: classId,
                 title: newAssignment.title,
-                description: newAssignment.description,
+                description: finalDescription,
                 points: newAssignment.points,
                 due_date: newAssignment.due_date,
                 topic_id: newAssignment.topic_id || undefined,
-                type: newAssignment.type
+                type: newAssignment.type,
+                attachments: attachments.length > 0 ? attachments : undefined
             });
 
             setAssignments(prev => [assignment, ...prev]);
             setShowAssignmentModal(false);
             setNewAssignment({ title: '', description: '', points: 100, due_date: '', type: 'assignment', topic_id: '' });
+            setAssignmentFile(null);
         } catch (error) {
             console.error('Error creating assignment:', error);
+        } finally {
+            setIsUploading(false);
         }
     };
 
@@ -1632,6 +1692,34 @@ const TeacherClassDetail: React.FC = () => {
                                     />
                                 </div>
 
+                                {newAssignment.type === 'material' && (
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Adjuntar Archivo (Opcional)</label>
+                                        <div className="flex items-center gap-3">
+                                            <label className="cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-lg font-medium transition flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-lg">attach_file</span>
+                                                {assignmentFile ? 'Cambiar archivo' : 'Seleccionar archivo'}
+                                                <input
+                                                    type="file"
+                                                    className="hidden"
+                                                    onChange={(e) => setAssignmentFile(e.target.files?.[0] || null)}
+                                                    accept=".pdf,.doc,.docx,.pptx"
+                                                />
+                                            </label>
+                                            {assignmentFile && (
+                                                <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1 rounded-lg text-sm">
+                                                    <span className="material-symbols-outlined text-sm">description</span>
+                                                    <span className="truncate max-w-[150px]">{assignmentFile.name}</span>
+                                                    <button onClick={() => setAssignmentFile(null)} className="hover:text-blue-900">
+                                                        <span className="material-symbols-outlined text-sm">close</span>
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-slate-500 mt-1">Si subes un PDF, la IA generará un resumen automático.</p>
+                                    </div>
+                                )}
+
                                 {newAssignment.type === 'assignment' && (
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -1665,10 +1753,17 @@ const TeacherClassDetail: React.FC = () => {
                             </button>
                             <button
                                 onClick={handleCreateAssignment}
-                                disabled={!newAssignment.title || (newAssignment.type === 'assignment' && !newAssignment.due_date)}
-                                className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                disabled={!newAssignment.title || (newAssignment.type === 'assignment' && !newAssignment.due_date) || isUploading}
+                                className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
                             >
-                                {newAssignment.type === 'material' ? 'Publicar Información' : 'Crear Tarea'}
+                                {isUploading ? (
+                                    <>
+                                        <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                                        Procesando...
+                                    </>
+                                ) : (
+                                    newAssignment.type === 'material' ? 'Publicar Información' : 'Crear Tarea'
+                                )}
                             </button>
                         </div>
                     </div>
