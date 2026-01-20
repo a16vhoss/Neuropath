@@ -14,7 +14,7 @@ interface ProgressionData {
 }
 
 interface VisualProgressionMapProps {
-    studySets: StudySet[];
+    studySets?: StudySet[];
     studySetId?: string; // Optional: to focus on a single set
 }
 
@@ -71,7 +71,7 @@ const VisualProgressionMap: React.FC<VisualProgressionMapProps> = ({ studySets, 
 
                 } else {
                     // DASHBOARD MODE: Breakdown by Study Set
-                    if (!studySets.length) {
+                    if (!studySets || !studySets.length) {
                         setLoading(false);
                         return;
                     }

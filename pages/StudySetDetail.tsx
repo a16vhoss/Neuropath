@@ -16,6 +16,8 @@ import {
 } from '../services/supabaseClient';
 import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary } from '../services/pdfProcessingService';
 import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL } from '../services/geminiService';
+import CumulativeReportsCard from '../components/CumulativeReportsCard';
+import VisualProgressionMap from '../components/VisualProgressionMap';
 
 interface Flashcard {
     id: string;
@@ -46,7 +48,7 @@ interface StudySetFull {
     material_count: number;
 }
 
-type TabType = 'overview' | 'flashcards' | 'materials';
+type TabType = 'overview' | 'flashcards' | 'materials' | 'reports';
 
 const StudySetDetail: React.FC = () => {
     const { studySetId } = useParams();
@@ -610,7 +612,7 @@ const StudySetDetail: React.FC = () => {
 
                     {/* Tabs */}
                     <div className="flex gap-6 mt-4 border-t border-slate-100 pt-4">
-                        {(['overview', 'flashcards', 'materials'] as TabType[]).map((tab) => (
+                        {(['overview', 'flashcards', 'materials', 'reports'] as TabType[]).map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
@@ -622,6 +624,7 @@ const StudySetDetail: React.FC = () => {
                                 {tab === 'overview' && 'Resumen'}
                                 {tab === 'flashcards' && `Flashcards (${studySet.flashcard_count})`}
                                 {tab === 'materials' && `Materiales (${studySet.material_count})`}
+                                {tab === 'reports' && 'Reportes'}
                             </button>
                         ))}
                     </div>
@@ -694,6 +697,7 @@ const StudySetDetail: React.FC = () => {
                             </button>
                         </div>
 
+
                         {/* Study Guide (formerly Description) */}
                         <div className="md:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
                             <div className="flex justify-between items-center mb-2">
@@ -744,6 +748,25 @@ const StudySetDetail: React.FC = () => {
                                     )}
                                 </div>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Reports Tab */}
+                {activeTab === 'reports' && (
+                    <div className="space-y-6">
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                                <h3 className="font-bold text-slate-900 mb-4">📈 Rendimiento en este Set</h3>
+                                <CumulativeReportsCard studySetId={studySet.id} />
+                            </div>
+
+                            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                                <h3 className="font-bold text-slate-900 mb-4">🎯 Mapa de Dominio por Temas</h3>
+                                <div className="h-[350px] flex items-center justify-center">
+                                    <VisualProgressionMap studySetId={studySet.id} />
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
