@@ -68,6 +68,7 @@ const StudySetDetail: React.FC = () => {
     const [activeTab, setActiveTab] = useState<TabType>('overview');
     const [refreshReports, setRefreshReports] = useState(0);
     const [flashcardProgress, setFlashcardProgress] = useState<Map<string, FlashcardProgress>>(new Map());
+    const [viewingStatsFlashcard, setViewingStatsFlashcard] = useState<Flashcard | null>(null);
 
     // Edit states
     const [isEditingName, setIsEditingName] = useState(false);
@@ -829,17 +830,15 @@ const StudySetDetail: React.FC = () => {
                 {/* Reports Tab */}
                 {activeTab === 'reports' && (
                     <div className="space-y-6">
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                                <h3 className="font-bold text-slate-900 mb-4">📈 Rendimiento en este Set</h3>
-                                <CumulativeReportsCard studySetId={studySet.id} />
-                            </div>
+                        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                            <h3 className="font-bold text-slate-900 mb-4">📈 Rendimiento en este Set</h3>
+                            <CumulativeReportsCard studySetId={studySet.id} />
+                        </div>
 
-                            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                                <h3 className="font-bold text-slate-900 mb-4">🎯 Mapa de Dominio por Temas</h3>
-                                <div className="h-[350px] flex items-center justify-center">
-                                    <VisualProgressionMap studySetId={studySet.id} refreshTrigger={refreshReports} />
-                                </div>
+                        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                            <h3 className="font-bold text-slate-900 mb-4">🎯 Mapa de Dominio por Temas</h3>
+                            <div className="h-[600px]">
+                                <VisualProgressionMap studySetId={studySet.id} refreshTrigger={refreshReports} />
                             </div>
                         </div>
                     </div>
@@ -917,6 +916,13 @@ const StudySetDetail: React.FC = () => {
                                                 )}
                                             </div>
                                             <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => setViewingStatsFlashcard(card)}
+                                                    className="p-2 text-slate-400 hover:text-violet-500 hover:bg-violet-50 rounded-lg transition"
+                                                    title="Ver estadísticas"
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">bar_chart</span>
+                                                </button>
                                                 <button
                                                     onClick={() => setEditingFlashcard(card)}
                                                     className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition"
@@ -1358,6 +1364,109 @@ const StudySetDetail: React.FC = () => {
                         </div>
                     </div>
                 )}
+
+            {/* Flashcard Stats Modal */}
+            {viewingStatsFlashcard && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setViewingStatsFlashcard(null)}>
+                    <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="p-6 border-b border-slate-100">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-xl font-bold text-slate-900">📊 Estadísticas de Flashcard</h2>
+                                <button onClick={() => setViewingStatsFlashcard(null)} className="text-slate-400 hover:text-slate-600">
+                                    <span className="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            {/* Question/Answer Preview */}
+                            <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-2xl p-4 border border-violet-100">
+                                <p className="text-sm text-violet-600 font-medium mb-1">Pregunta</p>
+                                <p className="text-slate-800 font-medium">{viewingStatsFlashcard.question}</p>
+                                <p className="text-sm text-violet-600 font-medium mt-3 mb-1">Respuesta</p>
+                                <p className="text-slate-600 text-sm">{viewingStatsFlashcard.answer}</p>
+                            </div>
+
+                            {flashcardProgress.get(viewingStatsFlashcard.id) ? (
+                                <>
+                                    {/* Mastery Level */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-slate-50 rounded-2xl p-4 text-center">
+                                            <p className="text-sm text-slate-500 mb-1">Nivel de Dominio</p>
+                                            <p className="text-3xl font-bold text-violet-600">
+                                                {'⭐'.repeat(flashcardProgress.get(viewingStatsFlashcard.id)?.difficulty_level || 1)}
+                                            </p>
+                                            <p className="text-sm font-medium text-slate-700 mt-1">
+                                                Nivel {flashcardProgress.get(viewingStatsFlashcard.id)?.difficulty_level || 1} / 4
+                                            </p>
+                                        </div>
+                                        <div className="bg-slate-50 rounded-2xl p-4 text-center">
+                                            <p className="text-sm text-slate-500 mb-1">Porcentaje de Dominio</p>
+                                            <p className="text-3xl font-bold text-emerald-600">
+                                                {flashcardProgress.get(viewingStatsFlashcard.id)?.mastery_percent || 0}%
+                                            </p>
+                                            <div className="w-full h-2 bg-slate-200 rounded-full mt-2 overflow-hidden">
+                                                <div
+                                                    className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all"
+                                                    style={{ width: `${flashcardProgress.get(viewingStatsFlashcard.id)?.mastery_percent || 0}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Detailed Stats */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-blue-50 rounded-xl p-4">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="material-symbols-outlined text-blue-600 text-lg">check_circle</span>
+                                                <p className="text-sm text-slate-600">Correctas en nivel actual</p>
+                                            </div>
+                                            <p className="text-2xl font-bold text-blue-700">
+                                                {flashcardProgress.get(viewingStatsFlashcard.id)?.correct_at_level || 0}
+                                            </p>
+                                        </div>
+                                        <div className="bg-amber-50 rounded-xl p-4">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="material-symbols-outlined text-amber-600 text-lg">replay</span>
+                                                <p className="text-sm text-slate-600">Intentos en nivel actual</p>
+                                            </div>
+                                            <p className="text-2xl font-bold text-amber-700">
+                                                {flashcardProgress.get(viewingStatsFlashcard.id)?.attempts_at_level || 0}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Level Explanation */}
+                                    <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-4">
+                                        <p className="text-sm text-slate-600">
+                                            {flashcardProgress.get(viewingStatsFlashcard.id)?.difficulty_level === 4
+                                                ? '🎉 ¡Excelente! Has dominado esta tarjeta completamente.'
+                                                : flashcardProgress.get(viewingStatsFlashcard.id)?.difficulty_level === 3
+                                                    ? '💪 Muy bien, estás casi en el nivel máximo.'
+                                                    : flashcardProgress.get(viewingStatsFlashcard.id)?.difficulty_level === 2
+                                                        ? '📈 Buen progreso, sigue practicando para subir de nivel.'
+                                                        : '🚀 Apenas empezando. Practica más para mejorar tu dominio.'}
+                                        </p>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-center py-8">
+                                    <span className="material-symbols-outlined text-5xl text-slate-200 mb-3">school</span>
+                                    <p className="text-slate-500 font-medium">Aún no has estudiado esta tarjeta</p>
+                                    <p className="text-sm text-slate-400 mt-1">Las estadísticas aparecerán después de practicarla.</p>
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-6 bg-slate-50 rounded-b-3xl">
+                            <button
+                                onClick={() => setViewingStatsFlashcard(null)}
+                                className="w-full px-4 py-3 bg-primary text-white font-bold rounded-xl hover:bg-blue-700 transition"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

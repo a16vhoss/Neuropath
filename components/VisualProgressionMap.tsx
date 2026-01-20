@@ -156,14 +156,14 @@ const VisualProgressionMap: React.FC<VisualProgressionMapProps> = ({ studySets, 
                 </h3>
             </div>
 
-            <div className="flex-1 min-h-[300px] -ml-4">
+            <div className="flex-1 min-h-[500px]">
                 {data.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart cx="50%" cy="50%" outerRadius="55%" data={data}>
+                        <RadarChart cx="50%" cy="50%" outerRadius="65%" data={data}>
                             <PolarGrid stroke="#e2e8f0" />
                             <PolarAngleAxis
                                 dataKey="subject"
-                                tick={{ fill: '#64748b', fontSize: 10 }}
+                                tick={{ fill: '#475569', fontSize: 11, fontWeight: 500 }}
                             />
                             <PolarRadiusAxis
                                 angle={30}
