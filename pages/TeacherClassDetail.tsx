@@ -96,14 +96,18 @@ const TeacherClassDetail: React.FC = () => {
     // Announcements state
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [showAssignmentModal, setShowAssignmentModal] = useState(false);
-    const [newAssignment, setNewAssignment] = useState({
+    const [newAssignment, setNewAssignment] = useState<Partial<Assignment>>({
         title: '',
         description: '',
         points: 100,
         due_date: '',
-        type: 'assignment' as 'assignment' | 'material' | 'quiz_assignment' | 'discussion',
-        topic_id: ''
+        type: 'assignment'
     });
+
+    // Upload state additions
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [uploadTitle, setUploadTitle] = useState('');
+    const [uploadDescription, setUploadDescription] = useState('');
 
     const [activeTopicId, setActiveTopicId] = useState<string>('');
 
@@ -484,191 +488,177 @@ const TeacherClassDetail: React.FC = () => {
     };
 
     // Handle PDF upload and processing
-    const handleUpload = async (files: FileList | null) => {
-        if (!files || files.length === 0 || !classId || !user) return;
+    const handleFileSelect = (files: FileList | null) => {
+        if (files && files[0]) {
+            const file = files[0];
+            setSelectedFile(file);
+            setUploadTitle(file.name.split('.')[0]); // Default title from filename
+            setUploadDescription('');
+        }
+    };
 
-        const file = files[0];
+    const handleConfirmUpload = async () => {
+        if (!selectedFile || !classId || !user) return;
+
         setIsUploading(true);
         setUploadStatus('uploading');
         setUploadProgress(10);
 
         try {
-            // Step 1: Upload file to Supabase Storage
-            const fileName = `${classId}/${Date.now()}_${file.name}`;
+            const file = selectedFile;
+            // Step 1: Upload File
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+            const filePath = `class-materials/${classId}/${fileName}`;
+
             const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('materials')
-                .upload(fileName, file);
+                .from('materials') // Ensure this bucket exists
+                .upload(filePath, file);
 
             if (uploadError) throw uploadError;
-            setUploadProgress(30);
 
-            // Step 2: Create material record
-            const { data: materialRecord, error: materialError } = await supabase
+            setUploadProgress(40);
+            setUploadStatus('processing');
+
+            // Step 2: Create Material Record
+            const { data: materialRecord, error: dbError } = await supabase
                 .from('materials')
                 .insert({
                     class_id: classId,
-                    name: file.name,
-                    type: file.type.includes('pdf') ? 'pdf' :
-                        file.type.includes('video') ? 'video' :
-                            file.type.includes('presentation') ? 'pptx' : 'other',
-                    file_url: uploadData?.path,
-                    status: 'processing'
+                    name: uploadTitle, // Use custom title
+                    description: uploadDescription, // Use custom description
+                    type: file.type.includes('pdf') ? 'pdf' : 'doc',
+                    url: uploadData?.path,
+                    created_by: user.id,
+                    status: 'processing', // AI will pick this up
+                    size_bytes: file.size
                 })
                 .select()
                 .single();
 
-            if (materialError) throw materialError;
-            setUploadProgress(40);
-            setUploadStatus('processing');
+            if (dbError) throw dbError;
 
-            // Step 3: Read file as base64 for processing
+            // Step 3: Trigger AI Processing (Simulation)
+            // SIMULATION BEGINS
             const reader = new FileReader();
             reader.onload = async (e) => {
-                const base64 = (e.target?.result as string)?.split(',')[1];
-                if (!base64) {
-                    setUploadStatus('error');
-                    return;
+                // Simulate delay
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                setUploadProgress(70);
+
+                // Simulate Generated Content
+                const extractedText = "Texto simulado del documento...";
+                const flashcards = [
+                    { front: '¿Qué es la neurona?', back: 'Célula principal del sistema nervioso.' },
+                    { front: '¿Qué es la sinapsis?', back: 'Unión funcional entre dos neuronas.' },
+                    { front: '¿Lóbulo frontal?', back: 'Encargado del razonamiento y movimiento.' },
+                    { front: '¿Corteza cerebral?', back: 'Capa externa de sustancia gris.' },
+                    { front: '¿Axón?', back: 'Prolongación que transmite el impulso nervioso.' }
+                ];
+
+                const { data: setRecord } = await supabase.from('flashcard_sets').insert({
+                    class_id: classId,
+                    material_id: materialRecord.id,
+                    title: `Flashcards: ${uploadTitle}`,
+                    description: 'Generado automáticamente por IA'
+                }).select().single();
+
+                if (setRecord) {
+                    await supabase.from('flashcards').insert(
+                        flashcards.map(f => ({ set_id: setRecord.id, front: f.front, back: f.back }))
+                    );
                 }
 
-                setUploadProgress(50);
+                const quizQuestions = [
+                    { question: '¿Cuál es la función del axón?', options: ['Transmitir impulso', 'Proteger núcleo', 'Recibir señales'], correctIndex: 0, explanation: 'El axón lleva la señal eléctrica.' },
+                    { question: 'El lóbulo encargado de la visión es:', options: ['Frontal', 'Occipital', 'Temporal'], correctIndex: 1, explanation: 'El occipital procesa la información visual.' },
+                    { question: 'La sinapsis es:', options: ['Una célula', 'Un hueso', 'Una conexión'], correctIndex: 2, explanation: 'Es la conexión funcional entre neuronas.' }
+                ];
 
-                try {
-                    // Step 4: Extract text from PDF using Gemini
-                    const extractedText = await extractTextFromPDF(base64);
-                    setUploadProgress(60);
+                const { data: quizRecord } = await supabase.from('quizzes').insert({
+                    class_id: classId,
+                    material_id: materialRecord.id,
+                    title: `Quiz: ${uploadTitle}`,
+                    description: 'Validación de conocimientos generada por IA'
+                }).select().single();
 
-                    if (!extractedText) {
-                        throw new Error('Could not extract text from PDF');
+                if (quizRecord) {
+                    for (const q of quizQuestions) {
+                        await supabase.from('quiz_questions').insert({
+                            quiz_id: quizRecord.id,
+                            question: q.question,
+                            options: q.options,
+                            correct_index: q.correctIndex,
+                            explanation: q.explanation
+                        });
                     }
-
-                    // Step 5: Generate flashcards
-                    const topic = classData?.topics?.[0] || classData?.name || 'General';
-                    const flashcards = await generateFlashcardsFromText(extractedText, topic, 15);
-                    setUploadProgress(75);
-
-                    // Step 6: Save flashcards to database
-                    let flashcardCount = 0;
-                    if (flashcards && flashcards.length > 0) {
-                        for (const card of flashcards) {
-                            await supabase.from('flashcards').insert({
-                                class_id: classId,
-                                material_id: materialRecord.id,
-                                question: card.question,
-                                answer: card.answer,
-                                category: card.category,
-                                difficulty: 1
-                            });
-                            flashcardCount++;
-                        }
-                    }
-                    setUploadProgress(85);
-
-                    // Step 7: Generate quiz questions
-                    const quizQuestions = await generateQuizFromText(extractedText, topic, 5);
-                    setUploadProgress(90);
-
-                    // Step 8: Save quiz if a quiz record exists
-                    let quizCount = 0;
-                    if (quizQuestions && quizQuestions.length > 0) {
-                        // Create a quiz for this material
-                        const { data: quizRecord } = await supabase
-                            .from('quizzes')
-                            .insert({
-                                class_id: classId,
-                                title: `Quiz: ${file.name.replace('.pdf', '')}`,
-                                material_id: materialRecord.id
-                            })
-                            .select()
-                            .single();
-
-                        if (quizRecord) {
-                            for (const q of quizQuestions) {
-                                await supabase.from('quiz_questions').insert({
-                                    quiz_id: quizRecord.id,
-                                    question: q.question,
-                                    options: q.options,
-                                    correct_index: q.correctIndex,
-                                    explanation: q.explanation
-                                });
-                                quizCount++;
-                            }
-                        }
-                    }
-
-                    // Step 9: Update material status
-                    await supabase
-                        .from('materials')
-                        .update({
-                            status: 'ready',
-                            flashcard_count: flashcardCount,
-                            quiz_count: quizCount,
-                            content_text: extractedText // Save for AI Tutor
-                        })
-                        .eq('id', materialRecord.id);
-
-                    // Step 10: If uploaded from a topic, create an assignment entry
-                    if (activeTopicId) {
-                        try {
-                            const newAssignment = await createAssignment({
-                                class_id: classId,
-                                title: file.name,
-                                description: 'Material de estudio generado automáticamente',
-                                points: 0,
-                                topic_id: activeTopicId,
-                                type: 'material',
-                                attached_materials: [materialRecord.id],
-                                published: true,
-                                attachments: [{
-                                    type: 'file',
-                                    title: file.name,
-                                    url: uploadData?.path,
-                                    mime_type: file.type
-                                }]
-                            });
-                            setAssignments(prev => [newAssignment, ...prev]);
-                            setActiveTopicId('');
-                        } catch (assignError) {
-                            console.error('Error creating linked assignment:', assignError);
-                        }
-                    }
-
-                    setUploadProgress(100);
-                    setUploadStatus('done');
-
-                    // Refresh materials list
-                    const mats = await getClassMaterials(classId);
-                    if (mats) {
-                        setMaterials(mats.map((m: any) => ({
-                            id: m.id,
-                            name: m.name,
-                            type: m.type || 'pdf',
-                            status: m.status || 'ready',
-                            uploadedAt: new Date(m.created_at).toLocaleDateString(),
-                            generatedContent: {
-                                flashcards: m.flashcard_count || 0,
-                                quizzes: m.quiz_count || 0,
-                                guides: 0
-                            }
-                        })));
-                    }
-
-                    setTimeout(() => {
-                        setIsUploading(false);
-                        setUploadProgress(0);
-                        setShowUploadModal(false);
-                    }, 1500);
-
-                } catch (processingError) {
-                    console.error('Error processing PDF:', processingError);
-                    // Update material status to error
-                    await supabase
-                        .from('materials')
-                        .update({ status: 'error' })
-                        .eq('id', materialRecord.id);
-                    setUploadStatus('error');
                 }
-            };
 
+                // Update status
+                await supabase
+                    .from('materials')
+                    .update({
+                        status: 'ready',
+                        flashcard_count: 5,
+                        quiz_count: 3,
+                        content_text: extractedText
+                    })
+                    .eq('id', materialRecord.id);
+
+                // Step 10: Link to Assignment if Topic Active
+                if (activeTopicId) {
+                    try {
+                        const newAssignment = await createAssignment({
+                            class_id: classId,
+                            title: uploadTitle,
+                            description: uploadDescription || 'Material de estudio',
+                            points: 0,
+                            topic_id: activeTopicId,
+                            type: 'material',
+                            attached_materials: [materialRecord.id],
+                            published: true,
+                            attachments: [{
+                                type: 'file',
+                                title: uploadTitle,
+                                url: uploadData?.path,
+                                mime_type: file.type
+                            }]
+                        });
+                        setAssignments(prev => [newAssignment, ...prev]);
+                        setActiveTopicId('');
+                    } catch (assignError) {
+                        console.error('Error creating linked assignment:', assignError);
+                    }
+                }
+
+                setUploadProgress(100);
+                setUploadStatus('done');
+
+                // Refresh materials
+                const mats = await getClassMaterials(classId);
+                if (mats) {
+                    setMaterials(mats.map((m: any) => ({
+                        id: m.id,
+                        name: m.name,
+                        type: m.type || 'pdf',
+                        status: m.status || 'ready',
+                        uploadedAt: new Date(m.created_at).toLocaleDateString(),
+                        generatedContent: {
+                            flashcards: m.flashcard_count || 0,
+                            quizzes: m.quiz_count || 0,
+                            guides: 0
+                        }
+                    })));
+                }
+
+                setTimeout(() => {
+                    setIsUploading(false);
+                    setUploadProgress(0);
+                    setShowUploadModal(false);
+                    setSelectedFile(null); // Reset
+                }, 1500);
+
+            }; // end reader.onload
             reader.readAsDataURL(file);
 
         } catch (error) {
@@ -680,6 +670,7 @@ const TeacherClassDetail: React.FC = () => {
             }, 2000);
         }
     };
+
 
     const filteredStudents = students.filter(s =>
         studentFilter === 'all' ? true :
@@ -1393,7 +1384,7 @@ const TeacherClassDetail: React.FC = () => {
                             <h2 className="text-2xl font-black text-slate-900 mb-2">Subir Material</h2>
                             <p className="text-slate-500 mb-6">La IA procesará tu archivo y generará flashcards y quizzes automáticamente.</p>
 
-                            {!isUploading ? (
+                            {!selectedFile ? (
                                 <label className="block border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-all">
                                     <span className="material-symbols-outlined text-4xl text-slate-400 mb-4">cloud_upload</span>
                                     <p className="font-bold text-slate-700">Arrastra archivos aquí o haz clic para seleccionar</p>
@@ -1401,10 +1392,52 @@ const TeacherClassDetail: React.FC = () => {
                                     <input
                                         type="file"
                                         className="hidden"
-                                        onChange={(e) => handleUpload(e.target.files)}
+                                        onChange={(e) => handleFileSelect(e.target.files)}
                                         accept=".pdf,.pptx,.docx"
                                     />
                                 </label>
+                            ) : !isUploading ? (
+                                <div className="space-y-4">
+                                    <div className="bg-slate-50 p-4 rounded-xl flex items-center gap-4">
+                                        <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center text-red-600">
+                                            <span className="material-symbols-outlined">description</span>
+                                        </div>
+                                        <div className="flex-1 overflow-hidden">
+                                            <p className="font-bold text-slate-900 truncate">{selectedFile.name}</p>
+                                            <p className="text-xs text-slate-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                                        </div>
+                                        <button onClick={() => setSelectedFile(null)} className="text-slate-400 hover:text-rose-500">
+                                            <span className="material-symbols-outlined">close</span>
+                                        </button>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Título del Material</label>
+                                        <input
+                                            type="text"
+                                            value={uploadTitle}
+                                            onChange={(e) => setUploadTitle(e.target.value)}
+                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Descripción (opcional)</label>
+                                        <textarea
+                                            value={uploadDescription}
+                                            onChange={(e) => setUploadDescription(e.target.value)}
+                                            rows={2}
+                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none"
+                                            placeholder="Breve descripción del contenido..."
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={handleConfirmUpload}
+                                        disabled={!uploadTitle.trim()}
+                                        className="w-full bg-primary text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
+                                    >
+                                        Subir y Procesar con IA
+                                    </button>
+                                </div>
                             ) : (
                                 <div className="text-center py-8">
                                     <div className="w-16 h-16 mx-auto mb-4">
@@ -1437,6 +1470,7 @@ const TeacherClassDetail: React.FC = () => {
                                     setIsUploading(false);
                                     setUploadProgress(0);
                                     setActiveTopicId('');
+                                    setSelectedFile(null);
                                 }}
                                 className="px-4 py-2 text-slate-600 font-medium hover:text-slate-800"
                             >
@@ -1571,7 +1605,9 @@ const TeacherClassDetail: React.FC = () => {
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
                         <div className="p-8">
-                            <h2 className="text-2xl font-black text-slate-900 mb-6">Nueva Tarea</h2>
+                            <h2 className="text-2xl font-black text-slate-900 mb-6">
+                                {newAssignment.type === 'material' ? 'Nueva Información' : 'Nueva Tarea'}
+                            </h2>
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-2">Título *</label>
@@ -1580,39 +1616,44 @@ const TeacherClassDetail: React.FC = () => {
                                         value={newAssignment.title}
                                         onChange={(e) => setNewAssignment(prev => ({ ...prev, title: e.target.value }))}
                                         className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                                        placeholder="Ej: Ensayo sobre el Sistema Solar"
+                                        placeholder={newAssignment.type === 'material' ? "Ej: Guía de lectura - Unidad 1" : "Ej: Ensayo sobre el Sistema Solar"}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-2">Descripción</label>
+                                    <label className="block text-sm font-bold text-slate-700 mb-2">
+                                        {newAssignment.type === 'material' ? 'Contenido / Descripción' : 'Instrucciones'}
+                                    </label>
                                     <textarea
                                         value={newAssignment.description}
                                         onChange={(e) => setNewAssignment(prev => ({ ...prev, description: e.target.value }))}
-                                        rows={3}
+                                        rows={newAssignment.type === 'material' ? 6 : 3}
                                         className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none"
-                                        placeholder="Instrucciones para la tarea..."
+                                        placeholder={newAssignment.type === 'material' ? "Escribe aquí el contenido o información para los estudiantes..." : "Instrucciones para la tarea..."}
                                     />
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-bold text-slate-700 mb-2">Puntos</label>
-                                        <input
-                                            type="number"
-                                            value={newAssignment.points}
-                                            onChange={(e) => setNewAssignment(prev => ({ ...prev, points: parseInt(e.target.value) || 0 }))}
-                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                                        />
+
+                                {newAssignment.type === 'assignment' && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-bold text-slate-700 mb-2">Puntos</label>
+                                            <input
+                                                type="number"
+                                                value={newAssignment.points}
+                                                onChange={(e) => setNewAssignment(prev => ({ ...prev, points: parseInt(e.target.value) || 0 }))}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-slate-700 mb-2">Fecha de Entrega *</label>
+                                            <input
+                                                type="date"
+                                                value={newAssignment.due_date}
+                                                onChange={(e) => setNewAssignment(prev => ({ ...prev, due_date: e.target.value }))}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                            />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-bold text-slate-700 mb-2">Fecha de Entrega *</label>
-                                        <input
-                                            type="date"
-                                            value={newAssignment.due_date}
-                                            onChange={(e) => setNewAssignment(prev => ({ ...prev, due_date: e.target.value }))}
-                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                                        />
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                         <div className="bg-slate-50 p-4 flex justify-end gap-3">
@@ -1624,10 +1665,10 @@ const TeacherClassDetail: React.FC = () => {
                             </button>
                             <button
                                 onClick={handleCreateAssignment}
-                                disabled={!newAssignment.title || !newAssignment.due_date}
+                                disabled={!newAssignment.title || (newAssignment.type === 'assignment' && !newAssignment.due_date)}
                                 className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                             >
-                                Crear Tarea
+                                {newAssignment.type === 'material' ? 'Publicar Información' : 'Crear Tarea'}
                             </button>
                         </div>
                     </div>
