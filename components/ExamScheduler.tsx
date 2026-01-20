@@ -4,6 +4,7 @@ import { supabase } from '../services/supabaseClient';
 
 interface ExamSchedulerProps {
     classId: string;
+    initialTopicId?: string;
     onClose: () => void;
     onCreated: (exam: ScheduledExam) => void;
 }
@@ -14,7 +15,7 @@ interface Quiz {
     question_count: number;
 }
 
-const ExamScheduler: React.FC<ExamSchedulerProps> = ({ classId, onClose, onCreated }) => {
+const ExamScheduler: React.FC<ExamSchedulerProps> = ({ classId, initialTopicId, onClose, onCreated }) => {
     const [quizzes, setQuizzes] = useState<Quiz[]>([]);
     const [topics, setTopics] = useState<ClassTopic[]>([]);
     const [loading, setLoading] = useState(true);
@@ -30,7 +31,7 @@ const ExamScheduler: React.FC<ExamSchedulerProps> = ({ classId, onClose, onCreat
     const [endDate, setEndDate] = useState('');
     const [endTime, setEndTime] = useState('23:59');
     const [durationMinutes, setDurationMinutes] = useState(60);
-    const [topicId, setTopicId] = useState('');
+    const [topicId, setTopicId] = useState(initialTopicId || '');
     const [allowRetakes, setAllowRetakes] = useState(false);
     const [maxAttempts, setMaxAttempts] = useState(1);
     const [shuffleQuestions, setShuffleQuestions] = useState(true);

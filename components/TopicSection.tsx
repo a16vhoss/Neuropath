@@ -11,7 +11,10 @@ interface TopicSectionProps {
     onDeleteAssignment?: (assignment: Assignment) => void;
     onEditTopic?: () => void;
     onDeleteTopic?: () => void;
-    onAddAssignment?: () => void;
+    onAddInfo?: () => void;
+    onAddTask?: () => void;
+    onAddExam?: () => void;
+    onAddMaterial?: () => void;
     collapsed?: boolean;
     onToggleCollapse?: () => void;
 }
@@ -25,14 +28,33 @@ const TopicSection: React.FC<TopicSectionProps> = ({
     onDeleteAssignment,
     onEditTopic,
     onDeleteTopic,
-    onAddAssignment,
+    onAddInfo,
+    onAddTask,
+    onAddExam,
+    onAddMaterial,
     collapsed = false,
     onToggleCollapse
 }) => {
+    const [showAddMenu, setShowAddMenu] = React.useState(false);
+    const menuRef = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setShowAddMenu(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
     return (
         <div className="mb-6">
             {/* Topic Header */}
-            <div className="flex items-center gap-3 mb-3 group">
+            <div className="flex items-center gap-3 mb-3 group relative">
                 <button
                     onClick={onToggleCollapse}
                     className="flex items-center gap-2 flex-1 text-left"
@@ -45,16 +67,54 @@ const TopicSection: React.FC<TopicSectionProps> = ({
                 </button>
 
                 {isTeacher && (
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                        {onAddAssignment && (
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition items-center">
+                        {/* New Add Button with Dropdown */}
+                        <div className="relative" ref={menuRef}>
                             <button
-                                onClick={onAddAssignment}
-                                className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
-                                title="Añadir tarea"
+                                onClick={() => setShowAddMenu(!showAddMenu)}
+                                className={`p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition ${showAddMenu ? 'bg-emerald-50 text-emerald-600' : ''}`}
+                                title="Añadir contenido"
                             >
                                 <span className="material-symbols-outlined text-lg">add</span>
                             </button>
-                        )}
+
+                            {/* Dropdown Menu */}
+                            {showAddMenu && (
+                                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <div className="p-1">
+                                        <button
+                                            onClick={() => { onAddInfo?.(); setShowAddMenu(false); }}
+                                            className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-primary rounded-lg flex items-center gap-2 transition"
+                                        >
+                                            <span className="material-symbols-outlined text-lg">info</span>
+                                            Información
+                                        </button>
+                                        <button
+                                            onClick={() => { onAddTask?.(); setShowAddMenu(false); }}
+                                            className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-primary rounded-lg flex items-center gap-2 transition"
+                                        >
+                                            <span className="material-symbols-outlined text-lg">assignment</span>
+                                            Tarea / Actividad
+                                        </button>
+                                        <button
+                                            onClick={() => { onAddExam?.(); setShowAddMenu(false); }}
+                                            className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-primary rounded-lg flex items-center gap-2 transition"
+                                        >
+                                            <span className="material-symbols-outlined text-lg">quiz</span>
+                                            Examen
+                                        </button>
+                                        <button
+                                            onClick={() => { onAddMaterial?.(); setShowAddMenu(false); }}
+                                            className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-primary rounded-lg flex items-center gap-2 transition"
+                                        >
+                                            <span className="material-symbols-outlined text-lg">folder_open</span>
+                                            Material de Estudio
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         {onEditTopic && (
                             <button
                                 onClick={onEditTopic}
@@ -82,7 +142,7 @@ const TopicSection: React.FC<TopicSectionProps> = ({
                 <div className="space-y-2 pl-6 border-l-2 border-slate-100">
                     {assignments.length === 0 ? (
                         <div className="text-sm text-slate-400 py-4 text-center">
-                            No hay tareas en este tema
+                            No hay contenido en este módulo
                         </div>
                     ) : (
                         assignments.map((assignment) => (

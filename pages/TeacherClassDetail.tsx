@@ -100,8 +100,12 @@ const TeacherClassDetail: React.FC = () => {
         title: '',
         description: '',
         points: 100,
-        due_date: ''
+        due_date: '',
+        type: 'assignment' as 'assignment' | 'material' | 'quiz_assignment' | 'discussion',
+        topic_id: ''
     });
+
+    const [activeTopicId, setActiveTopicId] = useState<string>('');
 
     const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
     const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
@@ -386,12 +390,13 @@ const TeacherClassDetail: React.FC = () => {
                 description: newAssignment.description,
                 points: newAssignment.points,
                 due_date: newAssignment.due_date,
-                topic_id: newAssignment.topic_id || undefined
+                topic_id: newAssignment.topic_id || undefined,
+                type: newAssignment.type
             });
 
             setAssignments(prev => [assignment, ...prev]);
             setShowAssignmentModal(false);
-            setNewAssignment({ title: '', description: '', points: 100, due_date: '', topic_id: '' });
+            setNewAssignment({ title: '', description: '', points: 100, due_date: '', type: 'assignment', topic_id: '' });
         } catch (error) {
             console.error('Error creating assignment:', error);
         }
@@ -600,6 +605,32 @@ const TeacherClassDetail: React.FC = () => {
                             content_text: extractedText // Save for AI Tutor
                         })
                         .eq('id', materialRecord.id);
+
+                    // Step 10: If uploaded from a topic, create an assignment entry
+                    if (activeTopicId) {
+                        try {
+                            const newAssignment = await createAssignment({
+                                class_id: classId,
+                                title: file.name,
+                                description: 'Material de estudio generado automáticamente',
+                                points: 0,
+                                topic_id: activeTopicId,
+                                type: 'material',
+                                attached_materials: [materialRecord.id],
+                                published: true,
+                                attachments: [{
+                                    type: 'file',
+                                    title: file.name,
+                                    url: uploadData?.path,
+                                    mime_type: file.type
+                                }]
+                            });
+                            setAssignments(prev => [newAssignment, ...prev]);
+                            setActiveTopicId('');
+                        } catch (assignError) {
+                            console.error('Error creating linked assignment:', assignError);
+                        }
+                    }
 
                     setUploadProgress(100);
                     setUploadStatus('done');
@@ -843,9 +874,36 @@ const TeacherClassDetail: React.FC = () => {
                                         }}
                                         onDeleteTopic={() => handleDeleteTopic(topic.id)}
                                         onDeleteAssignment={(assignment) => handleDeleteAssignment(assignment.id)}
-                                        onAddAssignment={() => {
-                                            setNewAssignment(prev => ({ ...prev, topic_id: topic.id }));
+                                        onAddInfo={() => {
+                                            setNewAssignment({
+                                                title: '',
+                                                description: '',
+                                                points: 0,
+                                                due_date: new Date().toISOString().split('T')[0],
+                                                type: 'material',
+                                                topic_id: topic.id
+                                            });
                                             setShowAssignmentModal(true);
+                                        }}
+                                        onAddTask={() => {
+                                            setNewAssignment({
+                                                title: '',
+                                                description: '',
+                                                points: 100,
+                                                due_date: '',
+                                                type: 'assignment',
+                                                topic_id: topic.id
+                                            });
+                                            setShowAssignmentModal(true);
+                                        }}
+                                        onAddExam={() => {
+                                            setActiveTopicId(topic.id);
+                                            setShowExamScheduler(true);
+                                            // TODO: Pre-select topic in ExamScheduler if possible
+                                        }}
+                                        onAddMaterial={() => {
+                                            setActiveTopicId(topic.id);
+                                            setShowUploadModal(true);
                                         }}
                                     />
                                 ))}
@@ -1314,10 +1372,15 @@ const TeacherClassDetail: React.FC = () => {
             {showExamScheduler && classId && (
                 <ExamScheduler
                     classId={classId}
-                    onClose={() => setShowExamScheduler(false)}
+                    initialTopicId={activeTopicId}
+                    onClose={() => {
+                        setShowExamScheduler(false);
+                        setActiveTopicId('');
+                    }}
                     onCreated={(newExam) => {
                         setScheduledExams(prev => [newExam, ...prev]);
                         setShowExamScheduler(false);
+                        setActiveTopicId('');
                     }}
                 />
             )}
@@ -1369,7 +1432,12 @@ const TeacherClassDetail: React.FC = () => {
                         </div>
                         <div className="bg-slate-50 p-4 flex justify-end gap-3">
                             <button
-                                onClick={() => { setShowUploadModal(false); setIsUploading(false); setUploadProgress(0); }}
+                                onClick={() => {
+                                    setShowUploadModal(false);
+                                    setIsUploading(false);
+                                    setUploadProgress(0);
+                                    setActiveTopicId('');
+                                }}
                                 className="px-4 py-2 text-slate-600 font-medium hover:text-slate-800"
                             >
                                 {uploadStatus === 'done' ? 'Cerrar' : 'Cancelar'}
