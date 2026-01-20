@@ -516,3 +516,52 @@ export const generatePodcastScript = async (context: string) => {
     return [];
   }
 };
+
+export const autoCategorizeFlashcards = async (flashcards: { id: string, question: string, answer: string }[]) => {
+  if (!API_KEY) return [];
+
+  try {
+    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    // Process in batches if too many
+    const subset = flashcards.slice(0, 50); // Limit to 50 for now to avoid context limits
+
+    const flashcardsData = subset.map(f => `ID: ${f.id}\nQ: ${f.question}\nA: ${f.answer}`).join('\n\n');
+
+    const prompt = `
+      Actúa como un experto organizador de contenido educativo.
+      Analiza las siguientes ${subset.length} flashcards y agrúpalas en 3 a 5 categorías temáticas distintas y descriptivas (ej. "Conceptos Básicos", "Historia", "Aplicación", "Teoría", etc.).
+      
+      IMPORTANTE:
+      1. Asigna una categoría a CADA flashcard.
+      2. Crea al menos 3 categorías diferentes si el contenido lo permite.
+      3. Las categorías deben ser breves (1-2 palabras), en Español.
+
+      Flashcards:
+      ${flashcardsData}
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              category: { type: Type.STRING }
+            },
+            required: ["id", "category"]
+          }
+        }
+      }
+    });
+
+    return JSON.parse(response.text || "[]") as { id: string, category: string }[];
+  } catch (e) {
+    console.error("Failed to auto-categorize flashcards", e);
+    return [];
+  }
+};

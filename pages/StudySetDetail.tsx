@@ -15,7 +15,7 @@ import {
     createMaterialWithFlashcards
 } from '../services/supabaseClient';
 import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary } from '../services/pdfProcessingService';
-import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL } from '../services/geminiService';
+import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL, autoCategorizeFlashcards } from '../services/geminiService';
 import CumulativeReportsCard from '../components/CumulativeReportsCard';
 import VisualProgressionMap from '../components/VisualProgressionMap';
 
@@ -236,6 +236,31 @@ const StudySetDetail: React.FC = () => {
             setEditingFlashcard(null);
         } catch (error) {
             console.error('Error updating flashcard:', error);
+        }
+    };
+
+    const handleAutoCategorize = async () => {
+        if (!studySet || studySet.flashcards.length === 0) return;
+        setUploading(true); // Reuse uploading spinner state
+
+        try {
+            const categorized = await autoCategorizeFlashcards(studySet.flashcards);
+
+            // Batch update is best, but for now we loop or use a supabase RPC if available.
+            // Let's loop for simplicity as the set size is usually small (<100) or use the upsert if we had it exposed.
+            // We will update one by one for safety or use a Promise.all
+
+            await Promise.all(categorized.map(c =>
+                updateFlashcard(c.id, { category: c.category })
+            ));
+
+            // Refresh data
+            loadStudySet();
+        } catch (error) {
+            console.error('Error auto-categorizing:', error);
+            alert('Error al categorizar automáticamente.');
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -797,13 +822,24 @@ const StudySetDetail: React.FC = () => {
                     <div>
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-slate-900">Flashcards</h3>
-                            <button
-                                onClick={() => setShowAddFlashcard(true)}
-                                className="flex items-center gap-2 bg-primary text-white font-medium px-4 py-2 rounded-xl hover:bg-blue-700 transition"
-                            >
-                                <span className="material-symbols-outlined">add</span>
-                                Nueva Flashcard
-                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleAutoCategorize}
+                                    disabled={uploading || studySet.flashcards.length === 0}
+                                    className="flex items-center gap-2 bg-indigo-100 text-indigo-700 font-medium px-4 py-2 rounded-xl hover:bg-indigo-200 transition disabled:opacity-50"
+                                    title="Organizar automáticamente con IA"
+                                >
+                                    <span className="material-symbols-outlined text-lg">auto_awesome</span>
+                                    {uploading ? 'Categorizando...' : 'Auto-Categorizar'}
+                                </button>
+                                <button
+                                    onClick={() => setShowAddFlashcard(true)}
+                                    className="flex items-center gap-2 bg-primary text-white font-medium px-4 py-2 rounded-xl hover:bg-blue-700 transition"
+                                >
+                                    <span className="material-symbols-outlined">add</span>
+                                    Nueva Flashcard
+                                </button>
+                            </div>
                         </div>
 
                         {studySet.flashcards.length === 0 ? (
