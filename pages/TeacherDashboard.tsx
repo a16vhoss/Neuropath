@@ -126,19 +126,42 @@ const TeacherDashboard: React.FC = () => {
           <span className="font-extrabold text-xl tracking-tighter text-slate-900">NEUROPATH</span>
         </div>
         <nav className="flex-1 p-4 space-y-2">
-          <div className="bg-primary/5 text-primary p-3 rounded-lg flex items-center gap-3 font-bold">
+          <div
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="bg-primary/5 text-primary p-3 rounded-lg flex items-center gap-3 font-bold cursor-pointer"
+          >
             <span className="material-symbols-outlined">dashboard</span> Panel
           </div>
-          <div className="text-slate-600 p-3 rounded-lg flex items-center gap-3 font-medium hover:bg-slate-50 cursor-pointer">
+          <div
+            onClick={() => document.getElementById('mis-clases')?.scrollIntoView({ behavior: 'smooth' })}
+            className="text-slate-600 p-3 rounded-lg flex items-center gap-3 font-medium hover:bg-slate-50 cursor-pointer"
+          >
             <span className="material-symbols-outlined">school</span> Mis Clases
           </div>
-          <div className="text-slate-600 p-3 rounded-lg flex items-center gap-3 font-medium hover:bg-slate-50 cursor-pointer">
+          <div
+            onClick={() => {
+              if (classes.length > 0) {
+                navigate(`/teacher/analytics/${classes[0].id}`);
+              }
+            }}
+            className="text-slate-600 p-3 rounded-lg flex items-center gap-3 font-medium hover:bg-slate-50 cursor-pointer"
+          >
             <span className="material-symbols-outlined">analytics</span> Analíticas
           </div>
-          <div className="text-slate-600 p-3 rounded-lg flex items-center gap-3 font-medium hover:bg-slate-50 cursor-pointer">
+          <div
+            onClick={() => {
+              if (classes.length > 0) {
+                navigate(`/teacher/class/${classes[0].id}?tab=materials`);
+              }
+            }}
+            className="text-slate-600 p-3 rounded-lg flex items-center gap-3 font-medium hover:bg-slate-50 cursor-pointer"
+          >
             <span className="material-symbols-outlined">folder</span> Materiales
           </div>
-          <div className="text-slate-600 p-3 rounded-lg flex items-center gap-3 font-medium hover:bg-slate-50 cursor-pointer">
+          <div
+            onClick={() => alert('Configuración próximamente')}
+            className="text-slate-600 p-3 rounded-lg flex items-center gap-3 font-medium hover:bg-slate-50 cursor-pointer"
+          >
             <span className="material-symbols-outlined">settings</span> Configuración
           </div>
         </nav>
@@ -224,7 +247,7 @@ const TeacherDashboard: React.FC = () => {
         )}
 
         {/* Classes Grid */}
-        <section>
+        <section id="mis-clases">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <span className="w-1.5 h-6 bg-primary rounded-full"></span> Mis Clases
