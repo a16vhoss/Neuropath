@@ -1214,10 +1214,14 @@ const StudySession: React.FC = () => {
                       className="w-full h-40 p-4 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all resize-none text-slate-700"
                     />
 
-                    {!showResult && designAnswer.length > 10 && (
+                    {!showResult && (
                       <button
                         onClick={() => handleQuizAnswer(0, designAnswer)}
-                        className="w-full py-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition-all"
+                        disabled={!designAnswer.trim()}
+                        className={`w-full py-4 font-bold rounded-xl transition-all ${designAnswer.trim()
+                            ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-md transform hover:-translate-y-1'
+                            : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          }`}
                       >
                         Enviar mi Solución
                       </button>
