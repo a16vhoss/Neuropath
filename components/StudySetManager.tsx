@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { updateStudySet, deleteStudySet, getStudySetFlashcards, updateFlashcard, deleteFlashcard, addFlashcardToStudySet } from '../services/supabaseClient';
+import CumulativeReportsCard from './CumulativeReportsCard';
+import VisualProgressionMap from './VisualProgressionMap';
 
 interface Flashcard {
     id: string;
@@ -22,7 +24,7 @@ interface StudySetManagerProps {
 }
 
 const StudySetManager: React.FC<StudySetManagerProps> = ({ studySet, onClose, onUpdate }) => {
-    const [activeTab, setActiveTab] = useState<'details' | 'content'>('details');
+    const [activeTab, setActiveTab] = useState<'details' | 'content' | 'reports'>('details');
     const [name, setName] = useState(studySet.name);
     const [description, setDescription] = useState(studySet.description || '');
     const [topics, setTopics] = useState(studySet.topics?.join(', ') || '');
@@ -140,10 +142,16 @@ const StudySetManager: React.FC<StudySetManagerProps> = ({ studySet, onClose, on
                     >
                         Content ({flashcards.length} cards)
                     </button>
+                    <button
+                        className={`flex-1 p-3 font-medium text-sm ${activeTab === 'reports' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+                        onClick={() => setActiveTab('reports')}
+                    >
+                        Reportes
+                    </button>
                 </div>
 
                 <div className="p-6 overflow-y-auto flex-1">
-                    {activeTab === 'details' ? (
+                    {activeTab === 'details' && (
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
@@ -190,7 +198,9 @@ const StudySetManager: React.FC<StudySetManagerProps> = ({ studySet, onClose, on
                                 </button>
                             </div>
                         </div>
-                    ) : (
+                    )}
+
+                    {activeTab === 'content' && (
                         <div className="space-y-6">
                             {/* Add New Card Form */}
                             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -287,7 +297,18 @@ const StudySetManager: React.FC<StudySetManagerProps> = ({ studySet, onClose, on
                             </div>
                         </div>
                     )}
+
+                    {activeTab === 'reports' && (
+                        <div className="space-y-6 pb-6">
+                            <h3 className="text-lg font-semibold text-gray-800">Progreso en este Set</h3>
+                            <div className="grid grid-cols-1 gap-6">
+                                <VisualProgressionMap studySetId={studySet.id} />
+                                <CumulativeReportsCard studySetId={studySet.id} />
+                            </div>
+                        </div>
+                    )}
                 </div>
+
             </div>
         </div>
     );

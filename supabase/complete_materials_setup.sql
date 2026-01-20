@@ -64,4 +64,5 @@ with check ( bucket_id = 'materials' );
 create policy "Users can view materials"
 on storage.objects for select
 to public
+
 using ( bucket_id = 'materials' );

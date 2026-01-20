@@ -20,7 +20,11 @@ interface WeeklyStats {
     studyTime: number; // estimated minutes
 }
 
-const CumulativeReportsCard: React.FC = () => {
+interface CumulativeReportsCardProps {
+    studySetId?: string;
+}
+
+const CumulativeReportsCard: React.FC<CumulativeReportsCardProps> = ({ studySetId }) => {
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -36,158 +40,153 @@ const CumulativeReportsCard: React.FC = () => {
         if (user) {
             fetchReports();
         }
-    }, [user]);
+    }, [user, studySetId]);
 
     const fetchReports = async () => {
         setLoading(true);
         try {
-            // Fetch quiz sessions WITHOUT join (avoid PGRST200 error)
-            const { data: quizSessions, error: quizError } = await supabase
+            // Fetch quiz sessions
+            let quizQuery = supabase
                 .from('quiz_sessions')
                 .select('id, created_at, score, total_questions, study_set_id')
                 .eq('user_id', user!.id)
                 .order('created_at', { ascending: false })
                 .limit(50);
 
+            if (studySetId) {
+                quizQuery = quizQuery.eq('study_set_id', studySetId);
+            }
+
+            const { data: quizSessions, error: quizError } = await quizQuery;
             if (quizError) console.error('Quiz sessions error:', quizError);
 
-            // Fetch adaptive study sessions WITHOUT join (avoid PGRST200 error)
-            const { data: adaptiveSessions, error: adaptiveError } = await supabase
+            // Fetch adaptive study sessions
+            let adaptiveQuery = supabase
                 .from('adaptive_study_sessions')
                 .select('id, created_at, mode, cards_correct, cards_studied, study_set_id, started_at, ended_at, duration_seconds')
                 .eq('user_id', user!.id)
                 .order('created_at', { ascending: false })
                 .limit(50);
 
+            if (studySetId) {
+                adaptiveQuery = adaptiveQuery.eq('study_set_id', studySetId);
+            }
+
+            const { data: adaptiveSessions, error: adaptiveError } = await adaptiveQuery;
             if (adaptiveError) console.error('Adaptive sessions error:', adaptiveError);
 
-            // Fetch review_logs for more accurate data (last 7 days)
-            const weekAgo = new Date();
-            weekAgo.setDate(weekAgo.getDate() - 7);
+            // Combine and process sessions
+            const allSessions: SessionSummary[] = [];
+            const studySetNames = new Map<string, string>(); // We might need names if not in single set mode
 
-            const { data: reviewLogs, error: reviewError } = await supabase
-                .from('review_logs')
-                .select('id, rating, reviewed_at, response_time_ms, session_id')
-                .eq('user_id', user!.id)
-                .gte('reviewed_at', weekAgo.toISOString())
-                .order('reviewed_at', { ascending: false });
+            // If we are NOT in single set mode, we need to fetch set names logic (omitted for brevity if studySetId is present, but kept for compatibility)
+            // Actually, let's just fetch names for the sets we encountered if we are global
+            const studySetIds = new Set<string>();
+            if (!studySetId) {
+                (quizSessions || []).forEach(s => s.study_set_id && studySetIds.add(s.study_set_id));
+                (adaptiveSessions || []).forEach(s => s.study_set_id && studySetIds.add(s.study_set_id));
 
-            if (reviewError) console.error('Review logs error:', reviewError);
+                if (studySetIds.size > 0) {
+                    const { data: studySets } = await supabase
+                        .from('study_sets')
+                        .select('id, name')
+                        .in('id', Array.from(studySetIds));
+                    studySets?.forEach(s => studySetNames.set(s.id, s.name));
+                }
+            }
 
-            // Group review logs by session or by day (for flashcard sessions without session_id)
-            const reviewsByDay = new Map<string, { total: number; correct: number; timeMs: number }>();
-
-            (reviewLogs || []).forEach(log => {
-                const dateKey = new Date(log.reviewed_at).toDateString();
-                const existing = reviewsByDay.get(dateKey) || { total: 0, correct: 0, timeMs: 0 };
-                existing.total += 1;
-                existing.correct += (log.rating >= 3) ? 1 : 0;
-                existing.timeMs += log.response_time_ms || 0;
-                reviewsByDay.set(dateKey, existing);
+            // Process Quizzes
+            (quizSessions || []).forEach(s => {
+                allSessions.push({
+                    id: s.id,
+                    created_at: s.created_at,
+                    mode: 'Quiz',
+                    study_set_id: s.study_set_id,
+                    study_set_name: studySetNames.get(s.study_set_id) || 'Unknown Set',
+                    score: s.score,
+                    total: s.total_questions,
+                    accuracy: s.total_questions > 0 ? Math.round((s.score / s.total_questions) * 100) : 0
+                });
             });
 
-            // Collect all unique study_set_ids to fetch names separately
-            const studySetIds = new Set<string>();
-            (quizSessions || []).forEach(s => s.study_set_id && studySetIds.add(s.study_set_id));
-            (adaptiveSessions || []).forEach(s => s.study_set_id && studySetIds.add(s.study_set_id));
-
-            // Fetch study set names separately (avoid PGRST200 join errors)
-            const studySetNames = new Map<string, string>();
-            if (studySetIds.size > 0) {
-                const { data: studySets } = await supabase
-                    .from('study_sets')
-                    .select('id, name')
-                    .in('id', Array.from(studySetIds));
-
-                (studySets || []).forEach(s => studySetNames.set(s.id, s.name));
-            }
-
-            // Merge and format sessions from quiz_sessions and adaptive_study_sessions
-            const allSessions: SessionSummary[] = [];
-
-            if (quizSessions) {
-                quizSessions.forEach(s => {
-                    allSessions.push({
-                        id: s.id,
-                        created_at: s.created_at,
-                        study_set_name: studySetNames.get(s.study_set_id) || 'Set Desconocido',
-                        study_set_id: s.study_set_id,
-                        mode: 'quiz',
-                        score: s.score || 0,
-                        total: s.total_questions || 0,
-                        accuracy: s.total_questions ? Math.round((s.score / s.total_questions) * 100) : 0
-                    });
+            // Process Adaptive
+            (adaptiveSessions || []).forEach(s => {
+                allSessions.push({
+                    id: s.id,
+                    created_at: s.created_at,
+                    mode: s.mode === 'cramming' ? 'Cramming' : 'Adaptive',
+                    study_set_id: s.study_set_id,
+                    study_set_name: studySetNames.get(s.study_set_id) || 'Unknown Set',
+                    score: s.cards_correct,
+                    total: s.cards_studied,
+                    accuracy: s.cards_studied > 0 ? Math.round((s.cards_correct / s.cards_studied) * 100) : 0
                 });
-            }
+            });
 
-            if (adaptiveSessions) {
-                adaptiveSessions.forEach(s => {
-                    allSessions.push({
-                        id: s.id,
-                        created_at: s.created_at,
-                        study_set_name: studySetNames.get(s.study_set_id) || 'Set Desconocido',
-                        study_set_id: s.study_set_id,
-                        mode: s.mode || 'flashcards',
-                        score: s.cards_correct || 0,
-                        total: s.cards_studied || 0,
-                        accuracy: s.cards_studied ? Math.round((s.cards_correct / s.cards_studied) * 100) : 0
-                    });
-                });
-            }
-
-            // Sort by date
             allSessions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
             setSessions(allSessions);
 
-            // Calculate weekly stats using review_logs for accuracy
-            const reviewLogStats = {
-                totalQuestions: (reviewLogs || []).length,
-                totalCorrect: (reviewLogs || []).filter(r => r.rating >= 3).length,
-                totalTimeMs: (reviewLogs || []).reduce((sum, r) => sum + (r.response_time_ms || 0), 0)
-            };
+            // CALCULATE STATS
+            if (studySetId) {
+                // If filtering by set, calculate stats from the fetched sessions directly
+                let totalQ = 0;
+                let totalCorrect = 0;
+                let totalTimeSeconds = 0;
 
-            // Use review_logs data if available, otherwise fallback to session data
-            const weeklySessions = allSessions.filter(s => new Date(s.created_at) >= weekAgo);
+                allSessions.forEach(s => {
+                    totalQ += s.total;
+                    // Approximate correct for quiz if not explicit (score is correct count)
+                    totalCorrect += s.score;
 
-            // Calculate total time from adaptive sessions with duration, or estimate from review logs
-            let totalStudyTimeMinutes = 0;
-
-            // First try to get real duration from adaptive sessions
-            (adaptiveSessions || []).forEach(s => {
-                if (new Date(s.created_at) >= weekAgo) {
-                    if (s.duration_seconds) {
-                        totalStudyTimeMinutes += s.duration_seconds / 60;
-                    } else if (s.started_at && s.ended_at) {
-                        const duration = (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 1000 / 60;
-                        totalStudyTimeMinutes += Math.min(duration, 60); // Cap at 60 min per session
+                    // Time is tricky. Adaptive has duration_seconds. Quiz doesn't usually.
+                    // We can estimate quiz time or just sum adaptive.
+                    // For now, let's use what we have.
+                    const adaptiveSession = adaptiveSessions?.find(as => as.id === s.id);
+                    if (adaptiveSession) {
+                        totalTimeSeconds += adaptiveSession.duration_seconds || 0;
+                    } else {
+                        // Estimate 30s per quiz question
+                        totalTimeSeconds += (s.total * 30);
                     }
-                }
-            });
+                });
 
-            // If no duration data, estimate from review logs (avg 15 sec per question)
-            if (totalStudyTimeMinutes === 0 && reviewLogStats.totalQuestions > 0) {
-                totalStudyTimeMinutes = Math.max(1, Math.round(reviewLogStats.totalTimeMs / 1000 / 60));
-                // Fallback: if response times weren't tracked, estimate 15 sec per question
-                if (totalStudyTimeMinutes === 0) {
-                    totalStudyTimeMinutes = Math.round(reviewLogStats.totalQuestions * 0.25); // 15 sec per question
-                }
+                setWeeklyStats({
+                    totalSessions: allSessions.length,
+                    totalQuestions: totalQ,
+                    avgAccuracy: totalQ > 0 ? Math.round((totalCorrect / totalQ) * 100) : 0,
+                    studyTime: Math.round(totalTimeSeconds / 60)
+                });
+
+            } else {
+                // GLOBAL MODE: Keep existing logic using review_logs for weekly stats
+                // Fetch review_logs for last 7 days
+                const weekAgo = new Date();
+                weekAgo.setDate(weekAgo.getDate() - 7);
+
+                const { data: reviewLogs, error: reviewError } = await supabase
+                    .from('review_logs')
+                    .select('id, rating, reviewed_at, response_time_ms')
+                    .eq('user_id', user!.id)
+                    .gte('reviewed_at', weekAgo.toISOString());
+
+                if (reviewError) console.error('Review logs error:', reviewError);
+
+                let totalCorrect = 0;
+                let totalTimeMs = 0;
+                const totalReviewed = reviewLogs?.length || 0;
+
+                reviewLogs?.forEach(log => {
+                    if (log.rating >= 3) totalCorrect++;
+                    totalTimeMs += log.response_time_ms || 0;
+                });
+
+                setWeeklyStats({
+                    totalSessions: allSessions.length, // Total sessions ever (fetched 50 limit)
+                    totalQuestions: totalReviewed, // In last week
+                    avgAccuracy: totalReviewed > 0 ? Math.round((totalCorrect / totalReviewed) * 100) : 0,
+                    studyTime: Math.round(totalTimeMs / 1000 / 60)
+                });
             }
-
-            // Use the better data source for questions/accuracy
-            const finalTotalQuestions = reviewLogStats.totalQuestions > 0
-                ? reviewLogStats.totalQuestions
-                : weeklySessions.reduce((sum, s) => sum + s.total, 0);
-
-            const finalTotalCorrect = reviewLogStats.totalQuestions > 0
-                ? reviewLogStats.totalCorrect
-                : weeklySessions.reduce((sum, s) => sum + s.score, 0);
-
-            setWeeklyStats({
-                totalSessions: weeklySessions.length || (reviewLogStats.totalQuestions > 0 ? 1 : 0),
-                totalQuestions: finalTotalQuestions,
-                avgAccuracy: finalTotalQuestions > 0 ? Math.round((finalTotalCorrect / finalTotalQuestions) * 100) : 0,
-                studyTime: Math.max(1, Math.round(totalStudyTimeMinutes))
-            });
 
         } catch (error) {
             console.error('Error fetching reports:', error);
@@ -195,6 +194,8 @@ const CumulativeReportsCard: React.FC = () => {
             setLoading(false);
         }
     };
+
+
 
     const formatDate = (dateStr: string) => {
         const date = new Date(dateStr);

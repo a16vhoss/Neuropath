@@ -15,60 +15,104 @@ interface ProgressionData {
 
 interface VisualProgressionMapProps {
     studySets: StudySet[];
+    studySetId?: string; // Optional: to focus on a single set
 }
 
-const VisualProgressionMap: React.FC<VisualProgressionMapProps> = ({ studySets }) => {
+const VisualProgressionMap: React.FC<VisualProgressionMapProps> = ({ studySets, studySetId }) => {
     const [data, setData] = useState<ProgressionData[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchMasteryLevels = async () => {
-            if (!studySets.length) {
-                setLoading(false);
-                return;
-            }
-
+            setLoading(true);
             try {
-                const promises = studySets.map(async (set) => {
-                    // Fetch flashcards mastery for this set
+                if (studySetId) {
+                    // SINGLE SET MODE: Breakdown by Category (Topic)
+                    // Fetch all flashcards for this set with their mastery
                     const { data: cards, error } = await supabase
                         .from('flashcards')
-                        .select('id, srs:flashcard_srs(mastery_level)')
-                        .eq('study_set_id', set.id);
+                        .select('id, category, srs:flashcard_srs(mastery_level)')
+                        .eq('study_set_id', studySetId);
 
                     if (error) throw error;
 
                     if (!cards || cards.length === 0) {
-                        return {
-                            subject: set.name.length > 15 ? set.name.substring(0, 15) + '...' : set.name,
-                            mastery: 0,
-                            fullMark: 4
-                        };
+                        setData([]);
+                        return;
                     }
 
-                    // Calculate average mastery (0-4)
-                    let totalMastery = 0;
-                    let ratedCards = 0;
+                    // Group by category
+                    const categoryMap = new Map<string, { total: number; count: number }>();
+                    let hasCategories = false;
 
                     cards.forEach((card: any) => {
-                        if (card.srs && card.srs.length > 0) {
-                            totalMastery += card.srs[0].mastery_level;
-                            ratedCards++;
-                        }
+                        const cat = card.category || 'General';
+                        if (card.category) hasCategories = true;
+
+                        const mastery = (card.srs && card.srs.length > 0) ? card.srs[0].mastery_level : 0;
+
+                        const existing = categoryMap.get(cat) || { total: 0, count: 0 };
+                        existing.total += mastery;
+                        existing.count++;
+                        categoryMap.set(cat, existing);
                     });
 
-                    const avgMastery = ratedCards > 0 ? (totalMastery / cards.length) : 0; // Normalize by total cards? or rated cards? FSRS usually tracks mastery of reviewed items.
-                    // Let's use average of ALL cards to show true set completion. Unseen cards are 0.
+                    // If NO cards have categories (all are 'General'), maybe we can't show a radar chart?
+                    // We will show it anyway, it will just have 1 axis "General" which looks weird.
+                    // If so, we might need a fallback or just show it.
 
-                    return {
-                        subject: set.name.length > 15 ? set.name.substring(0, 15) + '...' : set.name,
-                        mastery: parseFloat(avgMastery.toFixed(2)),
+                    const results: ProgressionData[] = Array.from(categoryMap.entries()).map(([cat, stats]) => ({
+                        subject: cat.length > 15 ? cat.substring(0, 15) + '...' : cat,
+                        mastery: parseFloat((stats.total / stats.count).toFixed(2)),
                         fullMark: 4
-                    };
-                });
+                    }));
 
-                const results = await Promise.all(promises);
-                setData(results);
+                    setData(results);
+
+                } else {
+                    // DASHBOARD MODE: Breakdown by Study Set
+                    if (!studySets.length) {
+                        setLoading(false);
+                        return;
+                    }
+
+                    const promises = studySets.map(async (set) => {
+                        // Fetch flashcards mastery for this set
+                        const { data: cards, error } = await supabase
+                            .from('flashcards')
+                            .select('id, srs:flashcard_srs(mastery_level)')
+                            .eq('study_set_id', set.id);
+
+                        if (error) throw error;
+
+                        if (!cards || cards.length === 0) {
+                            return {
+                                subject: set.name.length > 15 ? set.name.substring(0, 15) + '...' : set.name,
+                                mastery: 0,
+                                fullMark: 4
+                            };
+                        }
+
+                        // Calculate average mastery (0-4)
+                        let totalMastery = 0;
+                        cards.forEach((card: any) => {
+                            if (card.srs && card.srs.length > 0) {
+                                totalMastery += card.srs[0].mastery_level;
+                            }
+                        });
+
+                        const avgMastery = (totalMastery / cards.length);
+
+                        return {
+                            subject: set.name.length > 15 ? set.name.substring(0, 15) + '...' : set.name,
+                            mastery: parseFloat(avgMastery.toFixed(2)),
+                            fullMark: 4
+                        };
+                    });
+
+                    const results = await Promise.all(promises);
+                    setData(results);
+                }
             } catch (error) {
                 console.error('Error fetching visual progression data:', error);
             } finally {
@@ -77,7 +121,7 @@ const VisualProgressionMap: React.FC<VisualProgressionMapProps> = ({ studySets }
         };
 
         fetchMasteryLevels();
-    }, [studySets]);
+    }, [studySets, studySetId]);
 
     if (loading) {
         return <div className="h-64 flex items-center justify-center text-slate-400">Cargando mapa...</div>;
@@ -93,7 +137,9 @@ const VisualProgressionMap: React.FC<VisualProgressionMapProps> = ({ studySets }
         <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 h-full flex flex-col">
             <div className="flex items-center gap-2 mb-6">
                 <span className="material-symbols-outlined text-violet-600">radar</span>
-                <h3 className="font-bold text-slate-800 text-lg">Mapa de Dominio</h3>
+                <h3 className="font-bold text-slate-800 text-lg">
+                    {studySetId ? 'Dominio por Temas' : 'Mapa de Dominio'}
+                </h3>
             </div>
 
             <div className="flex-1 min-h-[300px] -ml-4">

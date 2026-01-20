@@ -34,6 +34,7 @@ export interface QuizResult {
     correctAnswerIndex: number;
     isCorrect: boolean;
     topic?: string;
+    textAnswer?: string;
 }
 
 export interface QuizSession {
@@ -402,7 +403,7 @@ export async function saveQuizSession(
             quiz_session_id: session.id,
             question_text: r.question,
             correct_answer: questions[r.questionIndex]?.options[r.correctAnswerIndex] || '',
-            user_answer: questions[r.questionIndex]?.options[r.userAnswerIndex] || '',
+            user_answer: r.textAnswer || (questions[r.questionIndex]?.options[r.userAnswerIndex] || ''),
             is_correct: r.isCorrect,
             topic: r.topic
         }));

@@ -519,7 +519,7 @@ const StudySession: React.FC = () => {
     setTimeout(() => setShowConfetti(false), 1000);
   };
 
-  const handleQuizAnswer = (optionIndex: number) => {
+  const handleQuizAnswer = (optionIndex: number, textAnswer?: string) => {
     if (showResult) return;
     setSelectedAnswer(optionIndex);
     setShowResult(true);
@@ -534,7 +534,8 @@ const StudySession: React.FC = () => {
       userAnswerIndex: optionIndex,
       correctAnswerIndex: currentQ.correctIndex,
       isCorrect,
-      topic: (currentQ as any).topic || 'General'
+      topic: (currentQ as any).topic || 'General',
+      textAnswer: textAnswer
     };
     setQuizResults(prev => [...prev, result]);
 
@@ -1215,7 +1216,7 @@ const StudySession: React.FC = () => {
 
                     {!showResult && designAnswer.length > 10 && (
                       <button
-                        onClick={() => handleQuizAnswer(0)}
+                        onClick={() => handleQuizAnswer(0, designAnswer)}
                         className="w-full py-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition-all"
                       >
                         Enviar mi Solución

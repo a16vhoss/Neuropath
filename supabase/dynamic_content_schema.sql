@@ -43,3 +43,4 @@ CREATE INDEX IF NOT EXISTS idx_generation_log_study_set ON content_generation_lo
 
 -- 8. Add parent_card_id to track which card spawned a harder version
 ALTER TABLE flashcards ADD COLUMN IF NOT EXISTS parent_card_id UUID REFERENCES flashcards(id);
+
