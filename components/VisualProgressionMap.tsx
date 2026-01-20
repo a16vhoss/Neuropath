@@ -29,18 +29,33 @@ const VisualProgressionMap: React.FC<VisualProgressionMapProps> = ({ studySets, 
             try {
                 if (studySetId) {
                     // SINGLE SET MODE: Breakdown by Category (Topic)
-                    // Fetch all flashcards for this set with their mastery
-                    const { data: cards, error } = await supabase
+                    // Fetch all flashcards for this set
+                    const { data: cards, error: cardError } = await supabase
                         .from('flashcards')
-                        .select('id, category, srs:flashcard_srs(mastery_level)')
+                        .select('id, category')
                         .eq('study_set_id', studySetId);
 
-                    if (error) throw error;
+                    if (cardError) throw cardError;
 
                     if (!cards || cards.length === 0) {
                         setData([]);
                         return;
                     }
+
+                    // Fetch progress to join manually
+                    const flashcardIds = cards.map(c => c.id);
+                    const { data: progress, error: progressError } = await supabase
+                        .from('flashcard_progress')
+                        .select('flashcard_id, difficulty_level')
+                        .in('flashcard_id', flashcardIds);
+
+                    if (progressError) console.error("Error fetching progress:", progressError);
+
+                    // Create progress map
+                    const progressMap = new Map();
+                    progress?.forEach((p: any) => {
+                        progressMap.set(p.flashcard_id, p.difficulty_level || 0);
+                    });
 
                     // Group by category
                     const categoryMap = new Map<string, { total: number; count: number }>();
@@ -50,7 +65,7 @@ const VisualProgressionMap: React.FC<VisualProgressionMapProps> = ({ studySets, 
                         const cat = card.category || 'General';
                         if (card.category) hasCategories = true;
 
-                        const mastery = (card.srs && card.srs.length > 0) ? card.srs[0].mastery_level : 0;
+                        const mastery = progressMap.get(card.id) || 0; // Default to 0 if no progress
 
                         const existing = categoryMap.get(cat) || { total: 0, count: 0 };
                         existing.total += mastery;
@@ -58,15 +73,24 @@ const VisualProgressionMap: React.FC<VisualProgressionMapProps> = ({ studySets, 
                         categoryMap.set(cat, existing);
                     });
 
-                    // If NO cards have categories (all are 'General'), maybe we can't show a radar chart?
-                    // We will show it anyway, it will just have 1 axis "General" which looks weird.
-                    // If so, we might need a fallback or just show it.
-
-                    const results: ProgressionData[] = Array.from(categoryMap.entries()).map(([cat, stats]) => ({
+                    let results: ProgressionData[] = Array.from(categoryMap.entries()).map(([cat, stats]) => ({
                         subject: cat.length > 15 ? cat.substring(0, 15) + '...' : cat,
                         mastery: parseFloat((stats.total / stats.count).toFixed(2)),
                         fullMark: 4
                     }));
+
+                    // Pad with placeholders if less than 3 data points to make the Radar Chart look good
+                    if (results.length > 0 && results.length < 3) {
+                        // Add placeholder "empty" axes to make it a polygon
+                        const needed = 3 - results.length;
+                        for (let i = 0; i < needed; i++) {
+                            results.push({
+                                subject: ` `, // Empty label
+                                mastery: 0,
+                                fullMark: 4
+                            });
+                        }
+                    }
 
                     setData(results);
 
@@ -78,31 +102,26 @@ const VisualProgressionMap: React.FC<VisualProgressionMapProps> = ({ studySets, 
                     }
 
                     const promises = studySets.map(async (set) => {
-                        // Fetch flashcards mastery for this set
-                        const { data: cards, error } = await supabase
+                        // Fetch flashcard count and total mastery
+                        const { data: cards } = await supabase
                             .from('flashcards')
-                            .select('id, srs:flashcard_srs(mastery_level)')
+                            .select('id')
                             .eq('study_set_id', set.id);
 
-                        if (error) throw error;
-
                         if (!cards || cards.length === 0) {
-                            return {
-                                subject: set.name.length > 15 ? set.name.substring(0, 15) + '...' : set.name,
-                                mastery: 0,
-                                fullMark: 4
-                            };
+                            return { subject: set.name, mastery: 0, fullMark: 4 };
                         }
 
-                        // Calculate average mastery (0-4)
-                        let totalMastery = 0;
-                        cards.forEach((card: any) => {
-                            if (card.srs && card.srs.length > 0) {
-                                totalMastery += card.srs[0].mastery_level;
-                            }
-                        });
+                        const cardIds = cards.map(c => c.id);
+                        const { data: progress } = await supabase
+                            .from('flashcard_progress')
+                            .select('difficulty_level')
+                            .in('flashcard_id', cardIds);
 
-                        const avgMastery = (totalMastery / cards.length);
+                        let totalMastery = 0;
+                        progress?.forEach((p: any) => totalMastery += (p.difficulty_level || 0));
+
+                        const avgMastery = progress && progress.length > 0 ? (totalMastery / cards.length) : 0; // Avg over ALL cards, not just studied ones? Usually mastery is over total curriculum.
 
                         return {
                             subject: set.name.length > 15 ? set.name.substring(0, 15) + '...' : set.name,
@@ -126,12 +145,6 @@ const VisualProgressionMap: React.FC<VisualProgressionMapProps> = ({ studySets, 
 
     if (loading) {
         return <div className="h-64 flex items-center justify-center text-slate-400">Cargando mapa...</div>;
-    }
-
-    if (data.length < 3) {
-        // Defines a minimum data points for radar chart to look good
-        // If less than 3, we can pad it or show a message.
-        // Let's pad with placeholders if needed, or just show it (it will look like a line or dot)
     }
 
     return (
