@@ -8,6 +8,8 @@ import {
     updateAssignment
 } from '../services/ClassroomService'; // Verify imports
 import { Assignment } from '../services/ClassroomService';
+import { supabase } from '../services/supabaseClient';
+import { extractTextFromPDF, generateStudySummary } from '../services/pdfProcessingService';
 
 const ClassItemDetail: React.FC = () => {
     const { classId, itemId } = useParams<{ classId: string; itemId: string }>();
@@ -22,6 +24,7 @@ const ClassItemDetail: React.FC = () => {
 
     // Teacher specific states
     const [publishing, setPublishing] = useState(false);
+    const [generatingSummary, setGeneratingSummary] = useState(false);
 
     useEffect(() => {
         loadItem();
@@ -70,6 +73,65 @@ const ClassItemDetail: React.FC = () => {
         }
     };
 
+    const handleGenerateSummary = async () => {
+        if (!item || !item.attachments || item.attachments.length === 0) return;
+
+        // Find PDF attachment
+        const pdfAttachment = item.attachments.find((a: any) =>
+            a.mime_type?.includes('pdf') || a.url?.endsWith('.pdf') || a.title?.endsWith('.pdf')
+        );
+
+        if (!pdfAttachment) {
+            alert('No se encontró un archivo PDF adjunto.');
+            return;
+        }
+
+        setGeneratingSummary(true);
+        try {
+            // Download file from Storage
+            // assignment.url contains the storage path (e.g. "classId/assignments/filename.pdf")
+            const { data: blob, error: downloadError } = await supabase.storage
+                .from('materials')
+                .download(pdfAttachment.url);
+
+            if (downloadError) throw downloadError;
+
+            // Convert to Base64
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+
+            reader.onload = async (e) => {
+                const base64 = (e.target?.result as string)?.split(',')[1];
+                if (base64) {
+                    const text = await extractTextFromPDF(base64);
+                    if (text) {
+                        const summary = await generateStudySummary(text, item.title);
+                        if (summary) {
+                            const newDescription = (item.description || '') + `\n\n--- 🤖 Resumen IA ---\n${summary}`;
+                            const updated = await updateAssignment(item.id, { description: newDescription });
+                            setItem(updated);
+                        } else {
+                            alert('No se pudo generar el resumen.');
+                        }
+                    } else {
+                        alert('No se pudo extraer texto del PDF.');
+                    }
+                }
+                setGeneratingSummary(false);
+            };
+
+            reader.onerror = () => {
+                console.error('File reading failed');
+                setGeneratingSummary(false);
+            };
+
+        } catch (err) {
+            console.error('Error generating summary:', err);
+            alert('Error al generar resumen.');
+            setGeneratingSummary(false);
+        }
+    };
+
     if (loading) return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50">
             <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
@@ -110,6 +172,19 @@ const ClassItemDetail: React.FC = () => {
                             Editar
                         </button>
                     </div>
+                )}
+                {isTeacher && item.attachments?.some((a: any) => a.mime_type?.includes('pdf') || a.url?.endsWith('.pdf')) && (
+                    <button
+                        onClick={handleGenerateSummary}
+                        disabled={generatingSummary}
+                        className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded-lg hover:bg-indigo-50 transition ml-2"
+                        title="Generar Resumen con IA"
+                    >
+                        <span className={`material-symbols-outlined text-lg ${generatingSummary ? 'animate-spin' : ''}`}>
+                            {generatingSummary ? 'autorenew' : 'smart_toy'}
+                        </span>
+                        {generatingSummary ? 'Generando...' : 'Resumen IA'}
+                    </button>
                 )}
             </div>
 

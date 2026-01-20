@@ -414,10 +414,8 @@ const TeacherClassDetail: React.FC = () => {
 
                 // 2. AI Processing for PDF
                 if (assignmentFile.type.includes('pdf')) {
-                    const reader = new FileReader();
-                    reader.readAsDataURL(assignmentFile);
-
                     await new Promise<void>((resolve) => {
+                        const reader = new FileReader();
                         reader.onload = async (e) => {
                             try {
                                 const base64 = (e.target?.result as string)?.split(',')[1];
@@ -436,6 +434,11 @@ const TeacherClassDetail: React.FC = () => {
                                 resolve();
                             }
                         };
+                        reader.onerror = () => {
+                            console.error('FileReader error');
+                            resolve();
+                        };
+                        reader.readAsDataURL(assignmentFile);
                     });
                 }
 
