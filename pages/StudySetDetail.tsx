@@ -26,6 +26,14 @@ interface Flashcard {
     category?: string;
 }
 
+interface FlashcardProgress {
+    flashcard_id: string;
+    difficulty_level: number;
+    mastery_percent: number;
+    correct_at_level: number;
+    attempts_at_level: number;
+}
+
 interface Material {
     id: string;
     name: string;
@@ -59,6 +67,7 @@ const StudySetDetail: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<TabType>('overview');
     const [refreshReports, setRefreshReports] = useState(0);
+    const [flashcardProgress, setFlashcardProgress] = useState<Map<string, FlashcardProgress>>(new Map());
 
     // Edit states
     const [isEditingName, setIsEditingName] = useState(false);
@@ -98,6 +107,22 @@ const StudySetDetail: React.FC = () => {
             setStudySet(data);
             setEditName(data.name);
             setEditDescription(data.description || '');
+
+            // Fetch flashcard progress for mastery display
+            if (user && data.flashcards.length > 0) {
+                const flashcardIds = data.flashcards.map((f: Flashcard) => f.id);
+                const { data: progress, error } = await supabase
+                    .from('flashcard_progress')
+                    .select('flashcard_id, difficulty_level, mastery_percent, correct_at_level, attempts_at_level')
+                    .eq('student_id', user.id)
+                    .in('flashcard_id', flashcardIds);
+
+                if (!error && progress) {
+                    const progressMap = new Map<string, FlashcardProgress>();
+                    progress.forEach((p: any) => progressMap.set(p.flashcard_id, p));
+                    setFlashcardProgress(progressMap);
+                }
+            }
         } catch (error) {
             console.error('Error loading study set:', error);
         } finally {
@@ -862,9 +887,34 @@ const StudySetDetail: React.FC = () => {
                                                     {card.category && (
                                                         <span className="bg-violet-100 text-violet-600 text-xs font-medium px-2 py-1 rounded">{card.category}</span>
                                                     )}
+                                                    {/* Mastery Stats */}
+                                                    {flashcardProgress.get(card.id) && (
+                                                        <span className={`text-xs font-medium px-2 py-1 rounded ${(flashcardProgress.get(card.id)?.difficulty_level || 0) >= 3
+                                                            ? 'bg-emerald-100 text-emerald-700'
+                                                            : (flashcardProgress.get(card.id)?.difficulty_level || 0) >= 2
+                                                                ? 'bg-blue-100 text-blue-700'
+                                                                : 'bg-amber-100 text-amber-700'
+                                                            }`}>
+                                                            {'⭐'.repeat(flashcardProgress.get(card.id)?.difficulty_level || 1)} Nv.{flashcardProgress.get(card.id)?.difficulty_level || 1}
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <p className="font-medium text-slate-900 mb-1">{card.question}</p>
                                                 <p className="text-sm text-slate-500">{card.answer}</p>
+                                                {/* Progress bar */}
+                                                {flashcardProgress.get(card.id) && (
+                                                    <div className="mt-2 flex items-center gap-2">
+                                                        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                            <div
+                                                                className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all"
+                                                                style={{ width: `${flashcardProgress.get(card.id)?.mastery_percent || 0}%` }}
+                                                            />
+                                                        </div>
+                                                        <span className="text-xs text-slate-500">
+                                                            {flashcardProgress.get(card.id)?.mastery_percent || 0}%
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="flex gap-2">
                                                 <button

@@ -74,7 +74,7 @@ const VisualProgressionMap: React.FC<VisualProgressionMapProps> = ({ studySets, 
                     });
 
                     let results: ProgressionData[] = Array.from(categoryMap.entries()).map(([cat, stats]) => ({
-                        subject: cat.length > 15 ? cat.substring(0, 15) + '...' : cat,
+                        subject: cat.length > 12 ? cat.substring(0, 10) + '...' : cat,
                         mastery: parseFloat((stats.total / stats.count).toFixed(2)),
                         fullMark: 4
                     }));
@@ -159,11 +159,11 @@ const VisualProgressionMap: React.FC<VisualProgressionMapProps> = ({ studySets, 
             <div className="flex-1 min-h-[300px] -ml-4">
                 {data.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart cx="50%" cy="50%" outerRadius="70%" data={data}>
+                        <RadarChart cx="50%" cy="50%" outerRadius="55%" data={data}>
                             <PolarGrid stroke="#e2e8f0" />
                             <PolarAngleAxis
                                 dataKey="subject"
-                                tick={{ fill: '#64748b', fontSize: 12 }}
+                                tick={{ fill: '#64748b', fontSize: 10 }}
                             />
                             <PolarRadiusAxis
                                 angle={30}
