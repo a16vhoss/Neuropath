@@ -16,9 +16,10 @@ interface ProgressionData {
 interface VisualProgressionMapProps {
     studySets?: StudySet[];
     studySetId?: string; // Optional: to focus on a single set
+    refreshTrigger?: number;
 }
 
-const VisualProgressionMap: React.FC<VisualProgressionMapProps> = ({ studySets, studySetId }) => {
+const VisualProgressionMap: React.FC<VisualProgressionMapProps> = ({ studySets, studySetId, refreshTrigger = 0 }) => {
     const [data, setData] = useState<ProgressionData[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -121,7 +122,7 @@ const VisualProgressionMap: React.FC<VisualProgressionMapProps> = ({ studySets, 
         };
 
         fetchMasteryLevels();
-    }, [studySets, studySetId]);
+    }, [studySets, studySetId, refreshTrigger]);
 
     if (loading) {
         return <div className="h-64 flex items-center justify-center text-slate-400">Cargando mapa...</div>;

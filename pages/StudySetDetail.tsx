@@ -58,6 +58,7 @@ const StudySetDetail: React.FC = () => {
     const [studySet, setStudySet] = useState<StudySetFull | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<TabType>('overview');
+    const [refreshReports, setRefreshReports] = useState(0);
 
     // Edit states
     const [isEditingName, setIsEditingName] = useState(false);
@@ -234,6 +235,7 @@ const StudySetDetail: React.FC = () => {
                 flashcards: prev.flashcards.map(fc => fc.id === editingFlashcard.id ? editingFlashcard : fc)
             } : null);
             setEditingFlashcard(null);
+            setRefreshReports(prev => prev + 1);
         } catch (error) {
             console.error('Error updating flashcard:', error);
         }
@@ -256,6 +258,7 @@ const StudySetDetail: React.FC = () => {
 
             // Refresh data
             loadStudySet();
+            setRefreshReports(prev => prev + 1);
         } catch (error) {
             console.error('Error auto-categorizing:', error);
             alert('Error al categorizar automáticamente.');
@@ -810,7 +813,7 @@ const StudySetDetail: React.FC = () => {
                             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
                                 <h3 className="font-bold text-slate-900 mb-4">🎯 Mapa de Dominio por Temas</h3>
                                 <div className="h-[350px] flex items-center justify-center">
-                                    <VisualProgressionMap studySetId={studySet.id} />
+                                    <VisualProgressionMap studySetId={studySet.id} refreshTrigger={refreshReports} />
                                 </div>
                             </div>
                         </div>
