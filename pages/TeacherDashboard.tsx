@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getTeacherClasses, createClass, supabase } from '../services/supabaseClient';
+import { getClassAnalytics, getAtRiskStudents } from '../services/ClassroomService';
 
 interface ClassInfo {
   id: string;
@@ -46,15 +47,25 @@ const TeacherDashboard: React.FC = () => {
         setLoadingClasses(true);
         const data = await getTeacherClasses(user.id);
 
-        const classData: ClassInfo[] = data?.map((c: any) => ({
-          id: c.id,
-          name: c.name,
-          code: c.code,
-          students: c.enrollments?.[0]?.count || 0,
-          progress: 65, // Would calculate from actual student progress
-          materials: c.materials?.[0]?.count || 0,
-          atRisk: 0 // Would calculate from actual at-risk students
-        })) || [];
+        const classData: ClassInfo[] = await Promise.all((data || []).map(async (c: any) => {
+          // Fetch real analytics for each class
+          const analytics = await getClassAnalytics(c.id);
+          const atRiskStudents = await getAtRiskStudents(c.id);
+
+          // Use average grade as the primary "progress/performance" indicator for now
+          // or fallback to submission rate if that makes more sense for "progress"
+          const progressValue = analytics.averageGrade > 0 ? analytics.averageGrade : 0;
+
+          return {
+            id: c.id,
+            name: c.name,
+            code: c.code,
+            students: c.enrollments?.[0]?.count || 0,
+            progress: Math.round(progressValue),
+            materials: c.materials?.[0]?.count || 0,
+            atRisk: atRiskStudents.length
+          };
+        }));
 
         setClasses(classData);
       } catch (error) {
@@ -87,15 +98,21 @@ const TeacherDashboard: React.FC = () => {
 
       // Reload classes
       const data = await getTeacherClasses(user.id);
-      const classData: ClassInfo[] = data?.map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        code: c.code,
-        students: c.enrollments?.[0]?.count || 0,
-        progress: 0,
-        materials: 0,
-        atRisk: 0
-      })) || [];
+      const classData: ClassInfo[] = await Promise.all((data || []).map(async (c: any) => {
+        const analytics = await getClassAnalytics(c.id);
+        const atRiskStudents = await getAtRiskStudents(c.id);
+        const progressValue = analytics.averageGrade > 0 ? analytics.averageGrade : 0;
+
+        return {
+          id: c.id,
+          name: c.name,
+          code: c.code,
+          students: c.enrollments?.[0]?.count || 0,
+          progress: Math.round(progressValue),
+          materials: c.materials?.[0]?.count || 0,
+          atRisk: atRiskStudents.length
+        };
+      }));
       setClasses(classData);
 
       setShowCreateModal(false);
