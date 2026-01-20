@@ -26,6 +26,16 @@ const ClassItemDetail: React.FC = () => {
     const [publishing, setPublishing] = useState(false);
     const [generatingSummary, setGeneratingSummary] = useState(false);
 
+    // Edit State
+    const [isEditing, setIsEditing] = useState(false);
+    const [editForm, setEditForm] = useState<{
+        title: string;
+        description: string;
+        due_date: string;
+        points: number;
+    }>({ title: '', description: '', due_date: '', points: 0 });
+    const [saving, setSaving] = useState(false);
+
     useEffect(() => {
         loadItem();
     }, [itemId]);
@@ -130,230 +140,359 @@ const ClassItemDetail: React.FC = () => {
             alert('Error al generar resumen.');
             setGeneratingSummary(false);
         }
-    };
+    }
+};
 
-    // Parse description to separate AI Summary
-    const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+const handleEditClick = () => {
+    if (!item) return;
+    setEditForm({
+        title: item.title,
+        description: mainDescription, // Use main description without AI summary for editing
+        due_date: item.due_date ? new Date(item.due_date).toISOString().split('T')[0] : '',
+        points: item.points || 100
+    });
+    setIsEditing(true);
+};
 
-    const { mainDescription, aiSummary } = React.useMemo(() => {
-        if (!item?.description) return { mainDescription: '', aiSummary: null };
-        // Split by the specific separator we added
-        const parts = item.description.split('--- 🤖 Resumen IA ---');
-        if (parts.length > 1) {
-            return {
-                mainDescription: parts[0].trim(),
-                aiSummary: parts.slice(1).join('--- 🤖 Resumen IA ---').trim()
-            };
+const handleSaveEdit = async () => {
+    if (!item) return;
+    setSaving(true);
+    try {
+        // Re-append AI summary if it exists
+        let finalDescription = editForm.description;
+        if (aiSummary) {
+            finalDescription += `\n\n--- 🤖 Resumen IA ---\n${aiSummary}`;
         }
-        return { mainDescription: item.description, aiSummary: null };
-    }, [item?.description]);
 
-    if (loading) return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50">
-            <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
-        </div>
-    );
+        const updates: Partial<Assignment> = {
+            title: editForm.title,
+            description: finalDescription,
+            points: editForm.points,
+            due_date: editForm.due_date ? new Date(editForm.due_date).toISOString() : null as any // Allow null to clear date
+        };
 
-    if (error || !item) return (
-        <div className="p-8 text-center">
-            <h2 className="text-xl font-bold text-slate-800">No encontrado</h2>
-            <button onClick={() => navigate(-1)} className="text-primary hover:underline mt-4">Regresar</button>
-        </div>
-    );
+        const updated = await updateAssignment(item.id, updates);
+        setItem(updated);
+        setIsEditing(false);
+    } catch (err) {
+        console.error('Error updating assignment:', err);
+        alert('Error al guardar cambios.');
+    } finally {
+        setSaving(false);
+    }
+};
 
-    return (
-        <div className="min-h-screen bg-white">
-            {/* Header / Breadcrumbs */}
-            <div className="border-b border-slate-200 bg-white sticky top-0 z-10 px-6 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm text-slate-500">
-                    <button onClick={() => navigate(isTeacher ? `/teacher/class/${classId}` : `/student/class/${classId}`)} className="hover:text-primary transition">
-                        <span className="material-symbols-outlined align-middle text-lg">arrow_back</span> Volver a Módulos
-                    </button>
-                    <span>/</span>
-                    <span className="text-slate-900 font-medium truncate max-w-[300px]">{item.title}</span>
-                </div>
-                {isTeacher && (
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={handleTogglePublish}
-                            disabled={publishing}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${item.published ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                        >
-                            <span className="material-symbols-outlined text-lg">
-                                {item.published ? 'check_circle' : 'visibility_off'}
-                            </span>
-                            {item.published ? 'Publicado' : 'Borrador'}
-                        </button>
-                        <button className="bg-primary text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition">
-                            Editar
-                        </button>
-                    </div>
-                )}
-                {isTeacher && item.attachments?.some((a: any) => a.mime_type?.includes('pdf') || a.url?.endsWith('.pdf')) && (
-                    <button
-                        onClick={handleGenerateSummary}
-                        disabled={generatingSummary}
-                        className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded-lg hover:bg-indigo-50 transition ml-2"
-                        title="Generar Resumen con IA"
-                    >
-                        <span className={`material-symbols-outlined text-lg ${generatingSummary ? 'animate-spin' : ''}`}>
-                            {generatingSummary ? 'autorenew' : 'smart_toy'}
-                        </span>
-                        {generatingSummary ? 'Generando...' : 'Resumen IA'}
-                    </button>
-                )}
+// Parse description to separate AI Summary
+const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+
+const { mainDescription, aiSummary } = React.useMemo(() => {
+    if (!item?.description) return { mainDescription: '', aiSummary: null };
+    // Split by the specific separator we added
+    const parts = item.description.split('--- 🤖 Resumen IA ---');
+    if (parts.length > 1) {
+        return {
+            mainDescription: parts[0].trim(),
+            aiSummary: parts.slice(1).join('--- 🤖 Resumen IA ---').trim()
+        };
+    }
+    return { mainDescription: item.description, aiSummary: null };
+}, [item?.description]);
+
+if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
+    </div>
+);
+
+if (error || !item) return (
+    <div className="p-8 text-center">
+        <h2 className="text-xl font-bold text-slate-800">No encontrado</h2>
+        <button onClick={() => navigate(-1)} className="text-primary hover:underline mt-4">Regresar</button>
+    </div>
+);
+
+return (
+    <div className="min-h-screen bg-white">
+        {/* Header / Breadcrumbs */}
+        <div className="border-b border-slate-200 bg-white sticky top-0 z-10 px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+                <button onClick={() => navigate(isTeacher ? `/teacher/class/${classId}` : `/student/class/${classId}`)} className="hover:text-primary transition">
+                    <span className="material-symbols-outlined align-middle text-lg">arrow_back</span> Volver a Módulos
+                </button>
+                <span>/</span>
+                <span className="text-slate-900 font-medium truncate max-w-[300px]">{item.title}</span>
             </div>
+            {isTeacher && (
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleTogglePublish}
+                        disabled={publishing}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2 ${item.published ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                    >
+                        <span className="material-symbols-outlined text-lg">
+                            {item.published ? 'check_circle' : 'visibility_off'}
+                        </span>
+                        {item.published ? 'Publicado' : 'Borrador'}
+                    </button>
+                    <button
+                        onClick={handleEditClick}
+                        className="bg-primary text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition"
+                    >
+                        Editar
+                    </button>
+                </div>
+            )}
+            {isTeacher && item.attachments?.some((a: any) => a.mime_type?.includes('pdf') || a.url?.endsWith('.pdf')) && (
+                <button
+                    onClick={handleGenerateSummary}
+                    disabled={generatingSummary}
+                    className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded-lg hover:bg-indigo-50 transition ml-2"
+                    title="Generar Resumen con IA"
+                >
+                    <span className={`material-symbols-outlined text-lg ${generatingSummary ? 'animate-spin' : ''}`}>
+                        {generatingSummary ? 'autorenew' : 'smart_toy'}
+                    </span>
+                    {generatingSummary ? 'Generando...' : 'Resumen IA'}
+                </button>
+            )}
+        </div>
 
-            {/* Main Content */}
-            <div className="max-w-5xl mx-auto px-6 py-8">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Left Column: Content */}
-                    <div className="lg:col-span-2 space-y-8">
-                        {/* Header Info */}
-                        <div>
-                            <div className="flex items-center gap-3 mb-4">
-                                <span className={`p-2 rounded-lg ${item.type === 'assignment' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>
-                                    <span className="material-symbols-outlined">
-                                        {item.type === 'assignment' ? 'assignment' : 'folder_open'}
-                                    </span>
-                                </span>
-                                <h1 className="text-3xl font-bold text-slate-900">{item.title}</h1>
+        {/* Edit Modal */}
+        {isEditing && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="p-8">
+                        <h2 className="text-2xl font-black text-slate-900 mb-6">Editar Contenido</h2>
+                        <div className="space-y-5">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-2">Título</label>
+                                <input
+                                    type="text"
+                                    value={editForm.title}
+                                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none font-medium"
+                                />
                             </div>
 
-                            <div className="flex items-center gap-6 text-slate-500 text-sm">
-                                {item.due_date && (
-                                    <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-lg">event</span>
-                                        <span>Entrega: {new Date(item.due_date).toLocaleString()}</span>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-2">Fecha de Entrega</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="date"
+                                            value={editForm.due_date}
+                                            onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })}
+                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                        />
+                                        {editForm.due_date && (
+                                            <button
+                                                onClick={() => setEditForm({ ...editForm, due_date: '' })}
+                                                className="px-3 py-2 bg-slate-100 text-slate-500 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition"
+                                                title="Quitar fecha"
+                                            >
+                                                <span className="material-symbols-outlined">close</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                                {item?.type === 'assignment' && (
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Puntos</label>
+                                        <input
+                                            type="number"
+                                            value={editForm.points}
+                                            onChange={(e) => setEditForm({ ...editForm, points: parseInt(e.target.value) || 0 })}
+                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                        />
                                     </div>
                                 )}
-                                {item.points !== undefined && item.type === 'assignment' && (
-                                    <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-lg">stars</span>
-                                        <span>{item.points} Puntos</span>
-                                    </div>
-                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-2">Descripción</label>
+                                <textarea
+                                    value={editForm.description}
+                                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                                    rows={8}
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none"
+                                />
+                                <p className="text-xs text-slate-400 mt-2 text-right">
+                                    {aiSummary ? '* El resumen IA se mantendrá adjunto al guardar.' : ''}
+                                </p>
                             </div>
                         </div>
+                    </div>
+                    <div className="bg-slate-50 p-6 flex justify-end gap-3 border-t border-slate-100">
+                        <button
+                            onClick={() => setIsEditing(false)}
+                            className="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition"
+                            disabled={saving}
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={handleSaveEdit}
+                            disabled={saving || !editForm.title}
+                            className="bg-primary text-white font-bold px-6 py-2.5 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-blue-900/20"
+                        >
+                            {saving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                            {saving ? 'Guardando...' : 'Guardar Cambios'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
 
-                        <hr className="border-slate-100" />
+        {/* Main Content */}
+        <div className="max-w-5xl mx-auto px-6 py-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Left Column: Content */}
+                <div className="lg:col-span-2 space-y-8">
+                    {/* Header Info */}
+                    <div>
+                        <div className="flex items-center gap-3 mb-4">
+                            <span className={`p-2 rounded-lg ${item.type === 'assignment' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>
+                                <span className="material-symbols-outlined">
+                                    {item.type === 'assignment' ? 'assignment' : 'folder_open'}
+                                </span>
+                            </span>
+                            <h1 className="text-3xl font-bold text-slate-900">{item.title}</h1>
+                        </div>
 
-                        {/* Description */}
-                        <div className="prose prose-slate max-w-none">
-                            <h3 className="text-lg font-bold text-slate-900 mb-4">Descripción</h3>
-                            <div className="whitespace-pre-wrap text-slate-700 leading-relaxed mb-6">
-                                {mainDescription || 'Sin descripción.'}
-                            </div>
-
-                            {/* AI Summary Accordion */}
-                            {aiSummary && (
-                                <div className="border border-indigo-100 rounded-xl overflow-hidden bg-white shadow-sm">
-                                    <button
-                                        onClick={() => setIsSummaryOpen(!isSummaryOpen)}
-                                        className="w-full flex items-center justify-between p-4 bg-indigo-50/50 hover:bg-indigo-50 transition text-left group"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600 group-hover:bg-indigo-200 transition">
-                                                <span className="material-symbols-outlined text-xl">smart_toy</span>
-                                            </div>
-                                            <div>
-                                                <span className="font-bold text-indigo-900 block">Resumen IA</span>
-                                                <span className="text-xs text-indigo-600/70">Generado automáticamente del material adjunto</span>
-                                            </div>
-                                        </div>
-                                        <span className={`material-symbols-outlined text-indigo-400 transition-transform duration-300 ${isSummaryOpen ? 'rotate-180' : ''}`}>
-                                            expand_more
-                                        </span>
-                                    </button>
-
-                                    {isSummaryOpen && (
-                                        <div className="p-6 border-t border-indigo-100 bg-white animate-in slide-in-from-top-2 duration-200">
-                                            <div className="whitespace-pre-wrap text-slate-700">
-                                                {aiSummary}
-                                            </div>
-                                        </div>
-                                    )}
+                        <div className="flex items-center gap-6 text-slate-500 text-sm">
+                            {item.due_date && (
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-lg">event</span>
+                                    <span>Entrega: {new Date(item.due_date).toLocaleString()}</span>
+                                </div>
+                            )}
+                            {item.points !== undefined && item.type === 'assignment' && (
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-lg">stars</span>
+                                    <span>{item.points} Puntos</span>
                                 </div>
                             )}
                         </div>
-
-                        {/* Attachments */}
-                        {item.attachments && item.attachments.length > 0 && (
-                            <div className="mt-8">
-                                <h3 className="text-lg font-bold text-slate-900 mb-4">Recursos Adjuntos</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {item.attachments.map((att: any, idx: number) => (
-                                        <a
-                                            key={idx}
-                                            href={att.url || '#'}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-3 p-4 border border-slate-200 rounded-xl hover:border-primary hover:shadow-md transition bg-white group"
-                                        >
-                                            <div className="bg-slate-100 p-2 rounded-lg text-slate-500 group-hover:bg-primary/10 group-hover:text-primary transition">
-                                                <span className="material-symbols-outlined">description</span>
-                                            </div>
-                                            <div className="overflow-hidden">
-                                                <p className="font-medium text-slate-900 truncate">{att.title || att.name || 'Archivo'}</p>
-                                                <p className="text-xs text-slate-500">Click para abrir</p>
-                                            </div>
-                                            <span className="material-symbols-outlined ml-auto text-slate-300 group-hover:text-primary">open_in_new</span>
-                                        </a>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
                     </div>
 
-                    {/* Right Column: Actions (Submission, etc) */}
-                    <div className="lg:col-span-1">
-                        {!isTeacher && item.type === 'assignment' && (
-                            <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 sticky top-24">
-                                <h3 className="font-bold text-slate-900 mb-4 text-lg">Tu Entrega</h3>
-                                {submission ? (
-                                    <div className="space-y-4">
-                                        <div className={`p-3 rounded-lg border text-center ${submission.status === 'graded' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
-                                            submission.status === 'submitted' ? 'bg-blue-50 border-blue-200 text-blue-700' :
-                                                'bg-slate-100 border-slate-200 text-slate-600'
-                                            }`}>
-                                            <p className="font-bold capitalize">{submission.status === 'submitted' ? 'Entregado' : submission.status}</p>
-                                            {submission.grade && <p className="text-2xl font-black mt-1">{submission.grade}/{item.points}</p>}
+                    <hr className="border-slate-100" />
+
+                    {/* Description */}
+                    <div className="prose prose-slate max-w-none">
+                        <h3 className="text-lg font-bold text-slate-900 mb-4">Descripción</h3>
+                        <div className="whitespace-pre-wrap text-slate-700 leading-relaxed mb-6">
+                            {mainDescription || 'Sin descripción.'}
+                        </div>
+
+                        {/* AI Summary Accordion */}
+                        {aiSummary && (
+                            <div className="border border-indigo-100 rounded-xl overflow-hidden bg-white shadow-sm">
+                                <button
+                                    onClick={() => setIsSummaryOpen(!isSummaryOpen)}
+                                    className="w-full flex items-center justify-between p-4 bg-indigo-50/50 hover:bg-indigo-50 transition text-left group"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600 group-hover:bg-indigo-200 transition">
+                                            <span className="material-symbols-outlined text-xl">smart_toy</span>
                                         </div>
-                                        <button className="w-full bg-white border border-slate-300 font-bold py-2.5 rounded-xl hover:bg-slate-50 transition text-slate-700">
-                                            Ver Detalles
-                                        </button>
+                                        <div>
+                                            <span className="font-bold text-indigo-900 block">Resumen IA</span>
+                                            <span className="text-xs text-indigo-600/70">Generado automáticamente del material adjunto</span>
+                                        </div>
                                     </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        <p className="text-sm text-slate-600">No has entregado esta tarea.</p>
-                                        <button className="w-full bg-primary text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-900/20">
-                                            Empezar Tarea
-                                        </button>
+                                    <span className={`material-symbols-outlined text-indigo-400 transition-transform duration-300 ${isSummaryOpen ? 'rotate-180' : ''}`}>
+                                        expand_more
+                                    </span>
+                                </button>
+
+                                {isSummaryOpen && (
+                                    <div className="p-6 border-t border-indigo-100 bg-white animate-in slide-in-from-top-2 duration-200">
+                                        <div className="whitespace-pre-wrap text-slate-700">
+                                            {aiSummary}
+                                        </div>
                                     </div>
                                 )}
                             </div>
                         )}
+                    </div>
 
-                        {/* Teacher Sidebar Info (Stats could go here) */}
-                        {isTeacher && (
-                            <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 sticky top-24">
-                                <h3 className="font-bold text-slate-900 mb-4 text-lg">Gestión</h3>
-                                <div className="space-y-2">
-                                    <button className="w-full text-left px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-primary hover:text-primary transition font-medium flex justify-between items-center group">
-                                        <span>Ver Entregas</span>
-                                        <span className="bg-slate-100 px-2 py-0.5 rounded-md text-xs text-slate-600 group-hover:bg-primary/10 group-hover:text-primary">12/24</span>
-                                    </button>
-                                    <button className="w-full text-left px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-primary hover:text-primary transition font-medium">
-                                        Calificar (SpeedGrader)
+                    {/* Attachments */}
+                    {item.attachments && item.attachments.length > 0 && (
+                        <div className="mt-8">
+                            <h3 className="text-lg font-bold text-slate-900 mb-4">Recursos Adjuntos</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {item.attachments.map((att: any, idx: number) => (
+                                    <a
+                                        key={idx}
+                                        href={att.url || '#'}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-3 p-4 border border-slate-200 rounded-xl hover:border-primary hover:shadow-md transition bg-white group"
+                                    >
+                                        <div className="bg-slate-100 p-2 rounded-lg text-slate-500 group-hover:bg-primary/10 group-hover:text-primary transition">
+                                            <span className="material-symbols-outlined">description</span>
+                                        </div>
+                                        <div className="overflow-hidden">
+                                            <p className="font-medium text-slate-900 truncate">{att.title || att.name || 'Archivo'}</p>
+                                            <p className="text-xs text-slate-500">Click para abrir</p>
+                                        </div>
+                                        <span className="material-symbols-outlined ml-auto text-slate-300 group-hover:text-primary">open_in_new</span>
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Right Column: Actions (Submission, etc) */}
+                <div className="lg:col-span-1">
+                    {!isTeacher && item.type === 'assignment' && (
+                        <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 sticky top-24">
+                            <h3 className="font-bold text-slate-900 mb-4 text-lg">Tu Entrega</h3>
+                            {submission ? (
+                                <div className="space-y-4">
+                                    <div className={`p-3 rounded-lg border text-center ${submission.status === 'graded' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                                        submission.status === 'submitted' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                                            'bg-slate-100 border-slate-200 text-slate-600'
+                                        }`}>
+                                        <p className="font-bold capitalize">{submission.status === 'submitted' ? 'Entregado' : submission.status}</p>
+                                        {submission.grade && <p className="text-2xl font-black mt-1">{submission.grade}/{item.points}</p>}
+                                    </div>
+                                    <button className="w-full bg-white border border-slate-300 font-bold py-2.5 rounded-xl hover:bg-slate-50 transition text-slate-700">
+                                        Ver Detalles
                                     </button>
                                 </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <p className="text-sm text-slate-600">No has entregado esta tarea.</p>
+                                    <button className="w-full bg-primary text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-900/20">
+                                        Empezar Tarea
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Teacher Sidebar Info (Stats could go here) */}
+                    {isTeacher && (
+                        <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 sticky top-24">
+                            <h3 className="font-bold text-slate-900 mb-4 text-lg">Gestión</h3>
+                            <div className="space-y-2">
+                                <button className="w-full text-left px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-primary hover:text-primary transition font-medium flex justify-between items-center group">
+                                    <span>Ver Entregas</span>
+                                    <span className="bg-slate-100 px-2 py-0.5 rounded-md text-xs text-slate-600 group-hover:bg-primary/10 group-hover:text-primary">12/24</span>
+                                </button>
+                                <button className="w-full text-left px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-primary hover:text-primary transition font-medium">
+                                    Calificar (SpeedGrader)
+                                </button>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
-    );
+    </div>
+);
 };
 
 export default ClassItemDetail;
