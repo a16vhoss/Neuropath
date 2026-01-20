@@ -46,7 +46,7 @@ const TeacherClassDetail: React.FC = () => {
     const { user } = useAuth();
 
     const [classData, setClassData] = useState<ClassData | null>(null);
-    const [activeTab, setActiveTab] = useState<'overview' | 'materials' | 'students' | 'exams'>('overview');
+    const [activeTab, setActiveTab] = useState<'home' | 'announcements' | 'modules' | 'discussions' | 'grades' | 'people' | 'evaluation' | 'attendance'>('home');
     const [showUploadModal, setShowUploadModal] = useState(false);
     const [showExamModal, setShowExamModal] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
@@ -407,26 +407,59 @@ const TeacherClassDetail: React.FC = () => {
                     <span className="material-symbols-outlined text-primary text-3xl font-bold">neurology</span>
                     <span className="font-extrabold text-xl tracking-tighter text-slate-900">NEUROPATH</span>
                 </div>
-                <nav className="flex-1 p-4 space-y-2">
+                <nav className="flex-1 p-4 space-y-1">
                     <div onClick={() => navigate('/teacher')} className="text-slate-600 p-3 rounded-lg flex items-center gap-3 font-medium hover:bg-slate-50 cursor-pointer">
-                        <span className="material-symbols-outlined">arrow_back</span> Volver
+                        <span className="material-symbols-outlined">arrow_back</span> Volver al Panel
                     </div>
                     <div className="border-t border-slate-100 my-4"></div>
+
+                    {/* Class name header */}
+                    <div className="px-3 py-2 mb-2">
+                        <h3 className="font-bold text-slate-900 truncate">{classData?.name || 'Clase'}</h3>
+                        <p className="text-xs text-slate-500 font-mono">{classData?.code}</p>
+                    </div>
+
                     {[
-                        { id: 'overview', icon: 'dashboard', label: 'Resumen' },
-                        { id: 'materials', icon: 'folder', label: 'Materiales' },
-                        { id: 'students', icon: 'groups', label: 'Estudiantes' },
-                        { id: 'exams', icon: 'assignment', label: 'Exámenes' }
+                        { id: 'home', icon: 'home', label: 'Inicio' },
+                        { id: 'announcements', icon: 'campaign', label: 'Anuncios' },
+                        { id: 'modules', icon: 'folder_open', label: 'Módulos' },
+                        { id: 'discussions', icon: 'forum', label: 'Discusiones' },
+                        { id: 'grades', icon: 'grade', label: 'Calificaciones', badge: atRiskCount > 0 ? atRiskCount : undefined },
+                        { id: 'people', icon: 'groups', label: 'Personas' },
+                        { id: 'evaluation', icon: 'assignment', label: 'Plan de Evaluación' },
+                        { id: 'attendance', icon: 'fact_check', label: 'Pase de Lista' }
                     ].map((item) => (
                         <div
                             key={item.id}
                             onClick={() => setActiveTab(item.id as any)}
-                            className={`p-3 rounded-lg flex items-center gap-3 font-medium cursor-pointer transition-colors ${activeTab === item.id ? 'bg-primary/5 text-primary' : 'text-slate-600 hover:bg-slate-50'
+                            className={`p-3 rounded-lg flex items-center justify-between font-medium cursor-pointer transition-colors ${activeTab === item.id ? 'bg-primary/10 text-primary border-l-4 border-primary' : 'text-slate-600 hover:bg-slate-50'
                                 }`}
                         >
-                            <span className="material-symbols-outlined">{item.icon}</span> {item.label}
+                            <div className="flex items-center gap-3">
+                                <span className="material-symbols-outlined text-xl">{item.icon}</span>
+                                <span>{item.label}</span>
+                            </div>
+                            {item.badge && (
+                                <span className="bg-primary text-white text-xs font-bold px-2 py-0.5 rounded-full">{item.badge}</span>
+                            )}
                         </div>
                     ))}
+
+                    <div className="border-t border-slate-100 my-4"></div>
+
+                    {/* Quick actions */}
+                    <div
+                        onClick={() => navigate(`/teacher/analytics/${classId}`)}
+                        className="text-slate-600 p-3 rounded-lg flex items-center gap-3 font-medium hover:bg-slate-50 cursor-pointer"
+                    >
+                        <span className="material-symbols-outlined">analytics</span> Analíticas
+                    </div>
+                    <div
+                        onClick={() => setShowUploadModal(true)}
+                        className="text-slate-600 p-3 rounded-lg flex items-center gap-3 font-medium hover:bg-slate-50 cursor-pointer"
+                    >
+                        <span className="material-symbols-outlined">upload</span> Subir Material
+                    </div>
                 </nav>
             </aside>
 
@@ -451,8 +484,8 @@ const TeacherClassDetail: React.FC = () => {
                     </div>
                 </header>
 
-                {/* Overview Tab */}
-                {activeTab === 'overview' && (
+                {/* Home Tab */}
+                {activeTab === 'home' && (
                     <div className="space-y-8">
                         {/* Quick Stats */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -508,8 +541,8 @@ const TeacherClassDetail: React.FC = () => {
                     </div>
                 )}
 
-                {/* Materials Tab */}
-                {activeTab === 'materials' && (
+                {/* Modules Tab (Materials) */}
+                {activeTab === 'modules' && (
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
                             <h2 className="text-xl font-bold">Materiales del Curso</h2>
@@ -587,8 +620,8 @@ const TeacherClassDetail: React.FC = () => {
                     </div>
                 )}
 
-                {/* Students Tab */}
-                {activeTab === 'students' && (
+                {/* People Tab (Students) */}
+                {activeTab === 'people' && (
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
                             <h2 className="text-xl font-bold">Estudiantes ({students.length})</h2>
@@ -680,8 +713,8 @@ const TeacherClassDetail: React.FC = () => {
                     </div>
                 )}
 
-                {/* Exams Tab */}
-                {activeTab === 'exams' && (
+                {/* Evaluation Tab (Exams) */}
+                {activeTab === 'evaluation' && (
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
                             <h2 className="text-xl font-bold">Gestión de Exámenes</h2>
@@ -739,6 +772,175 @@ const TeacherClassDetail: React.FC = () => {
                                 </button>
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* Announcements Tab */}
+                {activeTab === 'announcements' && (
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-xl font-bold">Anuncios</h2>
+                            <button className="bg-primary text-white font-bold px-4 py-2 rounded-xl hover:bg-blue-700 transition flex items-center gap-2">
+                                <span className="material-symbols-outlined">add</span> Nuevo Anuncio
+                            </button>
+                        </div>
+
+                        {/* Empty state */}
+                        <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm text-center">
+                            <div className="w-16 h-16 bg-violet-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <span className="material-symbols-outlined text-3xl text-violet-600">campaign</span>
+                            </div>
+                            <h3 className="font-bold text-slate-900 mb-2 text-lg">No hay anuncios aún</h3>
+                            <p className="text-slate-500 mb-4">Publica anuncios para comunicarte con toda la clase</p>
+                            <button className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700">
+                                Crear Primer Anuncio
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Discussions Tab */}
+                {activeTab === 'discussions' && (
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-xl font-bold">Foros de Discusión</h2>
+                            <button className="bg-primary text-white font-bold px-4 py-2 rounded-xl hover:bg-blue-700 transition flex items-center gap-2">
+                                <span className="material-symbols-outlined">add</span> Nuevo Tema
+                            </button>
+                        </div>
+
+                        {/* Empty state */}
+                        <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm text-center">
+                            <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <span className="material-symbols-outlined text-3xl text-emerald-600">forum</span>
+                            </div>
+                            <h3 className="font-bold text-slate-900 mb-2 text-lg">Sin discusiones activas</h3>
+                            <p className="text-slate-500 mb-4">Crea temas de discusión para fomentar la participación</p>
+                            <button className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700">
+                                Crear Primer Tema
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Grades Tab */}
+                {activeTab === 'grades' && (
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-xl font-bold">Libro de Calificaciones</h2>
+                            <div className="flex gap-2">
+                                <button className="px-4 py-2 rounded-lg border border-slate-200 font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-lg">download</span> Exportar
+                                </button>
+                            </div>
+                        </div>
+
+                        {students.length > 0 ? (
+                            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                                <table className="w-full">
+                                    <thead className="bg-slate-50 border-b border-slate-100">
+                                        <tr>
+                                            <th className="text-left p-4 font-bold text-slate-700">Estudiante</th>
+                                            <th className="text-center p-4 font-bold text-slate-700">Progreso</th>
+                                            <th className="text-center p-4 font-bold text-slate-700">Tareas</th>
+                                            <th className="text-center p-4 font-bold text-slate-700">Exámenes</th>
+                                            <th className="text-center p-4 font-bold text-slate-700">Promedio</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {students.map((student) => (
+                                            <tr key={student.id} className="border-b border-slate-50 hover:bg-slate-50">
+                                                <td className="p-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                                                            {student.name.charAt(0)}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-medium text-slate-900">{student.name}</p>
+                                                            <p className="text-xs text-slate-500">{student.email}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="text-center p-4">
+                                                    <span className={`font-bold ${student.progress >= 70 ? 'text-emerald-600' : student.progress >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>
+                                                        {student.progress}%
+                                                    </span>
+                                                </td>
+                                                <td className="text-center p-4 text-slate-600">-</td>
+                                                <td className="text-center p-4 text-slate-600">-</td>
+                                                <td className="text-center p-4">
+                                                    <span className={`font-bold ${student.progress >= 70 ? 'text-emerald-600' : student.progress >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>
+                                                        {student.progress >= 70 ? 'A' : student.progress >= 50 ? 'B' : 'C'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm text-center">
+                                <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                    <span className="material-symbols-outlined text-3xl text-amber-600">grade</span>
+                                </div>
+                                <h3 className="font-bold text-slate-900 mb-2 text-lg">Sin estudiantes aún</h3>
+                                <p className="text-slate-500">Las calificaciones aparecerán cuando haya estudiantes inscritos</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Attendance Tab */}
+                {activeTab === 'attendance' && (
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-xl font-bold">Pase de Lista</h2>
+                            <button className="bg-primary text-white font-bold px-4 py-2 rounded-xl hover:bg-blue-700 transition flex items-center gap-2">
+                                <span className="material-symbols-outlined">add</span> Nueva Sesión
+                            </button>
+                        </div>
+
+                        {/* Today's attendance */}
+                        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-bold text-slate-900">Hoy - {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
+                                <span className="text-sm text-slate-500">{students.length} estudiantes</span>
+                            </div>
+
+                            {students.length > 0 ? (
+                                <div className="space-y-2">
+                                    {students.map((student) => (
+                                        <div key={student.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                                                    {student.name.charAt(0)}
+                                                </div>
+                                                <span className="font-medium text-slate-900">{student.name}</span>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button className="px-3 py-1 rounded-lg bg-emerald-100 text-emerald-700 font-medium text-sm hover:bg-emerald-200">
+                                                    Presente
+                                                </button>
+                                                <button className="px-3 py-1 rounded-lg bg-amber-100 text-amber-700 font-medium text-sm hover:bg-amber-200">
+                                                    Retardo
+                                                </button>
+                                                <button className="px-3 py-1 rounded-lg bg-rose-100 text-rose-700 font-medium text-sm hover:bg-rose-200">
+                                                    Falta
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <button className="w-full mt-4 bg-primary text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition">
+                                        Guardar Asistencia
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="text-center py-8">
+                                    <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">groups</span>
+                                    <p className="text-slate-500">No hay estudiantes inscritos</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </main>
