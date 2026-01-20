@@ -5,6 +5,25 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase, getClassMaterials, getClassEnrollments, uploadMaterial } from '../services/supabaseClient';
 import { generateFlashcardsFromText, generateQuizFromText, extractTextFromPDF } from '../services/pdfProcessingService';
 import StudentProgressModal from '../components/StudentProgressModal';
+import AnnouncementCard from '../components/AnnouncementCard';
+import AssignmentCard from '../components/AssignmentCard';
+import ExamScheduler from '../components/ExamScheduler';
+import {
+    getClassAnnouncements,
+    createAnnouncement,
+    deleteAnnouncement,
+    getClassAssignments,
+    createAssignment,
+    deleteAssignment,
+    getAssignmentSubmissions,
+    gradeSubmission,
+    getClassExams,
+    scheduleExam,
+    Announcement,
+    Assignment,
+    AssignmentSubmission,
+    ScheduledExam
+} from '../services/ClassroomService';
 
 interface Material {
     id: string;
@@ -65,6 +84,25 @@ const TeacherClassDetail: React.FC = () => {
     const [loadingExams, setLoadingExams] = useState(true);
     const [examForm, setExamForm] = useState({ name: '', date: '', type: 'exam' as 'exam' | 'quiz' | 'practice', topics: [] as string[] });
     const [creatingExam, setCreatingExam] = useState(false);
+
+    // Announcements state
+    const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+    const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
+    const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+    const [newAnnouncementContent, setNewAnnouncementContent] = useState('');
+
+    // Assignments/Grades state
+    const [assignments, setAssignments] = useState<Assignment[]>([]);
+    const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
+    const [loadingAssignments, setLoadingAssignments] = useState(true);
+
+    // Scheduled Exams state
+    const [scheduledExams, setScheduledExams] = useState<ScheduledExam[]>([]);
+    const [showExamScheduler, setShowExamScheduler] = useState(false);
+
+    // Attendance state
+    const [attendanceRecords, setAttendanceRecords] = useState<Record<string, 'present' | 'late' | 'absent'>>({});
+    const [savingAttendance, setSavingAttendance] = useState(false);
 
     // Load class data
     useEffect(() => {
@@ -167,6 +205,62 @@ const TeacherClassDetail: React.FC = () => {
         loadExams();
     }, [classId]);
 
+    // Load announcements
+    useEffect(() => {
+        const loadAnnouncements = async () => {
+            if (!classId) return;
+            setLoadingAnnouncements(true);
+            try {
+                const data = await getClassAnnouncements(classId);
+                setAnnouncements(data);
+            } catch (error) {
+                console.error('Error loading announcements:', error);
+            } finally {
+                setLoadingAnnouncements(false);
+            }
+        };
+        loadAnnouncements();
+    }, [classId]);
+
+    // Load assignments and submissions
+    useEffect(() => {
+        const loadAssignmentsData = async () => {
+            if (!classId) return;
+            setLoadingAssignments(true);
+            try {
+                const assignmentsData = await getClassAssignments(classId);
+                setAssignments(assignmentsData);
+
+                // Load all submissions for grading
+                const allSubmissions: AssignmentSubmission[] = [];
+                for (const assignment of assignmentsData) {
+                    const subs = await getAssignmentSubmissions(assignment.id);
+                    allSubmissions.push(...subs);
+                }
+                setSubmissions(allSubmissions);
+            } catch (error) {
+                console.error('Error loading assignments:', error);
+            } finally {
+                setLoadingAssignments(false);
+            }
+        };
+        loadAssignmentsData();
+    }, [classId]);
+
+    // Load scheduled exams
+    useEffect(() => {
+        const loadScheduledExams = async () => {
+            if (!classId) return;
+            try {
+                const data = await getClassExams(classId);
+                setScheduledExams(data);
+            } catch (error) {
+                console.error('Error loading scheduled exams:', error);
+            }
+        };
+        loadScheduledExams();
+    }, [classId]);
+
     // Create exam handler
     const handleCreateExam = async () => {
         if (!classId || !examForm.name) return;
@@ -199,6 +293,84 @@ const TeacherClassDetail: React.FC = () => {
             console.error('Error creating exam:', error);
         } finally {
             setCreatingExam(false);
+        }
+    };
+
+    // Create announcement handler
+    const handleCreateAnnouncement = async () => {
+        if (!classId || !user || !newAnnouncementContent.trim()) return;
+        try {
+            const newAnnouncement = await createAnnouncement({
+                class_id: classId,
+                teacher_id: user.id,
+                content: newAnnouncementContent.trim()
+            });
+            setAnnouncements(prev => [newAnnouncement, ...prev]);
+            setNewAnnouncementContent('');
+            setShowAnnouncementModal(false);
+        } catch (error) {
+            console.error('Error creating announcement:', error);
+        }
+    };
+
+    // Delete announcement handler
+    const handleDeleteAnnouncement = async (id: string) => {
+        try {
+            await deleteAnnouncement(id);
+            setAnnouncements(prev => prev.filter(a => a.id !== id));
+        } catch (error) {
+            console.error('Error deleting announcement:', error);
+        }
+    };
+
+    // Delete assignment handler
+    const handleDeleteAssignment = async (id: string) => {
+        if (!window.confirm('¿Estás seguro de eliminar este elemento?')) return;
+        try {
+            await deleteAssignment(id);
+            setAssignments(prev => prev.filter(a => a.id !== id));
+        } catch (error) {
+            console.error('Error deleting assignment:', error);
+        }
+    };
+
+    // Update attendance handler
+    const handleAttendanceChange = (studentId: string, status: 'present' | 'late' | 'absent') => {
+        setAttendanceRecords(prev => ({ ...prev, [studentId]: status }));
+    };
+
+    // Save attendance handler
+    const handleSaveAttendance = async () => {
+        if (!classId) return;
+        setSavingAttendance(true);
+        try {
+            // Create attendance session
+            const { data: session, error: sessionError } = await supabase
+                .from('attendance_sessions')
+                .insert({ class_id: classId, session_date: new Date().toISOString().split('T')[0] })
+                .select()
+                .single();
+
+            if (sessionError) throw sessionError;
+
+            // Insert records
+            const records = Object.entries(attendanceRecords).map(([studentId, status]) => ({
+                session_id: session.id,
+                student_id: studentId,
+                status
+            }));
+
+            if (records.length > 0) {
+                await supabase.from('attendance_records').insert(records);
+            }
+
+            setAttendanceRecords({});
+            alert('¡Asistencia guardada correctamente!');
+        } catch (error) {
+            console.error('Error saving attendance:', error);
+            alert('Error al guardar la asistencia. La tabla puede no existir aún.');
+        } finally {
+            setSavingAttendance(false);
         }
     };
 
@@ -779,47 +951,111 @@ const TeacherClassDetail: React.FC = () => {
                 {activeTab === 'announcements' && (
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
-                            <h2 className="text-xl font-bold">Anuncios</h2>
-                            <button className="bg-primary text-white font-bold px-4 py-2 rounded-xl hover:bg-blue-700 transition flex items-center gap-2">
+                            <h2 className="text-xl font-bold">Anuncios ({announcements.length})</h2>
+                            <button
+                                onClick={() => setShowAnnouncementModal(true)}
+                                className="bg-primary text-white font-bold px-4 py-2 rounded-xl hover:bg-blue-700 transition flex items-center gap-2"
+                            >
                                 <span className="material-symbols-outlined">add</span> Nuevo Anuncio
                             </button>
                         </div>
 
-                        {/* Empty state */}
-                        <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm text-center">
-                            <div className="w-16 h-16 bg-violet-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <span className="material-symbols-outlined text-3xl text-violet-600">campaign</span>
+                        {loadingAnnouncements ? (
+                            <div className="text-center py-8">
+                                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+                                <p className="text-slate-500 mt-2">Cargando anuncios...</p>
                             </div>
-                            <h3 className="font-bold text-slate-900 mb-2 text-lg">No hay anuncios aún</h3>
-                            <p className="text-slate-500 mb-4">Publica anuncios para comunicarte con toda la clase</p>
-                            <button className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700">
-                                Crear Primer Anuncio
-                            </button>
-                        </div>
+                        ) : announcements.length > 0 ? (
+                            <div className="space-y-4">
+                                {announcements.map((announcement) => (
+                                    <div key={announcement.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                                                    {announcement.teacher?.full_name?.charAt(0) || 'P'}
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-slate-900">{announcement.teacher?.full_name || 'Profesor'}</p>
+                                                    <p className="text-xs text-slate-500">{new Date(announcement.created_at).toLocaleDateString('es-MX', { dateStyle: 'medium' })}</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => handleDeleteAnnouncement(announcement.id)}
+                                                className="text-slate-400 hover:text-rose-500 transition"
+                                            >
+                                                <span className="material-symbols-outlined">delete</span>
+                                            </button>
+                                        </div>
+                                        {announcement.title && <h3 className="font-bold text-lg mb-2">{announcement.title}</h3>}
+                                        <p className="text-slate-700 whitespace-pre-wrap">{announcement.content}</p>
+                                        {announcement.pinned && (
+                                            <span className="inline-flex items-center gap-1 mt-3 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                                                <span className="material-symbols-outlined text-sm">push_pin</span> Fijado
+                                            </span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm text-center">
+                                <div className="w-16 h-16 bg-violet-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                    <span className="material-symbols-outlined text-3xl text-violet-600">campaign</span>
+                                </div>
+                                <h3 className="font-bold text-slate-900 mb-2 text-lg">No hay anuncios aún</h3>
+                                <p className="text-slate-500 mb-4">Publica anuncios para comunicarte con toda la clase</p>
+                                <button
+                                    onClick={() => setShowAnnouncementModal(true)}
+                                    className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700"
+                                >
+                                    Crear Primer Anuncio
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
 
+                {/* Discussions Tab */}
                 {/* Discussions Tab */}
                 {activeTab === 'discussions' && (
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
                             <h2 className="text-xl font-bold">Foros de Discusión</h2>
-                            <button className="bg-primary text-white font-bold px-4 py-2 rounded-xl hover:bg-blue-700 transition flex items-center gap-2">
+                            <button
+                                onClick={() => navigate(`/class/${classId}/create-assignment`)} // TODO: Pass type=discussion pref
+                                className="bg-primary text-white font-bold px-4 py-2 rounded-xl hover:bg-blue-700 transition flex items-center gap-2"
+                            >
                                 <span className="material-symbols-outlined">add</span> Nuevo Tema
                             </button>
                         </div>
 
-                        {/* Empty state */}
-                        <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm text-center">
-                            <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <span className="material-symbols-outlined text-3xl text-emerald-600">forum</span>
+                        {assignments.filter(a => a.type === 'discussion').length > 0 ? (
+                            <div className="grid grid-cols-1 gap-4">
+                                {assignments.filter(a => a.type === 'discussion').map(discussion => (
+                                    <AssignmentCard
+                                        key={discussion.id}
+                                        assignment={discussion}
+                                        isTeacher={true}
+                                        onEdit={() => navigate(`/class/${classId}/edit-assignment/${discussion.id}`)}
+                                        onDelete={() => handleDeleteAssignment(discussion.id)}
+                                    />
+                                ))}
                             </div>
-                            <h3 className="font-bold text-slate-900 mb-2 text-lg">Sin discusiones activas</h3>
-                            <p className="text-slate-500 mb-4">Crea temas de discusión para fomentar la participación</p>
-                            <button className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700">
-                                Crear Primer Tema
-                            </button>
-                        </div>
+                        ) : (
+                            /* Empty state */
+                            <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm text-center">
+                                <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                    <span className="material-symbols-outlined text-3xl text-emerald-600">forum</span>
+                                </div>
+                                <h3 className="font-bold text-slate-900 mb-2 text-lg">Sin discusiones activas</h3>
+                                <p className="text-slate-500 mb-4">Crea temas de discusión para fomentar la participación</p>
+                                <button
+                                    onClick={() => navigate(`/class/${classId}/create-assignment`)}
+                                    className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700"
+                                >
+                                    Crear Primer Tema
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -918,20 +1154,38 @@ const TeacherClassDetail: React.FC = () => {
                                                 <span className="font-medium text-slate-900">{student.name}</span>
                                             </div>
                                             <div className="flex gap-2">
-                                                <button className="px-3 py-1 rounded-lg bg-emerald-100 text-emerald-700 font-medium text-sm hover:bg-emerald-200">
+                                                <button
+                                                    onClick={() => handleAttendanceChange(student.id, 'present')}
+                                                    className={`px-3 py-1 rounded-lg font-medium text-sm transition ${attendanceRecords[student.id] === 'present' ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}
+                                                >
                                                     Presente
                                                 </button>
-                                                <button className="px-3 py-1 rounded-lg bg-amber-100 text-amber-700 font-medium text-sm hover:bg-amber-200">
+                                                <button
+                                                    onClick={() => handleAttendanceChange(student.id, 'late')}
+                                                    className={`px-3 py-1 rounded-lg font-medium text-sm transition ${attendanceRecords[student.id] === 'late' ? 'bg-amber-600 text-white' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}
+                                                >
                                                     Retardo
                                                 </button>
-                                                <button className="px-3 py-1 rounded-lg bg-rose-100 text-rose-700 font-medium text-sm hover:bg-rose-200">
+                                                <button
+                                                    onClick={() => handleAttendanceChange(student.id, 'absent')}
+                                                    className={`px-3 py-1 rounded-lg font-medium text-sm transition ${attendanceRecords[student.id] === 'absent' ? 'bg-rose-600 text-white' : 'bg-rose-100 text-rose-700 hover:bg-rose-200'}`}
+                                                >
                                                     Falta
                                                 </button>
                                             </div>
                                         </div>
                                     ))}
-                                    <button className="w-full mt-4 bg-primary text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition">
-                                        Guardar Asistencia
+                                    <button
+                                        onClick={handleSaveAttendance}
+                                        disabled={savingAttendance}
+                                        className="w-full mt-4 bg-primary text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition disabled:opacity-50 flex justify-center items-center gap-2"
+                                    >
+                                        {savingAttendance ? (
+                                            <>
+                                                <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                                                Guardando...
+                                            </>
+                                        ) : 'Guardar Asistencia'}
                                     </button>
                                 </div>
                             ) : (
@@ -944,6 +1198,18 @@ const TeacherClassDetail: React.FC = () => {
                     </div>
                 )}
             </main>
+
+            {/* Exam Scheduler Modal */}
+            {showExamScheduler && classId && (
+                <ExamScheduler
+                    classId={classId}
+                    onClose={() => setShowExamScheduler(false)}
+                    onCreated={(newExam) => {
+                        setScheduledExams(prev => [newExam, ...prev]);
+                        setShowExamScheduler(false);
+                    }}
+                />
+            )}
 
             {/* Upload Modal */}
             {showUploadModal && (
