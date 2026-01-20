@@ -132,6 +132,22 @@ const ClassItemDetail: React.FC = () => {
         }
     };
 
+    // Parse description to separate AI Summary
+    const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+
+    const { mainDescription, aiSummary } = React.useMemo(() => {
+        if (!item?.description) return { mainDescription: '', aiSummary: null };
+        // Split by the specific separator we added
+        const parts = item.description.split('--- 🤖 Resumen IA ---');
+        if (parts.length > 1) {
+            return {
+                mainDescription: parts[0].trim(),
+                aiSummary: parts.slice(1).join('--- 🤖 Resumen IA ---').trim()
+            };
+        }
+        return { mainDescription: item.description, aiSummary: null };
+    }, [item?.description]);
+
     if (loading) return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50">
             <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
@@ -225,9 +241,40 @@ const ClassItemDetail: React.FC = () => {
                         {/* Description */}
                         <div className="prose prose-slate max-w-none">
                             <h3 className="text-lg font-bold text-slate-900 mb-4">Descripción</h3>
-                            <div className="whitespace-pre-wrap text-slate-700 leading-relaxed">
-                                {item.description || 'Sin descripción.'}
+                            <div className="whitespace-pre-wrap text-slate-700 leading-relaxed mb-6">
+                                {mainDescription || 'Sin descripción.'}
                             </div>
+
+                            {/* AI Summary Accordion */}
+                            {aiSummary && (
+                                <div className="border border-indigo-100 rounded-xl overflow-hidden bg-white shadow-sm">
+                                    <button
+                                        onClick={() => setIsSummaryOpen(!isSummaryOpen)}
+                                        className="w-full flex items-center justify-between p-4 bg-indigo-50/50 hover:bg-indigo-50 transition text-left group"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600 group-hover:bg-indigo-200 transition">
+                                                <span className="material-symbols-outlined text-xl">smart_toy</span>
+                                            </div>
+                                            <div>
+                                                <span className="font-bold text-indigo-900 block">Resumen IA</span>
+                                                <span className="text-xs text-indigo-600/70">Generado automáticamente del material adjunto</span>
+                                            </div>
+                                        </div>
+                                        <span className={`material-symbols-outlined text-indigo-400 transition-transform duration-300 ${isSummaryOpen ? 'rotate-180' : ''}`}>
+                                            expand_more
+                                        </span>
+                                    </button>
+
+                                    {isSummaryOpen && (
+                                        <div className="p-6 border-t border-indigo-100 bg-white animate-in slide-in-from-top-2 duration-200">
+                                            <div className="whitespace-pre-wrap text-slate-700">
+                                                {aiSummary}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* Attachments */}
