@@ -66,6 +66,7 @@ const StudySetDetail: React.FC = () => {
 
     // Add flashcard modal
     const [showAddFlashcard, setShowAddFlashcard] = useState(false);
+    const [editingFlashcard, setEditingFlashcard] = useState<Flashcard | null>(null);
     const [newQuestion, setNewQuestion] = useState('');
     const [newAnswer, setNewAnswer] = useState('');
 
@@ -215,6 +216,26 @@ const StudySetDetail: React.FC = () => {
             loadStudySet();
         } catch (error) {
             console.error('Error adding flashcard:', error);
+        }
+    };
+
+    const handleUpdateFlashcard = async () => {
+        if (!editingFlashcard || !editingFlashcard.question || !editingFlashcard.answer) return;
+
+        try {
+            await updateFlashcard(editingFlashcard.id, {
+                question: editingFlashcard.question,
+                answer: editingFlashcard.answer,
+                category: editingFlashcard.category
+            });
+            // Update local state
+            setStudySet(prev => prev ? {
+                ...prev,
+                flashcards: prev.flashcards.map(fc => fc.id === editingFlashcard.id ? editingFlashcard : fc)
+            } : null);
+            setEditingFlashcard(null);
+        } catch (error) {
+            console.error('Error updating flashcard:', error);
         }
     };
 
@@ -806,12 +827,22 @@ const StudySetDetail: React.FC = () => {
                                                 <p className="font-medium text-slate-900 mb-1">{card.question}</p>
                                                 <p className="text-sm text-slate-500">{card.answer}</p>
                                             </div>
-                                            <button
-                                                onClick={() => handleDeleteFlashcard(card.id)}
-                                                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition"
-                                            >
-                                                <span className="material-symbols-outlined text-sm">delete</span>
-                                            </button>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => setEditingFlashcard(card)}
+                                                    className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition"
+                                                    title="Editar"
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">edit</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteFlashcard(card.id)}
+                                                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                                                    title="Eliminar"
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">delete</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -1179,7 +1210,66 @@ const StudySetDetail: React.FC = () => {
                     </div>
                 )
             }
-        </div >
+            {/* Edit Flashcard Modal */}
+            {
+                editingFlashcard && (
+                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden">
+                            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                                <h3 className="font-bold text-lg text-slate-900">Editar Flashcard</h3>
+                                <button onClick={() => setEditingFlashcard(null)} className="text-slate-400 hover:text-slate-600">
+                                    <span className="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">Tema / Categoría</label>
+                                    <input
+                                        type="text"
+                                        value={editingFlashcard.category || ''}
+                                        onChange={(e) => setEditingFlashcard({ ...editingFlashcard, category: e.target.value })}
+                                        placeholder="Ej: Historia, Definiciones, Fórmulas..."
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition"
+                                    />
+                                    <p className="text-xs text-slate-500 mt-1">
+                                        Agrupa tus flashcards por temas para verlos en el Mapa de Dominio.
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">Pregunta (Anverso)</label>
+                                    <textarea
+                                        value={editingFlashcard.question}
+                                        onChange={(e) => setEditingFlashcard({ ...editingFlashcard, question: e.target.value })}
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl h-24 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition resize-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">Respuesta (Reverso)</label>
+                                    <textarea
+                                        value={editingFlashcard.answer}
+                                        onChange={(e) => setEditingFlashcard({ ...editingFlashcard, answer: e.target.value })}
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl h-24 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition resize-none"
+                                    />
+                                </div>
+                            </div>
+                            <div className="p-6 bg-slate-50 flex justify-end gap-3">
+                                <button
+                                    onClick={() => setEditingFlashcard(null)}
+                                    className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleUpdateFlashcard}
+                                    className="px-6 py-2 bg-primary text-white font-bold rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-500/30"
+                                >
+                                    Guardar Cambios
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+        </div>
     );
 };
 
