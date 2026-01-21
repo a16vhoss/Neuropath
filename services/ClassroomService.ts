@@ -404,6 +404,21 @@ export async function getAssignmentSubmissions(assignmentId: string): Promise<As
     return data || [];
 }
 
+export async function getStudentSubmission(assignmentId: string, studentId: string): Promise<AssignmentSubmission | null> {
+    const { data, error } = await supabase
+        .from('assignment_submissions')
+        .select(`
+      *,
+      student:profiles!student_id(id, full_name, avatar_url, email)
+    `)
+        .eq('assignment_id', assignmentId)
+        .eq('student_id', studentId)
+        .maybeSingle();
+
+    if (error) throw error;
+    return data;
+}
+
 export async function getSubmission(submissionId: string): Promise<AssignmentSubmission> {
     const { data, error } = await supabase
         .from('assignment_submissions')

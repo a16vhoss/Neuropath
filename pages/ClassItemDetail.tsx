@@ -5,7 +5,9 @@ import {
     getAssignment,
     getAssignmentSubmissions,
     submitAssignment,
-    updateAssignment
+    updateAssignment,
+    getStudentSubmission,
+    gradeSubmission
 } from '../services/ClassroomService'; // Verify imports
 import { Assignment } from '../services/ClassroomService';
 import { supabase } from '../services/supabaseClient';
@@ -25,6 +27,8 @@ const ClassItemDetail: React.FC = () => {
     // Teacher specific states
     const [publishing, setPublishing] = useState(false);
     const [generatingSummary, setGeneratingSummary] = useState(false);
+    const [isGradingModalOpen, setIsGradingModalOpen] = useState(false);
+    const [submissionsList, setSubmissionsList] = useState<any[]>([]);
 
     // Edit State
     const [isEditing, setIsEditing] = useState(false);
@@ -36,35 +40,35 @@ const ClassItemDetail: React.FC = () => {
     }>({ title: '', description: '', due_date: '', points: 0 });
     const [saving, setSaving] = useState(false);
 
+    // Student Submission State
+    const [submitting, setSubmitting] = useState(false);
+    const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
+    const [submissionFile, setSubmissionFile] = useState<File | null>(null);
+    const [submissionLink, setSubmissionLink] = useState('');
+    const [submissionText, setSubmissionText] = useState('');
+
     useEffect(() => {
-        loadItem();
-    }, [itemId]);
+        if (user) {
+            loadItem();
+        }
+    }, [itemId, user]);
 
     const loadItem = async () => {
         if (!itemId) return;
         setLoading(true);
         try {
-            // We need a specific getAssignment function or filter from list
-            // Assuming getClassAssignments can filter or we fetch all and find
-            // Better to add getAssignmentById in service if not exists.
-            // For now, I'll assume we can fetch it. I will implement getAssignmentById in service.
-
-            // Temporary: Fetch all and find (Optimization: Add getAssignmentById later)
-            // Actually, let's try to see if we can use a direct query in the component 
-            // or better, update ClassroomService. 
-            // Using a placeholder fetch for now.
-            // Using a placeholder fetch for now.
             const itemData = await getAssignment(itemId);
             setItem(itemData);
 
             // Load submission if student
-            if (!isTeacher) {
-                // Fetch submission logic
+            if (!isTeacher && user) {
+                const sub = await getStudentSubmission(itemId, user.id);
+                setSubmission(sub);
             }
 
         } catch (err: any) {
             console.error(err);
-            setError('Error al cargar el contenido module.');
+            setError('Error al cargar el contenido del módulo.');
         } finally {
             setLoading(false);
         }
@@ -142,6 +146,122 @@ const ClassItemDetail: React.FC = () => {
         }
     }
 
+
+
+
+    const handleStartAssignment = async () => {
+        if (!user || !item) return;
+        setSubmitting(true);
+        try {
+            if (submission) {
+                setIsSubmissionModalOpen(true);
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from('assignment_submissions')
+                .insert({
+                    assignment_id: item.id,
+                    student_id: user.id,
+                    status: 'in_progress',
+                    is_late: item.due_date ? new Date(item.due_date) < new Date() : false
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+            setSubmission(data);
+            setIsSubmissionModalOpen(true);
+        } catch (err) {
+            console.error(err);
+            alert('Error al iniciar la tarea.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleSubmitWork = async () => {
+        if (!submission || !user || !item) return;
+        setSubmitting(true);
+        try {
+            let attachments = submission.attachments || [];
+
+            // Upload File
+            if (submissionFile) {
+                const fileName = `submissions/${item.id}/${user.id}/${Date.now()}_${submissionFile.name}`;
+                const { error: uploadError } = await supabase.storage
+                    .from('materials')
+                    .upload(fileName, submissionFile);
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('materials')
+                    .getPublicUrl(fileName);
+
+                attachments = [...attachments, {
+                    type: 'file',
+                    title: submissionFile.name,
+                    url: publicUrl,
+                    mime_type: submissionFile.type
+                }];
+            }
+
+            // Append link if provided
+            let finalLink = submission.link_response;
+            if (submissionLink) {
+                finalLink = submissionLink; // Simple override for now
+            }
+
+            // Append text if provided
+            let finalText = submission.text_response;
+            if (submissionText) {
+                finalText = submissionText;
+            }
+
+            await submitAssignment(submission.id, {
+                text_response: finalText,
+                link_response: finalLink,
+                attachments: attachments
+            });
+
+            // Refresh
+            const updated = await getStudentSubmission(item.id, user.id);
+            setSubmission(updated);
+            setIsSubmissionModalOpen(false);
+            setSubmissionFile(null);
+            setSubmissionLink('');
+            setSubmissionText('');
+
+        } catch (err) {
+            console.error(err);
+            alert('Error al entregar tarea.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleViewSubmissions = async () => {
+        if (!item) return;
+        try {
+            const subs = await getAssignmentSubmissions(item.id);
+            setSubmissionsList(subs);
+            setIsGradingModalOpen(true);
+        } catch (err) {
+            console.error(err);
+            alert('Error al cargar entregas.');
+        }
+    };
+
+    const handleGradeSubmission = async (submissionId: string, grade: number) => {
+        try {
+            const updated = await gradeSubmission(submissionId, grade);
+            setSubmissionsList(prev => prev.map(s => s.id === submissionId ? { ...s, ...updated } : s));
+        } catch (err) {
+            console.error(err);
+            alert('Error al calificar.');
+        }
+    };
 
     const handleEditClick = () => {
         if (!item) return;
@@ -449,25 +569,59 @@ const ClassItemDetail: React.FC = () => {
                         {!isTeacher && item.type === 'assignment' && (
                             <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 sticky top-24">
                                 <h3 className="font-bold text-slate-900 mb-4 text-lg">Tu Entrega</h3>
-                                {submission ? (
+                                {!submission ? (
                                     <div className="space-y-4">
-                                        <div className={`p-3 rounded-lg border text-center ${submission.status === 'graded' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
-                                            submission.status === 'submitted' ? 'bg-blue-50 border-blue-200 text-blue-700' :
-                                                'bg-slate-100 border-slate-200 text-slate-600'
-                                            }`}>
-                                            <p className="font-bold capitalize">{submission.status === 'submitted' ? 'Entregado' : submission.status}</p>
-                                            {submission.grade && <p className="text-2xl font-black mt-1">{submission.grade}/{item.points}</p>}
-                                        </div>
-                                        <button className="w-full bg-white border border-slate-300 font-bold py-2.5 rounded-xl hover:bg-slate-50 transition text-slate-700">
-                                            Ver Detalles
+                                        <p className="text-sm text-slate-600">No has empezado esta tarea.</p>
+                                        <button
+                                            onClick={handleStartAssignment}
+                                            disabled={submitting}
+                                            className="w-full bg-primary text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-900/20 disabled:opacity-50"
+                                        >
+                                            {submitting ? 'Iniciando...' : 'Empezar Tarea'}
                                         </button>
                                     </div>
                                 ) : (
                                     <div className="space-y-4">
-                                        <p className="text-sm text-slate-600">No has entregado esta tarea.</p>
-                                        <button className="w-full bg-primary text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-900/20">
-                                            Empezar Tarea
-                                        </button>
+                                        <div className={`p-3 rounded-lg border text-center ${submission.status === 'graded' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                                            submission.status === 'turned_in' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                                                'bg-amber-50 border-amber-200 text-amber-700'
+                                            }`}>
+                                            <p className="font-bold capitalize mb-1">
+                                                {submission.status === 'graded' ? 'Calificado' :
+                                                    submission.status === 'turned_in' ? 'Entregado' :
+                                                        submission.status === 'in_progress' ? 'En Progreso' : 'Asignado'}
+                                            </p>
+                                            {submission.grade !== undefined && submission.grade !== null && (
+                                                <p className="text-2xl font-black">{submission.grade}/{item.points}</p>
+                                            )}
+                                        </div>
+
+                                        {(submission.status === 'in_progress' || submission.status === 'assigned' || submission.status === 'returned') && (
+                                            <div className="space-y-3">
+                                                <button
+                                                    onClick={() => {
+                                                        setSubmissionText(submission.text_response || '');
+                                                        setSubmissionLink(submission.link_response || '');
+                                                        setIsSubmissionModalOpen(true);
+                                                    }}
+                                                    className="w-full bg-white border border-slate-300 font-bold py-2.5 rounded-xl hover:bg-slate-50 transition text-slate-700 shadow-sm"
+                                                >
+                                                    {submission.status === 'returned' ? 'Reenviar Tarea' : 'Editar Entrega'}
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Display attached info summary if exists */}
+                                        {submission.attachments?.length > 0 && (
+                                            <div className="text-xs text-slate-500 mt-2">
+                                                <p className="font-bold">Adjuntos:</p>
+                                                <ul className="list-disc list-inside">
+                                                    {submission.attachments.map((a: any, i: number) => (
+                                                        <li key={i} className="truncate">{a.title}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -478,12 +632,19 @@ const ClassItemDetail: React.FC = () => {
                             <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 sticky top-24">
                                 <h3 className="font-bold text-slate-900 mb-4 text-lg">Gestión</h3>
                                 <div className="space-y-2">
-                                    <button className="w-full text-left px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-primary hover:text-primary transition font-medium flex justify-between items-center group">
+                                    <button
+                                        onClick={handleViewSubmissions}
+                                        className="w-full text-left px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-primary hover:text-primary transition font-medium flex justify-between items-center group"
+                                    >
                                         <span>Ver Entregas</span>
-                                        <span className="bg-slate-100 px-2 py-0.5 rounded-md text-xs text-slate-600 group-hover:bg-primary/10 group-hover:text-primary">12/24</span>
+                                        <span className="material-symbols-outlined text-slate-400 group-hover:text-primary">visibility</span>
                                     </button>
-                                    <button className="w-full text-left px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-primary hover:text-primary transition font-medium">
-                                        Calificar (SpeedGrader)
+                                    <button
+                                        onClick={handleViewSubmissions}
+                                        className="w-full text-left px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-primary hover:text-primary transition font-medium flex justify-between items-center group"
+                                    >
+                                        <span>Calificar</span>
+                                        <span className="material-symbols-outlined text-slate-400 group-hover:text-primary">grading</span>
                                     </button>
                                 </div>
                             </div>
@@ -491,6 +652,193 @@ const ClassItemDetail: React.FC = () => {
                     </div>
                 </div>
             </div>
+            {/* Student Submission Modal */}
+            {isSubmissionModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="p-8">
+                            <h2 className="text-2xl font-black text-slate-900 mb-6">Entrega de Tarea</h2>
+
+                            <div className="space-y-6">
+                                {/* Text Response */}
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-2">Respuesta de Texto</label>
+                                    <textarea
+                                        value={submissionText}
+                                        onChange={(e) => setSubmissionText(e.target.value)}
+                                        placeholder="Escribe tu respuesta aquí..."
+                                        rows={4}
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none"
+                                    />
+                                </div>
+
+                                {/* Link Response */}
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-2">Enlace (Link)</label>
+                                    <input
+                                        type="url"
+                                        value={submissionLink}
+                                        onChange={(e) => setSubmissionLink(e.target.value)}
+                                        placeholder="https://..."
+                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                                    />
+                                </div>
+
+                                {/* File Attachment */}
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-2">Adjuntar Archivo</label>
+                                    <div className="flex items-center justify-center w-full">
+                                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition">
+                                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                                <span className="material-symbols-outlined text-3xl text-slate-400 mb-2">cloud_upload</span>
+                                                <p className="mb-2 text-sm text-slate-500"><span className="font-semibold">Click para subir</span></p>
+                                                <p className="text-xs text-slate-500">{submissionFile ? submissionFile.name : 'PDF, DOCX, PNG, JPG'}</p>
+                                            </div>
+                                            <input
+                                                type="file"
+                                                className="hidden"
+                                                onChange={(e) => {
+                                                    if (e.target.files && e.target.files[0]) {
+                                                        setSubmissionFile(e.target.files[0]);
+                                                    }
+                                                }}
+                                            />
+                                        </label>
+                                    </div>
+                                    {submissionFile && (
+                                        <div className="mt-2 flex items-center gap-2 text-sm text-emerald-600 bg-emerald-50 p-2 rounded-lg">
+                                            <span className="material-symbols-outlined text-base">check_circle</span>
+                                            <span className="truncate">{submissionFile.name}</span>
+                                            <button onClick={() => setSubmissionFile(null)} className="ml-auto text-slate-400 hover:text-rose-500">
+                                                <span className="material-symbols-outlined text-base">close</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 p-6 flex justify-end gap-3 border-t border-slate-100">
+                            <button
+                                onClick={() => setIsSubmissionModalOpen(false)}
+                                className="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition"
+                                disabled={submitting}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSubmitWork}
+                                disabled={submitting}
+                                className="bg-primary text-white font-bold px-6 py-2.5 rounded-xl hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-blue-900/20"
+                            >
+                                {submitting ? 'Entregando...' : 'Entregar Tarea'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Teacher Grading Modal */}
+            {isTeacher && isGradingModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <h2 className="text-2xl font-black text-slate-900">Entregas de Estudiantes</h2>
+                            <button onClick={() => setIsGradingModalOpen(false)} className="bg-slate-200 p-2 rounded-full hover:bg-slate-300 transition">
+                                <span className="material-symbols-outlined text-slate-600">close</span>
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6">
+                            {submissionsList.length === 0 ? (
+                                <div className="text-center py-20 text-slate-500">
+                                    <span className="material-symbols-outlined text-5xl mb-4 text-slate-300">inbox</span>
+                                    <p>No hay entregas aún.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {submissionsList.map((sub) => (
+                                        <div key={sub.id} className="border border-slate-200 rounded-xl p-5 hover:border-blue-200 transition bg-white shadow-sm">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
+                                                        {sub.student?.avatar_url ? (
+                                                            <img src={sub.student.avatar_url} alt="Av" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <span className="material-symbols-outlined text-slate-400">person</span>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-slate-900">{sub.student?.full_name || 'Estudiante'}</p>
+                                                        <p className="text-xs text-slate-500">{new Date(sub.submitted_at || sub.created_at).toLocaleString()}</p>
+                                                    </div>
+                                                </div>
+                                                <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${sub.status === 'graded' ? 'bg-emerald-100 text-emerald-700' :
+                                                        sub.status === 'turned_in' ? 'bg-blue-100 text-blue-700' :
+                                                            'bg-amber-100 text-amber-700'
+                                                    }`}>
+                                                    {sub.status === 'graded' ? 'Calificado' : sub.status === 'turned_in' ? 'Entregado' : 'En Progreso'}
+                                                </div>
+                                            </div>
+
+                                            {/* Submission Content */}
+                                            <div className="mb-4 bg-slate-50 p-4 rounded-lg text-sm">
+                                                {sub.text_response && <p className="mb-2 whitespace-pre-wrap text-slate-700">{sub.text_response}</p>}
+                                                {sub.link_response && (
+                                                    <a href={sub.link_response} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 hover:underline mb-2">
+                                                        <span className="material-symbols-outlined text-base">link</span>
+                                                        <span className="truncate">{sub.link_response}</span>
+                                                    </a>
+                                                )}
+                                                {sub.attachments && sub.attachments.length > 0 && (
+                                                    <div className="flex flex-wrap gap-2 mt-2">
+                                                        {sub.attachments.map((att: any, idx: number) => (
+                                                            <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium hover:border-primary hover:text-primary transition text-slate-700">
+                                                                <span className="material-symbols-outlined text-sm">attachment</span>
+                                                                <span className="truncate max-w-[150px]">{att.title || 'Archivo'}</span>
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {!sub.text_response && !sub.link_response && (!sub.attachments || sub.attachments.length === 0) && (
+                                                    <p className="text-slate-400 italic">Sin contenido.</p>
+                                                )}
+                                            </div>
+
+                                            {/* Grading Input */}
+                                            <div className="flex items-center gap-4 border-t border-slate-100 pt-4">
+                                                <div className="flex-1">
+                                                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Calificación (/{item.points})</label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="number"
+                                                            defaultValue={sub.grade}
+                                                            placeholder="-"
+                                                            className="w-24 px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-slate-900 font-bold"
+                                                            onBlur={(e) => {
+                                                                const val = parseFloat(e.target.value);
+                                                                if (!isNaN(val)) handleGradeSubmission(sub.id, val);
+                                                            }}
+                                                        />
+                                                        {sub.grade !== null && sub.grade !== undefined && <span className="material-symbols-outlined text-emerald-500 animate-in fade-in">check_circle</span>}
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1">
+                                                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Feedback</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Opcional..."
+                                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
