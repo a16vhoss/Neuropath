@@ -1,7 +1,9 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+
+const MODEL_NAME = "gemini-1.5-flash-001";
 
 export const generateStudyFlashcards = async (topic: string) => {
   if (!API_KEY || API_KEY === 'PLACEHOLDER_API_KEY') {
@@ -10,20 +12,19 @@ export const generateStudyFlashcards = async (topic: string) => {
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash-001",
-      contents: `Generate 5 educational flashcards about "${topic}" in Spanish.`,
-      config: {
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const model = genAI.getGenerativeModel({
+      model: MODEL_NAME,
+      generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.ARRAY,
+          type: SchemaType.ARRAY,
           items: {
-            type: Type.OBJECT,
+            type: SchemaType.OBJECT,
             properties: {
-              question: { type: Type.STRING },
-              answer: { type: Type.STRING },
-              category: { type: Type.STRING }
+              question: { type: SchemaType.STRING },
+              answer: { type: SchemaType.STRING },
+              category: { type: SchemaType.STRING }
             },
             required: ["question", "answer", "category"]
           }
@@ -31,7 +32,8 @@ export const generateStudyFlashcards = async (topic: string) => {
       }
     });
 
-    return JSON.parse(response.text || "[]");
+    const result = await model.generateContent(`Generate 5 educational flashcards about "${topic}" in Spanish.`);
+    return JSON.parse(result.response.text() || "[]");
   } catch (e) {
     console.error("Failed to generate flashcards", e);
     return [];
@@ -43,7 +45,7 @@ export const generateStudyFlashcards = async (topic: string) => {
 export const getTutorResponse = async (question: string, context: string, subject?: string, mode: 'standard' | 'hint' | 'analogy' = 'standard', currentContext?: string) => {
   if (!API_KEY) return "Lo siento, la IA no está disponible en este momento.";
 
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const genAI = new GoogleGenerativeAI(API_KEY);
 
   let systemInstruction = "Actúa como un tutor socrático experto.";
   if (subject) {
@@ -63,15 +65,14 @@ export const getTutorResponse = async (question: string, context: string, subjec
     systemInstruction += " No des la respuesta directamente. Haz preguntas que guíen al estudiante a descubrir la respuesta por sí mismo.";
   }
 
-  const response = await ai.models.generateContent({
-    model: "gemini-1.5-flash-001",
-    contents: `Contexto del estudio (materiales): ${context}. \n\nLo que ve el estudiante ahora (Pregunta activa): ${currentContext || 'N/A'} \n\nPregunta/Comentario del estudiante: ${question}`,
-    config: {
-      systemInstruction: systemInstruction
-    }
+  const model = genAI.getGenerativeModel({
+    model: MODEL_NAME,
+    systemInstruction: systemInstruction
   });
 
-  return response.text;
+  const result = await model.generateContent(`Contexto del estudio (materiales): ${context}. \n\nLo que ve el estudiante ahora (Pregunta activa): ${currentContext || 'N/A'} \n\nPregunta/Comentario del estudiante: ${question}`);
+
+  return result.response.text();
 };
 
 // Unified function for Magic Import
@@ -82,7 +83,7 @@ export const generateStudySetFromContext = async (content: string, type: 'text' 
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    const genAI = new GoogleGenerativeAI(API_KEY);
 
     let prompt = `Analyze the following content and generate 10 high-quality educational flashcards in Spanish.
     Content Type: ${type}
@@ -93,19 +94,18 @@ export const generateStudySetFromContext = async (content: string, type: 'text' 
       Content: ${content.substring(0, 30000)}`;
     }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash-001",
-      contents: prompt,
-      config: {
+    const model = genAI.getGenerativeModel({
+      model: MODEL_NAME,
+      generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.ARRAY,
+          type: SchemaType.ARRAY,
           items: {
-            type: Type.OBJECT,
+            type: SchemaType.OBJECT,
             properties: {
-              question: { type: Type.STRING },
-              answer: { type: Type.STRING },
-              category: { type: Type.STRING }
+              question: { type: SchemaType.STRING },
+              answer: { type: SchemaType.STRING },
+              category: { type: SchemaType.STRING }
             },
             required: ["question", "answer", "category"]
           }
@@ -113,7 +113,9 @@ export const generateStudySetFromContext = async (content: string, type: 'text' 
       }
     });
 
-    return JSON.parse(response.text || "[]");
+    const result = await model.generateContent(prompt);
+
+    return JSON.parse(result.response.text() || "[]");
   } catch (e) {
     console.error("Failed to generate study set from context", e);
     throw e;
@@ -157,7 +159,7 @@ export const generateFlashcardsFromYouTubeURL = async (youtubeUrl: string): Prom
     console.log('YouTube metadata:', { videoTitle, channelName });
 
     // Use Gemini to generate educational flashcards AND detailed summary
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    const genAI = new GoogleGenerativeAI(API_KEY);
 
     const prompt = `Eres un experto educador. Analiza el siguiente video de YouTube y genera:
 1. Un RESUMEN ULTRA DETALLADO, EXTENSO Y ESPECÍFICO del contenido del video (mínimo 500 palabras)
@@ -181,26 +183,25 @@ PARA LAS FLASHCARDS:
 - Preguntas claras y respuestas educativas concisas
 - Categoría que refleje el tema principal`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash-001",
-      contents: prompt,
-      config: {
+    const model = genAI.getGenerativeModel({
+      model: MODEL_NAME,
+      generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.OBJECT,
+          type: SchemaType.OBJECT,
           properties: {
             summary: {
-              type: Type.STRING,
+              type: SchemaType.STRING,
               description: "Ultra detailed summary of the video content in Spanish, formatted with markdown"
             },
             flashcards: {
-              type: Type.ARRAY,
+              type: SchemaType.ARRAY,
               items: {
-                type: Type.OBJECT,
+                type: SchemaType.OBJECT,
                 properties: {
-                  question: { type: Type.STRING },
-                  answer: { type: Type.STRING },
-                  category: { type: Type.STRING }
+                  question: { type: SchemaType.STRING },
+                  answer: { type: SchemaType.STRING },
+                  category: { type: SchemaType.STRING }
                 },
                 required: ["question", "answer", "category"]
               }
@@ -211,15 +212,16 @@ PARA LAS FLASHCARDS:
       }
     });
 
-    const result = JSON.parse(response.text || "{}");
+    const result = await model.generateContent(prompt);
+    const resultData = JSON.parse(result.response.text() || "{}");
 
-    if (!result.flashcards || result.flashcards.length === 0) {
+    if (!resultData.flashcards || resultData.flashcards.length === 0) {
       throw new Error('No se pudieron generar flashcards. Intenta con otro video.');
     }
 
     return {
-      flashcards: result.flashcards,
-      summary: result.summary || `Resumen del video: ${videoTitle}`,
+      flashcards: resultData.flashcards,
+      summary: resultData.summary || `Resumen del video: ${videoTitle}`,
       videoTitle,
       channelName,
       videoUrl: youtubeUrl
@@ -285,7 +287,7 @@ export const generateFlashcardsFromWebURL = async (webUrl: string): Promise<WebA
 
     console.log('Web content extracted:', { pageTitle, contentLength: textContent.length });
 
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    const genAI = new GoogleGenerativeAI(API_KEY);
 
     const prompt = `Eres un experto educador. Analiza el siguiente contenido de una página web y genera:
 
@@ -305,26 +307,25 @@ URL: ${webUrl}
 CONTENIDO:
 ${textContent}`;
 
-    const apiResponse = await ai.models.generateContent({
-      model: "gemini-1.5-flash-001",
-      contents: prompt,
-      config: {
+    const model = genAI.getGenerativeModel({
+      model: MODEL_NAME,
+      generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.OBJECT,
+          type: SchemaType.OBJECT,
           properties: {
             summary: {
-              type: Type.STRING,
+              type: SchemaType.STRING,
               description: "Ultra detailed summary of the page content in Spanish, formatted with markdown"
             },
             flashcards: {
-              type: Type.ARRAY,
+              type: SchemaType.ARRAY,
               items: {
-                type: Type.OBJECT,
+                type: SchemaType.OBJECT,
                 properties: {
-                  question: { type: Type.STRING },
-                  answer: { type: Type.STRING },
-                  category: { type: Type.STRING }
+                  question: { type: SchemaType.STRING },
+                  answer: { type: SchemaType.STRING },
+                  category: { type: SchemaType.STRING }
                 },
                 required: ["question", "answer", "category"]
               }
@@ -335,15 +336,16 @@ ${textContent}`;
       }
     });
 
-    const result = JSON.parse(apiResponse.text || "{}");
+    const result = await model.generateContent(prompt);
+    const resultData = JSON.parse(result.response.text() || "{}");
 
-    if (!result.flashcards || result.flashcards.length === 0) {
+    if (!resultData.flashcards || resultData.flashcards.length === 0) {
       throw new Error('No se pudieron generar flashcards. Intenta con otro enlace.');
     }
 
     return {
-      flashcards: result.flashcards,
-      summary: result.summary || `Resumen de: ${pageTitle}`,
+      flashcards: resultData.flashcards,
+      summary: resultData.summary || `Resumen de: ${pageTitle}`,
       pageTitle,
       sourceUrl: webUrl
     };
@@ -357,7 +359,7 @@ ${textContent}`;
     // If direct fetch fails, try using Gemini's knowledge about the topic
     try {
       console.log('Direct fetch failed, using Gemini knowledge...');
-      const ai = new GoogleGenAI({ apiKey: API_KEY });
+      const genAI = new GoogleGenerativeAI(API_KEY);
 
       // Extract domain/topic from URL
       const urlParts = webUrl.split('/');
@@ -374,23 +376,22 @@ Ruta: ${pathParts}
 
 Usa tu conocimiento para crear contenido educativo relevante.`;
 
-      const fallbackResponse = await ai.models.generateContent({
-        model: "gemini-1.5-flash-001",
-        contents: fallbackPrompt,
-        config: {
+      const model = genAI.getGenerativeModel({
+        model: MODEL_NAME,
+        generationConfig: {
           responseMimeType: "application/json",
           responseSchema: {
-            type: Type.OBJECT,
+            type: SchemaType.OBJECT,
             properties: {
-              summary: { type: Type.STRING },
+              summary: { type: SchemaType.STRING },
               flashcards: {
-                type: Type.ARRAY,
+                type: SchemaType.ARRAY,
                 items: {
-                  type: Type.OBJECT,
+                  type: SchemaType.OBJECT,
                   properties: {
-                    question: { type: Type.STRING },
-                    answer: { type: Type.STRING },
-                    category: { type: Type.STRING }
+                    question: { type: SchemaType.STRING },
+                    answer: { type: SchemaType.STRING },
+                    category: { type: SchemaType.STRING }
                   },
                   required: ["question", "answer", "category"]
                 }
@@ -401,11 +402,12 @@ Usa tu conocimiento para crear contenido educativo relevante.`;
         }
       });
 
-      const fallbackResult = JSON.parse(fallbackResponse.text || "{}");
+      const fallbackResult = await model.generateContent(fallbackPrompt);
+      const fallbackData = JSON.parse(fallbackResult.response.text() || "{}");
 
       return {
-        flashcards: fallbackResult.flashcards || [],
-        summary: fallbackResult.summary || 'Contenido generado desde la URL',
+        flashcards: fallbackData.flashcards || [],
+        summary: fallbackData.summary || 'Contenido generado desde la URL',
         pageTitle: pathParts || domain,
         sourceUrl: webUrl
       };
@@ -421,48 +423,47 @@ export const generateQuizQuestions = async (context: string) => {
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash-001",
-      contents: context.substring(0, 25000),
-      config: {
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const model = genAI.getGenerativeModel({
+      model: MODEL_NAME,
+      generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.ARRAY,
+          type: SchemaType.ARRAY,
           items: {
-            type: Type.OBJECT,
+            type: SchemaType.OBJECT,
             properties: {
               type: {
-                type: Type.STRING,
+                type: SchemaType.STRING,
                 description: "Question type: true_false, multiple_choice, analysis, design, or practical"
               },
-              question: { type: Type.STRING },
+              question: { type: SchemaType.STRING },
               options: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
+                type: SchemaType.ARRAY,
+                items: { type: SchemaType.STRING },
                 description: "Answer options. For true_false: ['Verdadero', 'Falso']. For multiple_choice/analysis/practical: 4 options. For design: ['Mi solución está lista']"
               },
               correctIndex: {
-                type: Type.NUMBER,
+                type: SchemaType.NUMBER,
                 description: "Index of the correct option (0-based)"
               },
-              explanation: { type: Type.STRING },
-              topic: { type: Type.STRING },
+              explanation: { type: SchemaType.STRING },
+              topic: { type: SchemaType.STRING },
               scenario: {
-                type: Type.STRING,
+                type: SchemaType.STRING,
                 description: "For analysis type: a real-world case or scenario to analyze"
               },
               designPrompt: {
-                type: Type.STRING,
+                type: SchemaType.STRING,
                 description: "For design type: what solution to design/create"
               },
               evaluationCriteria: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
+                type: SchemaType.ARRAY,
+                items: { type: SchemaType.STRING },
                 description: "For design type: 3 criteria to evaluate the response"
               },
               realWorldExample: {
-                type: Type.STRING,
+                type: SchemaType.STRING,
                 description: "For practical type: a concrete, relatable example from daily life or industry showing how the concept is applied"
               }
             },
@@ -472,7 +473,8 @@ export const generateQuizQuestions = async (context: string) => {
       }
     });
 
-    return JSON.parse(response.text || "[]");
+    const result = await model.generateContent(context.substring(0, 25000));
+    return JSON.parse(result.response.text() || "[]");
   } catch (e) {
     console.error("Failed to generate quiz", e);
     return [];
@@ -485,24 +487,18 @@ export const generatePodcastScript = async (context: string) => {
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash-001",
-      contents: `Convert the following study notes into an engaging podcast script between two hosts, Alex (enthusiastic, asks questions) and Sam (expert, explains concepts with analogies). 
-      Make it feel like a real conversation with banter. Keep it under 5 minutes reading time.
-      
-      Context: ${context.substring(0, 20000)} ...
-      
-      Return JSON format.`,
-      config: {
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const model = genAI.getGenerativeModel({
+      model: MODEL_NAME,
+      generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.ARRAY,
+          type: SchemaType.ARRAY,
           items: {
-            type: Type.OBJECT,
+            type: SchemaType.OBJECT,
             properties: {
-              speaker: { type: Type.STRING, enum: ["Alex", "Sam"] },
-              text: { type: Type.STRING }
+              speaker: { type: SchemaType.STRING },
+              text: { type: SchemaType.STRING }
             },
             required: ["speaker", "text"]
           }
@@ -510,7 +506,15 @@ export const generatePodcastScript = async (context: string) => {
       }
     });
 
-    return JSON.parse(response.text || "[]");
+    const prompt = `Convert the following study notes into an engaging podcast script between two hosts, Alex (enthusiastic, asks questions) and Sam (expert, explains concepts with analogies). 
+    Make it feel like a real conversation with banter. Keep it under 5 minutes reading time.
+    
+    Context: ${context.substring(0, 20000)} ...
+    
+    Return JSON format.`;
+
+    const result = await model.generateContent(prompt);
+    return JSON.parse(result.response.text() || "[]");
   } catch (e) {
     console.error("Failed to generate podcast", e);
     return [];
@@ -521,7 +525,7 @@ export const autoCategorizeFlashcards = async (flashcards: { id: string, questio
   if (!API_KEY) return [];
 
   try {
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    const genAI = new GoogleGenerativeAI(API_KEY);
     // Process in batches if too many
     const subset = flashcards.slice(0, 50); // Limit to 50 for now to avoid context limits
 
@@ -540,18 +544,17 @@ export const autoCategorizeFlashcards = async (flashcards: { id: string, questio
       ${flashcardsData}
     `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash-001",
-      contents: prompt,
-      config: {
+    const model = genAI.getGenerativeModel({
+      model: MODEL_NAME,
+      generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.ARRAY,
+          type: SchemaType.ARRAY,
           items: {
-            type: Type.OBJECT,
+            type: SchemaType.OBJECT,
             properties: {
-              id: { type: Type.STRING },
-              category: { type: Type.STRING }
+              id: { type: SchemaType.STRING },
+              category: { type: SchemaType.STRING }
             },
             required: ["id", "category"]
           }
@@ -559,7 +562,8 @@ export const autoCategorizeFlashcards = async (flashcards: { id: string, questio
       }
     });
 
-    return JSON.parse(response.text || "[]") as { id: string, category: string }[];
+    const result = await model.generateContent(prompt);
+    return JSON.parse(result.response.text() || "[]") as { id: string, category: string }[];
   } catch (e) {
     console.error("Failed to auto-categorize flashcards", e);
     return [];

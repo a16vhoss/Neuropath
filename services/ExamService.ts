@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { getStudentStudySets, getStudySetFlashcards } from "./supabaseClient";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -54,10 +54,39 @@ export const generateMockExam = async (userId: string, studySetIds: string[] = [
             return null;
         }
 
-        const ai = new GoogleGenAI({ apiKey: API_KEY });
-        const response = await ai.models.generateContent({
+        const genAI = new GoogleGenerativeAI(API_KEY);
+        const model = genAI.getGenerativeModel({
             model: "gemini-1.5-flash-001",
-            contents: `You are an expert examiner. Create a challenging mock exam based on the following study notes.
+            generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: SchemaType.OBJECT,
+                    properties: {
+                        questions: {
+                            type: SchemaType.ARRAY,
+                            items: {
+                                type: SchemaType.OBJECT,
+                                properties: {
+                                    id: { type: SchemaType.STRING },
+                                    type: { type: SchemaType.STRING },
+                                    question: { type: SchemaType.STRING },
+                                    options: {
+                                        type: SchemaType.ARRAY,
+                                        items: { type: SchemaType.STRING }
+                                    },
+                                    correctAnswer: { type: SchemaType.STRING },
+                                    explanation: { type: SchemaType.STRING }
+                                },
+                                required: ["id", "type", "question", "correctAnswer", "explanation"]
+                            }
+                        }
+                    },
+                    required: ["questions"]
+                }
+            }
+        });
+
+        const prompt = `You are an expert examiner. Create a challenging mock exam based on the following study notes.
       
       Requirements:
       - Generate 10 questions.
@@ -72,51 +101,17 @@ export const generateMockExam = async (userId: string, studySetIds: string[] = [
       Study Notes:
       ${allContent.substring(0, 25000)}
       
-      Return strictly a JSON array of objects with this schema:
-      {
-        id: string (unique),
-        type: "multiple_choice" | "true_false" | "short_answer",
-        question: string,
-        options: string[] (optional, required for multiple_choice),
-        correctAnswer: string,
-        explanation: string
-      }`,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        questions: {
-                            type: Type.ARRAY,
-                            items: {
-                                type: Type.OBJECT,
-                                properties: {
-                                    id: { type: Type.STRING },
-                                    type: { type: Type.STRING, enum: ["multiple_choice", "true_false", "short_answer"] },
-                                    question: { type: Type.STRING },
-                                    options: {
-                                        type: Type.ARRAY,
-                                        items: { type: Type.STRING }
-                                    },
-                                    correctAnswer: { type: Type.STRING },
-                                    explanation: { type: Type.STRING }
-                                },
-                                required: ["id", "type", "question", "correctAnswer", "explanation"]
-                            }
-                        }
-                    }
-                }
-            }
-        });
+      Return strictly a JSON object with a "questions" array.`;
 
-        const result = JSON.parse(response.text || "{}");
+        const result = await model.generateContent(prompt);
+        const responseData = JSON.parse(result.response.text() || "{}");
 
-        if (!result.questions) return null;
+        if (!responseData.questions) return null;
 
         return {
             id: Date.now().toString(),
-            questions: result.questions,
-            totalQuestions: result.questions.length
+            questions: responseData.questions,
+            totalQuestions: responseData.questions.length
         };
 
     } catch (error) {
@@ -131,7 +126,7 @@ export const validateExamAnswers = async (questions: ExamQuestion[], userAnswers
             throw new Error("No API Key configurada para validación");
         }
 
-        const ai = new GoogleGenAI({ apiKey: API_KEY });
+        const genAI = new GoogleGenerativeAI(API_KEY);
 
         // Prepare payload
         const gradingPayload = questions.map(q => ({
@@ -141,9 +136,25 @@ export const validateExamAnswers = async (questions: ExamQuestion[], userAnswers
             userAnswer: userAnswers[q.id] || "No answer"
         }));
 
-        const response = await ai.models.generateContent({
+        const model = genAI.getGenerativeModel({
             model: "gemini-1.5-flash-001",
-            contents: `You are a strict but fair teacher grading an exam.
+            generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: SchemaType.ARRAY,
+                    items: {
+                        type: SchemaType.OBJECT,
+                        properties: {
+                            id: { type: SchemaType.STRING },
+                            correct: { type: SchemaType.BOOLEAN }
+                        },
+                        required: ["id", "correct"]
+                    }
+                }
+            }
+        });
+
+        const prompt = `You are a strict but fair teacher grading an exam.
              Compare the student's answer with the correct answer for each question.
              
              Rules:
@@ -155,22 +166,20 @@ export const validateExamAnswers = async (questions: ExamQuestion[], userAnswers
                 - Partial matches that convey the right meaning are ACCEPTED.
                 
              Input JSON:
-                
-             Input JSON:
              ${JSON.stringify(gradingPayload)}
              
-             Return a JSON object where keys are question IDs and values are booleans (true for correct, false for incorrect).
-             Example: { "q1": true, "q2": false }`,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    additionalProperties: { type: Type.BOOLEAN }
-                }
-            }
+             Return a JSON array of objects with "id" and "correct" boolean.`;
+
+        const result = await model.generateContent(prompt);
+        const gradingResults: { id: string, correct: boolean }[] = JSON.parse(result.response.text() || "[]");
+
+        // Convert array back to record
+        const output: Record<string, boolean> = {};
+        gradingResults.forEach(item => {
+            output[item.id] = item.correct;
         });
 
-        return JSON.parse(response.text || "{}");
+        return output;
     } catch (error) {
         console.error("Error validating exam:", error);
         throw error;
