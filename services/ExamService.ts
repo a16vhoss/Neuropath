@@ -1,5 +1,6 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { SchemaType } from "@google/generative-ai";
 import { getStudentStudySets, getStudySetFlashcards } from "./supabaseClient";
+import { getBestGeminiModel, getGeminiSDK } from "./geminiModelManager";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -28,8 +29,7 @@ export const generateMockExam = async (userId: string, studySetIds: string[] = [
             return null;
         }
 
-        // 2. Fetch flashcards from the most recent 5 study sets to build context
-        // We limit to 5 to avoid token limits and keep it relevant
+        // 2. Fetch flashcards from using available sets
         const recentSets = studySets.slice(0, 5);
         let allContent = "";
 
@@ -48,15 +48,14 @@ export const generateMockExam = async (userId: string, studySetIds: string[] = [
             return null;
         }
 
-        // 3. Generate Exam using Gemini directly here for specialized prompt
-        if (!API_KEY || API_KEY === 'PLACEHOLDER_API_KEY') {
-            console.error("No API Key for exam generation");
-            return null;
-        }
+        // 3. Generate Exam using Gemini Dynamic
+        const genAI = getGeminiSDK();
+        if (!genAI) return null;
 
-        const genAI = new GoogleGenerativeAI(API_KEY);
+        const modelName = await getBestGeminiModel();
+
         const model = genAI.getGenerativeModel({
-            model: "gemini-1.5-pro",
+            model: modelName,
             generationConfig: {
                 responseMimeType: "application/json",
                 responseSchema: {
@@ -122,11 +121,8 @@ export const generateMockExam = async (userId: string, studySetIds: string[] = [
 
 export const validateExamAnswers = async (questions: ExamQuestion[], userAnswers: Record<string, string>): Promise<Record<string, boolean>> => {
     try {
-        if (!API_KEY || API_KEY === 'PLACEHOLDER_API_KEY') {
-            throw new Error("No API Key configurada para validación");
-        }
-
-        const genAI = new GoogleGenerativeAI(API_KEY);
+        const genAI = getGeminiSDK();
+        if (!genAI) throw new Error("No API Key configured");
 
         // Prepare payload
         const gradingPayload = questions.map(q => ({
@@ -136,8 +132,9 @@ export const validateExamAnswers = async (questions: ExamQuestion[], userAnswers
             userAnswer: userAnswers[q.id] || "No answer"
         }));
 
+        const modelName = await getBestGeminiModel();
         const model = genAI.getGenerativeModel({
-            model: "gemini-1.5-pro",
+            model: modelName,
             generationConfig: {
                 responseMimeType: "application/json",
                 responseSchema: {
