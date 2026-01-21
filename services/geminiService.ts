@@ -140,3 +140,76 @@ export const generateFlashcardsFromYouTubeURL = async (url: string) => {
     throw error;
   }
 };
+
+/**
+ * Generate Flashcards from Web URL (Placeholder / Simple Text logic)
+ */
+export const generateFlashcardsFromWebURL = async (url: string) => {
+  // Note: Fetching web content client-side often hits CORS.
+  // Ideally this would be server-side. For now, we will assume
+  // we can't easily fetch arbitrary URLs client-side without a proxy.
+  // We'll implement a "best effort" or mock for now, OR rely on the user pasting text.
+  // If the requirement is strict, we'd need a proxy function in Supabase.
+
+  // For this 'fix', we will just implement it to avoid build errors, 
+  // maybe try to fetch if CORS allows, else fail gracefully.
+  try {
+    const response = await fetch(url);
+    const text = await response.text();
+    // Very basic scraping (extract body text) - likely to be messy HTML
+    // Use a simple regex to strip tags? Or just pass to Gemini if it's not too huge?
+    const cleanText = text.replace(/<[^>]*>?/gm, ' ').slice(0, 20000); // Strip HTML tags
+
+    return await generateStudySetFromContext(cleanText);
+  } catch (error) {
+    console.warn("Could not fetch web URL directly (likely CORS):", error);
+    throw new Error("No se pudo acceder a la URL web (posible restricción CORS). Intenta copiar y pegar el texto manualmente.");
+  }
+};
+
+/**
+ * Auto categorize flashcards
+ */
+export const autoCategorizeFlashcards = async (flashcards: any[]) => {
+  const genAI = getGeminiSDK();
+  if (!genAI || flashcards.length === 0) return flashcards;
+
+  try {
+    const modelName = await getBestGeminiModel();
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              id: { type: SchemaType.STRING }, // to match back
+              category: { type: SchemaType.STRING }
+            }
+          }
+        }
+      }
+    });
+
+    const prompt = `
+         Categoriza las siguientes flashcards en temas breves (ej: Historia, Definición, Fórmula).
+         Input JSON: ${JSON.stringify(flashcards.map((f, i) => ({ id: i.toString(), q: f.question })))}
+         Devuelve un array con {id, category}.
+         `;
+
+    const result = await model.generateContent(prompt);
+    const categories = JSON.parse(result.response.text());
+
+    // Merge back
+    return flashcards.map((f, i) => {
+      const cat = categories.find((c: any) => c.id === i.toString());
+      return { ...f, category: cat ? cat.category : 'General' };
+    });
+
+  } catch (error) {
+    console.error("Error auto-categorizing:", error);
+    return flashcards;
+  }
+};
