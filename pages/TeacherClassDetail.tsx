@@ -677,7 +677,9 @@ const TeacherClassDetail: React.FC = () => {
             // ... (keeping legacy quiz if needed, but focused on Study Set here)
 
             // Save Study Set & Flashcards (New System)
-            if (flashcards.length > 0 || extractedText) {
+            // Always create a Study Set container, even if AI fails to generate content,
+            // so the Student View renders correctly (Unified View).
+            if (materialRecord && materialRecord.id) {
                 try {
                     // Create the Class Study Set container
                     const studySet = await createClassStudySet(
