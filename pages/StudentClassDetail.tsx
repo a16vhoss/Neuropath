@@ -143,7 +143,7 @@ const StudentClassDetail: React.FC = () => {
             <aside className="w-full md:w-64 bg-white border-r border-slate-200 flex flex-col">
                 <div className="p-6 flex items-center gap-2 border-b border-slate-100">
                     <span className="material-symbols-outlined text-primary text-3xl font-bold">neurology</span>
-                    <span className="font-extrabold text-xl tracking-tighter text-slate-900">NEUROPATH</span>
+                    <span className="font-extrabold text-xl tracking-tighter text-slate-900">MHS</span>
                 </div>
                 <nav className="flex-1 p-4 space-y-1">
                     <div onClick={() => navigate('/student')} className="text-slate-600 p-3 rounded-lg flex items-center gap-3 font-medium hover:bg-slate-50 cursor-pointer">

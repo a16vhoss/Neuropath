@@ -25,7 +25,7 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-3xl font-bold">neurology</span>
-            <span className="font-extrabold text-2xl tracking-tighter text-slate-900">NEUROPATH</span>
+            <span className="font-extrabold text-2xl tracking-tighter text-slate-900">MHS</span>
           </div>
           <div className="hidden md:flex items-center gap-8 font-medium text-slate-600">
             <a href="#features" className="hover:text-primary transition-colors">Producto</a>
@@ -77,7 +77,7 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
           </div>
           <div className="lg:w-2/5 animate-fade-in hidden lg:block">
             <div className="bg-slate-900/40 p-2 rounded-2xl backdrop-blur-md border border-white/20 shadow-2xl rotate-3">
-              <img src="https://picsum.photos/seed/neuropath-ui/600/800" className="rounded-xl shadow-inner w-full h-[500px] object-cover" alt="Neuropath UI" />
+              <img src="https://picsum.photos/seed/neuropath-ui/600/800" className="rounded-xl shadow-inner w-full h-[500px] object-cover" alt="MHS UI" />
             </div>
           </div>
         </div>
@@ -122,7 +122,7 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
             <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <span className="material-symbols-outlined text-4xl">auto_awesome</span>
             </div>
-            <h3 className="text-3xl font-black mb-4">NEUROPATH: IA que Transforma la Educación</h3>
+            <h3 className="text-3xl font-black mb-4">MHS: IA que Transforma la Educación</h3>
             <p className="text-blue-100 text-lg max-w-2xl mx-auto">
               Sube tu material una vez. La IA crea rutas de estudio personalizadas automáticamente.
               Los profesores ven el progreso en tiempo real. Los estudiantes aprenden 3x más rápido.
@@ -162,7 +162,7 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-12">
             <p className="text-primary font-bold uppercase tracking-widest text-sm mb-2">Demo</p>
-            <h2 className="text-4xl font-black text-slate-900">Mira NEUROPATH en acción</h2>
+            <h2 className="text-4xl font-black text-slate-900">Mira MHS en acción</h2>
             <p className="text-slate-500 mt-4 max-w-2xl mx-auto">Descubre cómo la IA transforma materiales en rutas de aprendizaje personalizadas.</p>
           </div>
 
@@ -320,7 +320,7 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-12">
             <p className="text-primary font-bold uppercase tracking-widest text-sm mb-2">Comparación</p>
-            <h2 className="text-4xl font-black text-slate-900">¿Por qué NEUROPATH?</h2>
+            <h2 className="text-4xl font-black text-slate-900">¿Por qué MHS?</h2>
             <p className="text-slate-500 mt-4 max-w-2xl mx-auto">La única plataforma que integra gestión para profesores, IA adaptativa y gamificación para estudiantes.</p>
           </div>
 
@@ -332,7 +332,7 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
                   <th className="p-6 text-center">
                     <div className="flex flex-col items-center">
                       <span className="material-symbols-outlined text-primary text-2xl">neurology</span>
-                      <span className="font-bold text-primary">NEUROPATH</span>
+                      <span className="font-bold text-primary">MHS</span>
                     </div>
                   </th>
                   <th className="p-6 text-center text-slate-400 font-medium">Classroom</th>
@@ -391,7 +391,7 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
                 name: 'Dra. María González',
                 role: 'Profesora de Biología, Prepa UNAM',
                 avatar: 'teacher1',
-                quote: 'Antes pasaba horas creando materiales. Ahora subo mi PDF y NEUROPATH genera todo. Mis alumnos mejoraron 18% en promedio.',
+                quote: 'Antes pasaba horas creando materiales. Ahora subo mi PDF y MHS genera todo. Mis alumnos mejoraron 18% en promedio.',
                 rating: 5
               },
               {
@@ -405,7 +405,7 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
                 name: 'Lic. Roberto Sánchez',
                 role: 'Director Académico, Colegio Moderno',
                 avatar: 'director1',
-                quote: 'Implementamos NEUROPATH en toda la escuela. Los índices de reprobación bajaron 25%. La inversión se pagó sola.',
+                quote: 'Implementamos MHS en toda la escuela. Los índices de reprobación bajaron 25%. La inversión se pagó sola.',
                 rating: 5
               }
             ].map((testimonial, i) => (
@@ -546,7 +546,7 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
             {[
               { q: '¿Es realmente gratis para estudiantes?', a: 'Sí, el plan gratuito incluye materiales ilimitados, rutas personalizadas y flashcards IA sin costo. Solo cobramos por funciones premium como el Tutor Socrático y análisis avanzado.' },
               { q: '¿Cómo funciona la generación de contenido IA?', a: 'Usamos tecnología RAG (Retrieval-Augmented Generation) que analiza tu material y genera contenido educativo basado únicamente en lo que subiste, sin inventar información.' },
-              { q: '¿Puedo usar NEUROPATH para cualquier materia?', a: 'Sí, funciona con cualquier materia de preparatoria y universidad. El sistema se adapta al contenido que subes, ya sea matemáticas, historia, biología o cualquier otra área.' },
+              { q: '¿Puedo usar MHS para cualquier materia?', a: 'Sí, funciona con cualquier materia de preparatoria y universidad. El sistema se adapta al contenido que subes, ya sea matemáticas, historia, biología o cualquier otra área.' },
               { q: '¿Mis datos están seguros?', a: 'Absolutamente. Usamos encriptación de nivel bancario, cumplimos con LFPDPPP (México) y nunca compartimos tu información con terceros.' },
               { q: '¿Puedo cancelar en cualquier momento?', a: 'Sí, no hay contratos de permanencia. Puedes cancelar tu suscripción premium cuando quieras y seguir usando el plan gratuito.' },
               { q: '¿Ofrecen soporte técnico?', a: 'Usuarios gratuitos tienen acceso a nuestra base de conocimientos. Usuarios premium tienen chat en vivo. Instituciones cuentan con soporte dedicado 24/7.' }
@@ -595,7 +595,7 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
             <div className="md:col-span-2">
               <div className="flex items-center gap-2 mb-4">
                 <span className="material-symbols-outlined text-primary text-2xl font-bold">neurology</span>
-                <span className="font-extrabold text-xl tracking-tighter text-white">NEUROPATH</span>
+                <span className="font-extrabold text-xl tracking-tighter text-white">MHS</span>
               </div>
               <p className="text-sm leading-relaxed max-w-xs">
                 Transformando la educación con inteligencia artificial adaptativa. Estudia inteligente, no más duro.
@@ -630,7 +630,7 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
             </div>
           </div>
           <div className="pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm">© 2026 Neuropath Inc. Todos los derechos reservados.</p>
+            <p className="text-sm">© 2026 MHS Inc. Todos los derechos reservados.</p>
             <div className="flex gap-4">
               <a href="#" className="hover:text-white transition-colors"><span className="material-symbols-outlined">mail</span></a>
               <a href="#" className="hover:text-white transition-colors">𝕏</a>

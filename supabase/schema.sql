@@ -1,4 +1,4 @@
--- NEUROPATH Database Schema
+-- MHS Database Schema
 -- Run this in your Supabase SQL Editor (Dashboard > SQL Editor > New Query)
 
 -- Enable UUID extension

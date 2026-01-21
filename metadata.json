@@ -1,5 +1,5 @@
 {
-  "name": "Neuropath - AI Adaptive Education",
+  "name": "MHS - AI Adaptive Education",
   "description": "A cutting-edge SaaS platform that uses AI to transform study materials into personalized learning paths for students and predictive analytics for teachers.",
   "requestFramePermissions": [
     "camera",

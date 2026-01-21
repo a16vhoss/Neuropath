@@ -1,5 +1,5 @@
 -- ============================================
--- NEUROPATH Adaptive Learning System Migration
+-- MHS Adaptive Learning System Migration
 -- Sistema FSRS (Free Spaced Repetition Scheduler)
 -- ============================================
 -- INSTRUCCIONES: Copia y pega este script completo en tu

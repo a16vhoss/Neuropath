@@ -372,7 +372,7 @@ const StudentDashboard: React.FC = () => {
                     <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
                       <span className="material-symbols-outlined text-4xl text-primary">school</span>
                     </div>
-                    <h2 className="text-2xl font-black text-slate-900 mb-2">¡Bienvenido a NEUROPATH!</h2>
+                    <h2 className="text-2xl font-black text-slate-900 mb-2">¡Bienvenido a MHS!</h2>
                     <p className="text-slate-500 mb-6 max-w-md mx-auto">
                       Únete a tu primera clase con el código de tu profesor, o crea tu propio set de estudio personal.
                     </p>

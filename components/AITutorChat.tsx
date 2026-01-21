@@ -128,7 +128,7 @@ const AITutorChat: React.FC<AITutorChatProps> = ({ classId, topic, currentContex
                                 <span className="material-symbols-outlined">neurology</span>
                             </div>
                             <div>
-                                <h3 className="font-bold">Neuropath AI Tutor</h3>
+                                <h3 className="font-bold">MHS AI Tutor</h3>
                                 <p className="text-xs text-violet-100 flex items-center gap-1">
                                     <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
                                     {context ? 'Contexto cargado' : 'Cargando contexto...'}

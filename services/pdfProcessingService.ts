@@ -11,7 +11,7 @@ const getAIClient = () => {
     return new GoogleGenerativeAI(API_KEY);
 };
 
-const MODEL_NAME = "gemini-1.5-flash";
+const MODEL_NAME = "gemini-1.5-flash-001";
 
 /**
  * Call Gemini API using SDK
@@ -52,7 +52,19 @@ const callGemini = async (prompt: string, pdfBase64?: string, options: { jsonMod
         return result.response.text();
     } catch (error) {
         console.error('Error calling Gemini:', error);
+        await logAvailableModels();
         return null;
+    }
+};
+
+const logAvailableModels = async () => {
+    if (!API_KEY) return;
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`);
+        const data = await response.json();
+        console.log("📜 Available Gemini Models:", data);
+    } catch (e) {
+        console.error("Failed to list models:", e);
     }
 };
 
