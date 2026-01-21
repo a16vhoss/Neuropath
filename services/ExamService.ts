@@ -56,7 +56,7 @@ export const generateMockExam = async (userId: string, studySetIds: string[] = [
 
         const ai = new GoogleGenAI({ apiKey: API_KEY });
         const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
+            model: "gemini-1.5-flash",
             contents: `You are an expert examiner. Create a challenging mock exam based on the following study notes.
       
       Requirements:

@@ -12,7 +12,7 @@ export const generateStudyFlashcards = async (topic: string) => {
   try {
     const ai = new GoogleGenAI({ apiKey: API_KEY });
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: `Generate 5 educational flashcards about "${topic}" in Spanish.`,
       config: {
         responseMimeType: "application/json",
@@ -64,7 +64,7 @@ export const getTutorResponse = async (question: string, context: string, subjec
   }
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-1.5-flash",
     contents: `Contexto del estudio (materiales): ${context}. \n\nLo que ve el estudiante ahora (Pregunta activa): ${currentContext || 'N/A'} \n\nPregunta/Comentario del estudiante: ${question}`,
     config: {
       systemInstruction: systemInstruction
@@ -94,7 +94,7 @@ export const generateStudySetFromContext = async (content: string, type: 'text' 
     }
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -182,7 +182,7 @@ PARA LAS FLASHCARDS:
 - Categoría que refleje el tema principal`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -306,7 +306,7 @@ CONTENIDO:
 ${textContent}`;
 
     const apiResponse = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -375,7 +375,7 @@ Ruta: ${pathParts}
 Usa tu conocimiento para crear contenido educativo relevante.`;
 
       const fallbackResponse = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-1.5-flash",
         contents: fallbackPrompt,
         config: {
           responseMimeType: "application/json",
@@ -423,7 +423,7 @@ export const generateQuizQuestions = async (context: string) => {
   try {
     const ai = new GoogleGenAI({ apiKey: API_KEY });
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: context.substring(0, 25000),
       config: {
         responseMimeType: "application/json",
@@ -487,7 +487,7 @@ export const generatePodcastScript = async (context: string) => {
   try {
     const ai = new GoogleGenAI({ apiKey: API_KEY });
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: `Convert the following study notes into an engaging podcast script between two hosts, Alex (enthusiastic, asks questions) and Sam (expert, explains concepts with analogies). 
       Make it feel like a real conversation with banter. Keep it under 5 minutes reading time.
       
@@ -541,7 +541,7 @@ export const autoCategorizeFlashcards = async (flashcards: { id: string, questio
     `;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
