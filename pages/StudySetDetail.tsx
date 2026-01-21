@@ -58,10 +58,19 @@ interface StudySetFull {
 
 type TabType = 'overview' | 'flashcards' | 'materials' | 'reports';
 
-const StudySetDetail: React.FC = () => {
-    const { studySetId } = useParams();
+interface StudySetDetailProps {
+    studySetId?: string;
+    embedded?: boolean;
+    readOnly?: boolean;
+}
+
+const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, embedded = false, readOnly = false }) => {
+    const { studySetId: paramId } = useParams();
+    const studySetId = propId || paramId;
+
     const navigate = useNavigate();
     const { user } = useAuth();
+
 
     const [studySet, setStudySet] = useState<StudySetFull | null>(null);
     const [loading, setLoading] = useState(true);
@@ -612,18 +621,20 @@ const StudySetDetail: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className={embedded ? "" : "min-h-screen bg-slate-50"}>
             {/* Header */}
             <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
                 <div className="max-w-5xl mx-auto px-4 py-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <button
-                                onClick={() => navigate('/student')}
-                                className="p-2 hover:bg-slate-100 rounded-lg transition"
-                            >
-                                <span className="material-symbols-outlined">arrow_back</span>
-                            </button>
+                            {!embedded && (
+                                <button
+                                    onClick={() => navigate('/student')}
+                                    className="p-2 hover:bg-slate-100 rounded-lg transition"
+                                >
+                                    <span className="material-symbols-outlined">arrow_back</span>
+                                </button>
+                            )}
 
                             {isEditingName ? (
                                 <div className="flex items-center gap-2">
@@ -650,12 +661,14 @@ const StudySetDetail: React.FC = () => {
                                         <h1 className="text-xl font-bold text-slate-900">{studySet.name}</h1>
                                         <p className="text-sm text-slate-500">{studySet.flashcard_count} flashcards</p>
                                     </div>
-                                    <button
-                                        onClick={() => setIsEditingName(true)}
-                                        className="p-1 hover:bg-slate-100 rounded-lg text-slate-400"
-                                    >
-                                        <span className="material-symbols-outlined text-sm">edit</span>
-                                    </button>
+                                    {!readOnly && (
+                                        <button
+                                            onClick={() => setIsEditingName(true)}
+                                            className="p-1 hover:bg-slate-100 rounded-lg text-slate-400"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">edit</span>
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -675,13 +688,15 @@ const StudySetDetail: React.FC = () => {
                                 <span className="material-symbols-outlined">timer</span>
                                 Simulacro
                             </button>
-                            <button
-                                onClick={handleDeleteSet}
-                                className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition"
-                                title="Eliminar set"
-                            >
-                                <span className="material-symbols-outlined">delete</span>
-                            </button>
+                            {!readOnly && (
+                                <button
+                                    onClick={handleDeleteSet}
+                                    className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                                    title="Eliminar set"
+                                >
+                                    <span className="material-symbols-outlined">delete</span>
+                                </button>
+                            )}
                         </div>
                     </div>
 

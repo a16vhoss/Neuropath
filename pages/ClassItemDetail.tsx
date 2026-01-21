@@ -10,7 +10,8 @@ import {
     gradeSubmission
 } from '../services/ClassroomService'; // Verify imports
 import { Assignment } from '../services/ClassroomService';
-import { supabase } from '../services/supabaseClient';
+import { supabase, getClassStudySet } from '../services/supabaseClient';
+import StudySetDetail from './StudySetDetail';
 import { extractTextFromPDF, generateStudySummary } from '../services/pdfProcessingService';
 
 const ClassItemDetail: React.FC = () => {
@@ -54,11 +55,34 @@ const ClassItemDetail: React.FC = () => {
     const [submissionLink, setSubmissionLink] = useState('');
     const [submissionText, setSubmissionText] = useState('');
 
+    // Study Set Integration
+    const [linkedStudySetId, setLinkedStudySetId] = useState<string | null>(null);
+    const [loadingStudySet, setLoadingStudySet] = useState(false);
+
     useEffect(() => {
         if (user) {
             loadItem();
         }
     }, [itemId, user]);
+
+    useEffect(() => {
+        const fetchLinkedSet = async () => {
+            if (item && item.type === 'material' && !isTeacher) {
+                setLoadingStudySet(true);
+                const materialId = item.attached_materials?.[0];
+                if (materialId) {
+                    try {
+                        const set = await getClassStudySet(materialId);
+                        if (set) setLinkedStudySetId(set.id);
+                    } catch (e) {
+                        console.log("Study set not found yet, utilizing fallback view.");
+                    }
+                }
+                setLoadingStudySet(false);
+            }
+        };
+        fetchLinkedSet();
+    }, [item, isTeacher]);
 
     const loadItem = async () => {
         if (!itemId) return;
@@ -480,6 +504,30 @@ const ClassItemDetail: React.FC = () => {
             <button onClick={() => navigate(-1)} className="text-primary hover:underline mt-4">Regresar</button>
         </div>
     );
+
+    // Student View: Full Study Set Experience
+    if (linkedStudySetId && !isTeacher && item.type === 'material') {
+        return (
+            <div className="min-h-screen bg-slate-50">
+                {/* Header Context */}
+                <div className="bg-white border-b border-slate-200 sticky top-0 z-20 px-6 py-4 flex items-center gap-4">
+                    <button
+                        onClick={() => navigate(`/student/class/${classId}`)}
+                        className="flex items-center gap-2 text-slate-500 hover:text-primary transition font-medium"
+                    >
+                        <span className="material-symbols-outlined">arrow_back</span>
+                        Volver a Clase
+                    </button>
+                    <div className="h-4 w-px bg-slate-200"></div>
+                    <span className="text-slate-900 font-medium truncate">{item.title}</span>
+                    {loadingStudySet && <span className="text-xs text-slate-400 ml-2">(Sincronizando set...)</span>}
+                </div>
+
+                {/* Render Full Study Set Logic */}
+                <StudySetDetail studySetId={linkedStudySetId} embedded={true} readOnly={true} />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-white">

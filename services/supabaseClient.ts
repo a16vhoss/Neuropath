@@ -470,6 +470,19 @@ export const uploadMaterial = async (classId: string, name: string, type: string
         .single();
 
     if (error) throw error;
+
+    // Auto-create study set for the material
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+        try {
+            // We use the new helper defined at the end of file
+            // Since this is called at runtime, the function reference will be available
+            await createClassStudySet(classId, data.id, user.id, name, 'Material de clase generado automáticamente');
+        } catch (err) {
+            console.error('Error auto-creating study set:', err);
+        }
+    }
+
     return data;
 };
 
@@ -732,20 +745,27 @@ export const getStudySetWithDetails = async (studySetId: string) => {
 
     if (setError) throw setError;
 
-    const { data: flashcards, error: flashError } = await supabase
+    // 1. Fetch Flashcards (Robustly)
+    let flashcardsQuery = supabase
         .from('flashcards')
-        .select('id, question, answer, category')
-        .eq('study_set_id', studySetId);
+        .select('id, question, answer, category, study_set_id, material_id');
 
+    if (studySet.source_material_id) {
+        flashcardsQuery = flashcardsQuery.or(`study_set_id.eq.${studySetId},material_id.eq.${studySet.source_material_id}`);
+    } else {
+        flashcardsQuery = flashcardsQuery.eq('study_set_id', studySetId);
+    }
+
+    const { data: flashcards, error: flashError } = await flashcardsQuery;
     if (flashError) throw flashError;
 
+    // 2. Fetch Materials
     const { data: materials, error: matError } = await supabase
         .from('study_set_materials')
         .select('*')
         .eq('study_set_id', studySetId)
         .order('created_at', { ascending: false });
 
-    // Materials table might not exist yet, so we handle this gracefully
     const safeMatError = matError?.code === '42P01' ? null : matError;
     if (safeMatError) throw safeMatError;
 
@@ -756,4 +776,60 @@ export const getStudySetWithDetails = async (studySetId: string) => {
         flashcard_count: flashcards?.length || 0,
         material_count: materials?.length || 0
     };
+};
+
+// Class Study Set Integration Helpers
+export const getClassStudySet = async (materialId: string) => {
+    const { data, error } = await supabase
+        .from('study_sets')
+        .select(`
+            *,
+            flashcards (count),
+            materials:study_set_materials (count)
+        `)
+        .eq('source_material_id', materialId)
+        .single();
+
+    if (error && error.code !== 'PGRST116') throw error; // Ignore no rows found
+    return data;
+};
+
+export const createClassStudySet = async (
+    classId: string,
+    materialId: string,
+    teacherId: string,
+    title: string,
+    description: string,
+    flashcards: any[] = []
+) => {
+    // 1. Create the Study Set
+    const { data: studySet, error: createError } = await supabase
+        .from('study_sets')
+        .insert({
+            student_id: teacherId,
+            class_id: classId,
+            source_material_id: materialId,
+            name: title,
+            description: description || 'Material de estudio de la clase',
+            is_public_to_class: true,
+            icon: 'school',
+            color: 'indigo'
+        })
+        .select()
+        .single();
+
+    if (createError) throw createError;
+
+    // 2. Link existing flashcards
+    // We assume flashcards might have been created via 'generateFlashcards' which sets material_id
+    if (materialId) {
+        const { error: updateError } = await supabase
+            .from('flashcards')
+            .update({ study_set_id: studySet.id })
+            .eq('material_id', materialId);
+
+        if (updateError) console.error("Error linking flashcards to set:", updateError);
+    }
+
+    return studySet;
 };
