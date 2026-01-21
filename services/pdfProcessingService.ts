@@ -3,7 +3,8 @@
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 // Gemini API endpoint
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+// Gemini API endpoint
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
 /**
  * Call Gemini API
@@ -65,9 +66,10 @@ const callGemini = async (prompt: string, pdfBase64?: string, options: { jsonMod
  * Extract text content from a PDF file using Gemini's vision capabilities
  */
 export const extractTextFromPDF = async (pdfBase64: string): Promise<string | null> => {
-    const prompt = `Extrae todo el texto de este documento PDF. 
-                  Mantén la estructura del contenido (títulos, subtítulos, párrafos).
-                  Devuelve solo el texto extraído, sin comentarios adicionales.`;
+    const prompt = `Analiza este documento PDF (incluyendo imágenes/escaneos) y extrae TODO el texto legible.
+                  Si es un documento escaneado, realiza OCR completo.
+                  Mantén la estructura original (títulos, párrafos).
+                  Devuelve SOLO el texto plano extraído.`;
 
     return callGemini(prompt, pdfBase64);
 };
@@ -86,10 +88,10 @@ CONTENIDO:
 ${text.slice(0, 15000)} 
 
 INSTRUCCIONES:
-1. Cada flashcard debe tener una pregunta clara y una respuesta concisa pero completa
-2. Incluye una variedad de tipos de preguntas: definiciones, comparaciones, aplicaciones
-3. Asigna una categoría relevante a cada flashcard
-4. Las preguntas deben evaluar comprensión, no solo memorización
+1. Genera flashcards educativas basadas EXCLUSIVAMENTE en el texto proporcionado.
+2. Intenta generar ${count} flashcards, pero si el texto es corto, prioriza la CALIDAD sobre la cantidad (mínimo 3).
+3. Cada flashcard debe tener una pregunta clara y una respuesta concisa.
+4. Las preguntas deben evaluar comprensión, no solo memorización.
 
 FORMATO DE RESPUESTA (JSON válido):
 [
