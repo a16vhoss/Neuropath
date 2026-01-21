@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, getClassMaterials, getClassEnrollments, uploadMaterial } from '../services/supabaseClient';
+import { supabase, getClassMaterials, getClassEnrollments, uploadMaterial, createClassStudySet } from '../services/supabaseClient';
 import {
     extractTextFromPDF,
     generateFlashcardsFromText,
@@ -666,42 +666,65 @@ const TeacherClassDetail: React.FC = () => {
 
             if (dbError) throw dbError;
 
-            // Save Flashcards
-            if (flashcards.length > 0) {
-                const { data: setRecord } = await supabase.from('flashcard_sets').insert({
-                    class_id: classId,
-                    material_id: materialRecord.id,
-                    title: `Flashcards: ${uploadTitle}`,
-                    description: 'Generado automáticamente por IA',
-                    is_public: true
-                }).select().single();
-
-                if (setRecord) {
-                    await supabase.from('flashcards').insert(
-                        flashcards.map(f => ({ set_id: setRecord.id, front: f.question, back: f.answer }))
+            // Save Study Set & Flashcards (New System)
+            if (flashcards.length > 0 || extractedText) {
+                try {
+                    // Create the Class Study Set container
+                    const studySet = await createClassStudySet(
+                        classId,
+                        materialRecord.id, // Source material ID
+                        user.id,
+                        uploadTitle,
+                        'Generado automáticamente por IA'
                     );
+
+                    // Insert Flashcards linked to this set
+                    if (studySet && flashcards.length > 0) {
+                        const flashcardsPayload = flashcards.map(f => ({
+                            study_set_id: studySet.id,
+                            material_id: materialRecord.id,
+                            question: f.question,
+                            answer: f.answer,
+                            category: 'General'
+                        }));
+
+                        const { error: fcError } = await supabase
+                            .from('flashcards')
+                            .insert(flashcardsPayload);
+
+                        if (fcError) console.error("Error saving flashcards:", fcError);
+                    }
+                } catch (studySetError) {
+                    console.error("Error creating study set:", studySetError);
                 }
             }
 
-            // Save Quiz
+            // Save Quiz (Legacy/Separate system - wrapped in try/catch to avoid breaking flow)
             if (quizQuestions.length > 0) {
-                const { data: quizRecord } = await supabase.from('quizzes').insert({
-                    class_id: classId,
-                    material_id: materialRecord.id,
-                    title: `Quiz: ${uploadTitle}`,
-                    description: 'Validación de conocimientos generada por IA'
-                }).select().single();
+                try {
+                    const { data: quizRecord, error: quizError } = await supabase.from('quizzes').insert({
+                        class_id: classId,
+                        material_id: materialRecord.id,
+                        title: `Quiz: ${uploadTitle}`,
+                        description: 'Validación de conocimientos generada por IA'
+                    }).select().single();
 
-                if (quizRecord) {
-                    for (const q of quizQuestions) {
-                        await supabase.from('quiz_questions').insert({
+                    if (quizError) throw quizError;
+
+                    if (quizRecord) {
+                        const questionsPayload = quizQuestions.map(q => ({
                             quiz_id: quizRecord.id,
                             question: q.question,
                             options: q.options,
                             correct_index: q.correctIndex,
                             explanation: q.explanation
-                        });
+                        }));
+
+                        await supabase.from('quiz_questions').insert(questionsPayload);
                     }
+                } catch (err) {
+                    console.error("Error saving quiz:", err);
+                    // Don't throw, let the upload complete
                 }
             }
 
