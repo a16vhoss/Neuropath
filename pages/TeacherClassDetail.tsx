@@ -1,9 +1,13 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, getClassMaterials, getClassEnrollments, uploadMaterial } from '../services/supabaseClient';
-import { generateFlashcardsFromText, generateQuizFromText, extractTextFromPDF, generateStudySummary } from '../services/pdfProcessingService';
+import {
+    extractTextFromPDF,
+    generateFlashcardsFromText,
+    generateQuizFromText,
+    generateStudySummary
+} from '../services/pdfProcessingService';
 import StudentProgressModal from '../components/StudentProgressModal';
 import AnnouncementCard from '../components/AnnouncementCard';
 import AssignmentCard from '../components/AssignmentCard';
@@ -405,7 +409,7 @@ const TeacherClassDetail: React.FC = () => {
             if (assignmentFile) {
                 // 1. Upload File
                 const fileExt = assignmentFile.name.split('.').pop();
-                const fileName = `${classId}/assignments/${Date.now()}_${assignmentFile.name}`;
+                const fileName = `${classId} /assignments/${Date.now()}_${assignmentFile.name} `;
                 const { data: uploadData, error: uploadError } = await supabase.storage
                     .from('materials')
                     .upload(fileName, assignmentFile);
@@ -424,7 +428,7 @@ const TeacherClassDetail: React.FC = () => {
                                     if (text) {
                                         const summary = await generateStudySummary(text, newAssignment.title || 'General');
                                         if (summary) {
-                                            finalDescription += `\n\n--- 🤖 Resumen IA ---\n${summary}`;
+                                            finalDescription += `\n\n-- - 🤖 Resumen IA-- -\n${summary} `;
                                         }
                                     }
                                 }
@@ -575,11 +579,11 @@ const TeacherClassDetail: React.FC = () => {
             const file = selectedFile;
             // Step 1: Upload File
             const fileExt = file.name.split('.').pop();
-            const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-            const filePath = `class-materials/${classId}/${fileName}`;
+            const fileName = `${Math.random().toString(36).substring(2)}.${fileExt} `;
+            const filePath = `class-materials / ${classId}/${fileName}`;
 
             const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('materials') // Ensure this bucket exists
+                .from('materials')
                 .upload(filePath, file);
 
             if (uploadError) throw uploadError;
@@ -592,12 +596,12 @@ const TeacherClassDetail: React.FC = () => {
                 .from('materials')
                 .insert({
                     class_id: classId,
-                    name: uploadTitle, // Use custom title
-                    description: uploadDescription, // Use custom description
+                    name: uploadTitle,
+                    description: uploadDescription,
                     type: file.type.includes('pdf') ? 'pdf' : 'doc',
                     url: uploadData?.path,
                     created_by: user.id,
-                    status: 'processing', // AI will pick this up
+                    status: 'processing',
                     size_bytes: file.size
                 })
                 .select()
@@ -605,128 +609,148 @@ const TeacherClassDetail: React.FC = () => {
 
             if (dbError) throw dbError;
 
-            // Step 3: Trigger AI Processing (Simulation)
-            // SIMULATION BEGINS
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                // Simulate delay
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                setUploadProgress(70);
+            // Step 3: AI Processing
+            let extractedText = '';
+            let flashcardCount = 0;
+            let quizCount = 0;
 
-                // Simulate Generated Content
-                const extractedText = "Texto simulado del documento...";
-                const flashcards = [
-                    { front: '¿Qué es la neurona?', back: 'Célula principal del sistema nervioso.' },
-                    { front: '¿Qué es la sinapsis?', back: 'Unión funcional entre dos neuronas.' },
-                    { front: '¿Lóbulo frontal?', back: 'Encargado del razonamiento y movimiento.' },
-                    { front: '¿Corteza cerebral?', back: 'Capa externa de sustancia gris.' },
-                    { front: '¿Axón?', back: 'Prolongación que transmite el impulso nervioso.' }
-                ];
+            if (file.type.includes('pdf')) {
+                // Wrap FileReader in a promise to await it
+                await new Promise<void>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        try {
+                            const base64 = (e.target?.result as string)?.split(',')[1];
+                            if (!base64) throw new Error('Failed to read file');
 
-                const { data: setRecord } = await supabase.from('flashcard_sets').insert({
-                    class_id: classId,
-                    material_id: materialRecord.id,
-                    title: `Flashcards: ${uploadTitle}`,
-                    description: 'Generado automáticamente por IA'
-                }).select().single();
+                            setUploadProgress(50);
 
-                if (setRecord) {
-                    await supabase.from('flashcards').insert(
-                        flashcards.map(f => ({ set_id: setRecord.id, front: f.front, back: f.back }))
-                    );
-                }
+                            // 1. Extract Text
+                            extractedText = await extractTextFromPDF(base64) || '';
 
-                const quizQuestions = [
-                    { question: '¿Cuál es la función del axón?', options: ['Transmitir impulso', 'Proteger núcleo', 'Recibir señales'], correctIndex: 0, explanation: 'El axón lleva la señal eléctrica.' },
-                    { question: 'El lóbulo encargado de la visión es:', options: ['Frontal', 'Occipital', 'Temporal'], correctIndex: 1, explanation: 'El occipital procesa la información visual.' },
-                    { question: 'La sinapsis es:', options: ['Una célula', 'Un hueso', 'Una conexión'], correctIndex: 2, explanation: 'Es la conexión funcional entre neuronas.' }
-                ];
+                            setUploadProgress(70);
 
-                const { data: quizRecord } = await supabase.from('quizzes').insert({
-                    class_id: classId,
-                    material_id: materialRecord.id,
-                    title: `Quiz: ${uploadTitle}`,
-                    description: 'Validación de conocimientos generada por IA'
-                }).select().single();
+                            // 2. Generate Flashcards
+                            const flashcards = await generateFlashcardsFromText(extractedText, uploadTitle);
 
-                if (quizRecord) {
-                    for (const q of quizQuestions) {
-                        await supabase.from('quiz_questions').insert({
-                            quiz_id: quizRecord.id,
-                            question: q.question,
-                            options: q.options,
-                            correct_index: q.correctIndex,
-                            explanation: q.explanation
-                        });
-                    }
-                }
+                            if (flashcards && flashcards.length > 0) {
+                                flashcardCount = flashcards.length;
+                                const { data: setRecord } = await supabase.from('flashcard_sets').insert({
+                                    class_id: classId,
+                                    material_id: materialRecord.id,
+                                    title: `Flashcards: ${uploadTitle}`,
+                                    description: 'Generado automáticamente por IA',
+                                    is_public: true
+                                }).select().single();
 
-                // Update status
-                await supabase
-                    .from('materials')
-                    .update({
-                        status: 'ready',
-                        flashcard_count: 5,
-                        quiz_count: 3,
-                        content_text: extractedText
-                    })
-                    .eq('id', materialRecord.id);
+                                if (setRecord) {
+                                    await supabase.from('flashcards').insert(
+                                        flashcards.map(f => ({ set_id: setRecord.id, front: f.question, back: f.answer }))
+                                    );
+                                }
+                            }
 
-                // Step 10: Link to Assignment if Topic Active
-                if (activeTopicId) {
-                    try {
-                        const newAssignment = await createAssignment({
-                            class_id: classId,
-                            title: uploadTitle,
-                            description: uploadDescription || 'Material de estudio',
-                            points: 0,
-                            topic_id: activeTopicId,
-                            type: 'material',
-                            attached_materials: [materialRecord.id],
-                            published: true,
-                            attachments: [{
-                                type: 'file',
-                                title: uploadTitle,
-                                url: uploadData?.path,
-                                mime_type: file.type
-                            }]
-                        });
-                        setAssignments(prev => [newAssignment, ...prev]);
-                        setActiveTopicId('');
-                    } catch (assignError) {
-                        console.error('Error creating linked assignment:', assignError);
-                    }
-                }
+                            setUploadProgress(85);
 
-                setUploadProgress(100);
-                setUploadStatus('done');
+                            // 3. Generate Quiz
+                            const quizQuestions = await generateQuizFromText(extractedText, uploadTitle);
 
-                // Refresh materials
-                const mats = await getClassMaterials(classId);
-                if (mats) {
-                    setMaterials(mats.map((m: any) => ({
-                        id: m.id,
-                        name: m.name,
-                        type: m.type || 'pdf',
-                        status: m.status || 'ready',
-                        uploadedAt: new Date(m.created_at).toLocaleDateString(),
-                        generatedContent: {
-                            flashcards: m.flashcard_count || 0,
-                            quizzes: m.quiz_count || 0,
-                            guides: 0
+                            if (quizQuestions && quizQuestions.length > 0) {
+                                quizCount = quizQuestions.length;
+                                const { data: quizRecord } = await supabase.from('quizzes').insert({
+                                    class_id: classId,
+                                    material_id: materialRecord.id,
+                                    title: `Quiz: ${uploadTitle}`,
+                                    description: 'Validación de conocimientos generada por IA'
+                                }).select().single();
+
+                                if (quizRecord) {
+                                    for (const q of quizQuestions) {
+                                        await supabase.from('quiz_questions').insert({
+                                            quiz_id: quizRecord.id,
+                                            question: q.question,
+                                            options: q.options,
+                                            correct_index: q.correctIndex,
+                                            explanation: q.explanation
+                                        });
+                                    }
+                                }
+                            }
+                            resolve();
+                        } catch (err) {
+                            console.error('AI Processing error:', err);
+                            resolve(); // Continue even if AI fails
                         }
-                    })));
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            // Update status with real counts
+            await supabase
+                .from('materials')
+                .update({
+                    status: 'ready',
+                    flashcard_count: flashcardCount,
+                    quiz_count: quizCount,
+                    content_text: extractedText
+                })
+                .eq('id', materialRecord.id);
+
+
+            // Step 4: Link to Assignment if Topic Active
+            if (activeTopicId) {
+                try {
+                    const newAssignment = await createAssignment({
+                        class_id: classId,
+                        title: uploadTitle,
+                        description: uploadDescription || 'Material de estudio',
+                        points: 0,
+                        topic_id: activeTopicId,
+                        type: 'material',
+                        attached_materials: [materialRecord.id],
+                        published: true,
+                        attachments: [{
+                            type: 'file',
+                            title: uploadTitle,
+                            url: uploadData?.path,
+                            mime_type: file.type
+                        }]
+                    });
+                    setAssignments(prev => [newAssignment, ...prev]);
+                    setActiveTopicId('');
+                } catch (assignError) {
+                    console.error('Error creating linked assignment:', assignError);
                 }
+            }
 
-                setTimeout(() => {
-                    setIsUploading(false);
-                    setUploadProgress(0);
-                    setShowUploadModal(false);
-                    setSelectedFile(null); // Reset
-                }, 1500);
+            setUploadProgress(100);
+            setUploadStatus('done');
 
-            }; // end reader.onload
-            reader.readAsDataURL(file);
+            // Refresh materials
+            const mats = await getClassMaterials(classId);
+            if (mats) {
+                setMaterials(mats.map((m: any) => ({
+                    id: m.id,
+                    name: m.name,
+                    type: m.type || 'pdf',
+                    status: m.status || 'ready',
+                    uploadedAt: new Date(m.created_at).toLocaleDateString(),
+                    generatedContent: {
+                        flashcards: m.flashcard_count || 0,
+                        quizzes: m.quiz_count || 0,
+                        guides: 0
+                    }
+                })));
+            }
+
+            setTimeout(() => {
+                setIsUploading(false);
+                setUploadProgress(0);
+                setShowUploadModal(false);
+                setSelectedFile(null); // Reset
+            }, 1500);
 
         } catch (error) {
             console.error('Error uploading file:', error);
