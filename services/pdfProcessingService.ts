@@ -11,7 +11,7 @@ const getAIClient = () => {
     return new GoogleGenerativeAI(API_KEY);
 };
 
-const MODEL_NAME = "gemini-1.5-flash-001";
+const MODEL_NAME = "gemini-1.5-pro"; // Trying Pro as fallback
 
 /**
  * Call Gemini API using SDK
@@ -57,17 +57,6 @@ const callGemini = async (prompt: string, pdfBase64?: string, options: { jsonMod
     }
 };
 
-const logAvailableModels = async () => {
-    if (!API_KEY) return;
-    try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`);
-        const data = await response.json();
-        console.log("📜 Available Gemini Models:", data);
-    } catch (e) {
-        console.error("Failed to list models:", e);
-    }
-};
-
 /**
  * Extract text content from a PDF file using Gemini's vision capabilities
  */
@@ -76,8 +65,8 @@ export const extractTextFromPDF = async (pdfBase64: string): Promise<string | nu
     if (!genAI) return null;
 
     const prompt = `Analiza este documento PDF (incluyendo imágenes/escaneos) y extrae TODO el texto legible.
-                  Si es un documento escaneado, realiza OCR completo.
-                  Mantén la estructura original (títulos, párrafos).
+                  Si es un documento escaneado, realiza OCR completo (Optical Character Recognition).
+                  Mantén la estructura original (títulos, párrafos) en la medida de lo posible.
                   Devuelve SOLO el texto plano extraído.`;
 
     try {
@@ -92,9 +81,31 @@ export const extractTextFromPDF = async (pdfBase64: string): Promise<string | nu
             prompt
         ]);
         return result.response.text();
-    } catch (e) {
+    } catch (e: any) {
         console.error('Error extracting PDF text:', e);
+        // Visual diagnostic
+        const modelList = await logAvailableModels();
+        alert(`Error al procesar PDF con Gemini (${MODEL_NAME}):\n${e.message}\n\nModelos Disponibles:\n${modelList}`);
         return null;
+    }
+};
+
+const logAvailableModels = async (): Promise<string> => {
+    if (!API_KEY) return "No API Key";
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`);
+        if (!response.ok) {
+            return `Error listing models: ${response.status} ${response.statusText}`;
+        }
+        const data = await response.json();
+        console.log("📜 Available Gemini Models:", data);
+        if (data.models) {
+            return data.models.map((m: any) => m.name.replace('models/', '')).join(', ');
+        }
+        return "No models found in response";
+    } catch (e: any) {
+        console.error("Failed to list models:", e);
+        return `Failed to list models: ${e.message}`;
     }
 };
 

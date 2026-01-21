@@ -3,7 +3,7 @@ import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-const MODEL_NAME = "gemini-1.5-flash-001";
+const MODEL_NAME = "gemini-1.5-pro";
 
 export const generateStudyFlashcards = async (topic: string) => {
   if (!API_KEY || API_KEY === 'PLACEHOLDER_API_KEY') {
