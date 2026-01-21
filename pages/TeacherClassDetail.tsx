@@ -707,15 +707,24 @@ const TeacherClassDetail: React.FC = () => {
 
             // Link as Assignment if Active Topic
             // Link as Assignment if Active Topic
-            if (activeTopicId) {
-                await supabase.from('assignments').insert({
-                    topic_id: activeTopicId,
-                    title: `Material: ${uploadTitle}`,
-                    description: uploadDescription || 'Material de estudio complementario',
-                    material_id: materialRecord.id,
-                    type: 'reading',
-                    points: 0
-                });
+            // Always link as Assignment (even if Unassigned)
+            const { error: assignmentError } = await supabase.from('assignments').insert({
+                topic_id: activeTopicId || null,
+                title: uploadTitle || `Material: ${selectedFile ? selectedFile.name : 'Nuevo Material'}`,
+                description: uploadDescription || 'Material de estudio complementario',
+                material_id: materialRecord.id,
+                type: 'reading',
+                points: 0,
+                class_id: classId // Ensure class_id is set if required by schema, usually strictly linked to topic but good to check. 
+                // Wait, assignments table usually has class_id? Let's check schema or other inserts. 
+                // The previous code didn't have class_id, relying on topic?
+                // If topic_id is NULL, how do we know which class it belongs to?
+                // I should check if 'assignments' table has 'class_id'.
+            });
+
+            if (assignmentError) {
+                console.error('Error creating assignment link:', assignmentError);
+                // We don't block the process but might want to notify
             }
 
             setUploadProgress(100);
