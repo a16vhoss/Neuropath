@@ -8,7 +8,8 @@ ADD COLUMN IF NOT EXISTS url TEXT,
 ADD COLUMN IF NOT EXISTS content_text TEXT,
 ADD COLUMN IF NOT EXISTS flashcard_count INTEGER DEFAULT 0,
 ADD COLUMN IF NOT EXISTS quiz_count INTEGER DEFAULT 0,
-ADD COLUMN IF NOT EXISTS size_bytes BIGINT DEFAULT 0;
+ADD COLUMN IF NOT EXISTS size_bytes BIGINT DEFAULT 0,
+ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES public.profiles(id);
 
 -- 2. (Optional) Migrate existing data if necessary
 -- UPDATE public.materials SET url = file_url WHERE url IS NULL;
