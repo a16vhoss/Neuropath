@@ -777,7 +777,7 @@ const TeacherClassDetail: React.FC = () => {
                         { id: 'announcements', icon: 'campaign', label: 'Anuncios' },
                         { id: 'modules', icon: 'folder_open', label: 'Módulos' },
                         { id: 'assignments', icon: 'task', label: 'Tareas' },
-                        { id: 'discussions', icon: 'forum', label: 'Discusiones' },
+
                         { id: 'grades', icon: 'grade', label: 'Calificaciones', badge: atRiskCount > 0 ? atRiskCount : undefined },
                         { id: 'people', icon: 'groups', label: 'Personas' },
                         { id: 'evaluation', icon: 'assignment', label: 'Plan de Evaluación' },
@@ -1288,50 +1288,7 @@ const TeacherClassDetail: React.FC = () => {
                     </div>
                 )}
 
-                {/* Discussions Tab */}
-                {/* Discussions Tab */}
-                {activeTab === 'discussions' && (
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-xl font-bold">Foros de Discusión</h2>
-                            <button
-                                onClick={() => navigate(`/class/${classId}/create-assignment`)} // TODO: Pass type=discussion pref
-                                className="bg-primary text-white font-bold px-4 py-2 rounded-xl hover:bg-blue-700 transition flex items-center gap-2"
-                            >
-                                <span className="material-symbols-outlined">add</span> Nuevo Tema
-                            </button>
-                        </div>
 
-                        {assignments.filter(a => a.type === 'discussion').length > 0 ? (
-                            <div className="grid grid-cols-1 gap-4">
-                                {assignments.filter(a => a.type === 'discussion').map(discussion => (
-                                    <AssignmentCard
-                                        key={discussion.id}
-                                        assignment={discussion}
-                                        isTeacher={true}
-                                        onEdit={() => navigate(`/class/${classId}/edit-assignment/${discussion.id}`)}
-                                        onDelete={() => handleDeleteAssignment(discussion.id)}
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            /* Empty state */
-                            <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm text-center">
-                                <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                    <span className="material-symbols-outlined text-3xl text-emerald-600">forum</span>
-                                </div>
-                                <h3 className="font-bold text-slate-900 mb-2 text-lg">Sin discusiones activas</h3>
-                                <p className="text-slate-500 mb-4">Crea temas de discusión para fomentar la participación</p>
-                                <button
-                                    onClick={() => navigate(`/class/${classId}/create-assignment`)}
-                                    className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700"
-                                >
-                                    Crear Primer Tema
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
 
                 {/* Grades Tab */}
                 {activeTab === 'grades' && (
