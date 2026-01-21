@@ -722,7 +722,7 @@ const TeacherClassDetail: React.FC = () => {
                                 file_url: materialUrl || null,
                                 content_text: extractedText || null,
                                 flashcards_generated: flashcards.length,
-                                summary: extractedText ? extractedText.substring(0, 200) + '...' : null
+                                summary: studyGuide || (extractedText ? extractedText.substring(0, 200) + '...' : null)
                             });
                         } catch (matError) {
                             console.error("Error linking material to study set tab:", matError);
