@@ -56,7 +56,7 @@ export const generateMockExam = async (userId: string, studySetIds: string[] = [
 
         const genAI = new GoogleGenerativeAI(API_KEY);
         const model = genAI.getGenerativeModel({
-            model: "gemini-1.5-flash-latest",
+            model: "gemini-1.5-flash",
             generationConfig: {
                 responseMimeType: "application/json",
                 responseSchema: {
@@ -137,7 +137,7 @@ export const validateExamAnswers = async (questions: ExamQuestion[], userAnswers
         }));
 
         const model = genAI.getGenerativeModel({
-            model: "gemini-1.5-flash-latest",
+            model: "gemini-1.5-flash",
             generationConfig: {
                 responseMimeType: "application/json",
                 responseSchema: {

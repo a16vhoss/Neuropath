@@ -11,7 +11,7 @@ const getAIClient = () => {
     return new GoogleGenerativeAI(API_KEY);
 };
 
-const MODEL_NAME = "gemini-1.5-flash-latest";
+const MODEL_NAME = "gemini-1.5-flash";
 
 /**
  * Call Gemini API using SDK
@@ -36,7 +36,7 @@ const callGemini = async (prompt: string, pdfBase64?: string, options: { jsonMod
 
         let result;
         if (pdfBase64) {
-             result = await model.generateContent([
+            result = await model.generateContent([
                 {
                     inlineData: {
                         mimeType: "application/pdf",
