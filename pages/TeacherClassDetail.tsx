@@ -1510,7 +1510,7 @@ const TeacherClassDetail: React.FC = () => {
                         loadAssignmentsData();
                         setShowUploadModal(false);
                         if (newSet && newSet.linkedAssignmentId) {
-                            navigate(`/class/${classId}/item/${newSet.linkedAssignmentId}`);
+                            navigate(`/teacher/class/${classId}/item/${newSet.linkedAssignmentId}`);
                         }
                     }}
                     classId={classId}
