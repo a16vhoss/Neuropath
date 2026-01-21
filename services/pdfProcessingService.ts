@@ -11,81 +11,99 @@ const getAIClient = () => {
     return new GoogleGenerativeAI(API_KEY);
 };
 
-const MODEL_NAME = "gemini-1.5-pro"; // Trying Pro as fallback
+// FALLBACK STRATEGY: List of models to try in order
+const MODEL_CANDIDATES = [
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-001",
+    "gemini-1.5-pro",
+    "gemini-1.5-pro-001",
+    "gemini-pro-vision", // Legacy, might still work for some
+];
+
+const fallbackGenerate = async (
+    operationName: string,
+    fn: (modelName: string) => Promise<any>
+): Promise<any> => {
+    let lastError: any = null;
+
+    for (const modelName of MODEL_CANDIDATES) {
+        try {
+            console.log(`[${operationName}] Trying model: ${modelName}`);
+            const result = await fn(modelName);
+            // If successful, return immediately
+            console.log(`[${operationName}] Success with model: ${modelName}`);
+            return result;
+        } catch (error: any) {
+            console.warn(`[${operationName}] Failed with ${modelName}:`, error.message);
+            lastError = error;
+            // Continue to next model if 404 or other potentially recoverable error
+            // If it's an API Key error (400/403), we might want to stop, but for now try all.
+        }
+    }
+
+    // If all failed
+    console.error(`[${operationName}] All models failed.`);
+    // Diagnostic
+    await logAvailableModels();
+    alert(`Error Crítico en Gemini: No se pudo conectar con ningún modelo (${MODEL_CANDIDATES.join(', ')}). \nÚltimo error: ${lastError?.message}`);
+    throw lastError;
+};
 
 /**
- * Call Gemini API using SDK
+ * Call Gemini API using SDK with Fallback
  */
 const callGemini = async (prompt: string, pdfBase64?: string, options: { jsonMode?: boolean, responseSchema?: any } = {}): Promise<string | null> => {
     const genAI = getAIClient();
     if (!genAI) return null;
 
     try {
-        const modelConfig: any = {
-            model: MODEL_NAME,
-        };
+        return await fallbackGenerate("callGemini", async (modelName) => {
+            const modelConfig: any = { model: modelName };
+            if (options.jsonMode) {
+                modelConfig.generationConfig = {
+                    responseMimeType: "application/json",
+                    responseSchema: options.responseSchema
+                };
+            }
+            const model = genAI.getGenerativeModel(modelConfig);
 
-        if (options.jsonMode) {
-            modelConfig.generationConfig = {
-                responseMimeType: "application/json",
-                responseSchema: options.responseSchema
-            };
-        }
-
-        const model = genAI.getGenerativeModel(modelConfig);
-
-        let result;
-        if (pdfBase64) {
-            result = await model.generateContent([
-                {
-                    inlineData: {
-                        mimeType: "application/pdf",
-                        data: pdfBase64
-                    }
-                },
-                prompt
-            ]);
-        } else {
-            result = await model.generateContent(prompt);
-        }
-
-        return result.response.text();
+            let result;
+            if (pdfBase64) {
+                result = await model.generateContent([
+                    { inlineData: { mimeType: "application/pdf", data: pdfBase64 } },
+                    prompt
+                ]);
+            } else {
+                result = await model.generateContent(prompt);
+            }
+            return result.response.text();
+        });
     } catch (error) {
-        console.error('Error calling Gemini:', error);
-        await logAvailableModels();
+        console.error('Error calling Gemini (All models failed):', error);
         return null;
     }
 };
 
 /**
- * Extract text content from a PDF file using Gemini's vision capabilities
+ * Extract text content from a PDF file using Gemini with Fallback
  */
 export const extractTextFromPDF = async (pdfBase64: string): Promise<string | null> => {
     const genAI = getAIClient();
     if (!genAI) return null;
 
-    const prompt = `Analiza este documento PDF (incluyendo imágenes/escaneos) y extrae TODO el texto legible.
-                  Si es un documento escaneado, realiza OCR completo (Optical Character Recognition).
-                  Mantén la estructura original (títulos, párrafos) en la medida de lo posible.
-                  Devuelve SOLO el texto plano extraído.`;
+    const prompt = `Analiza este documento PDF y extrae TODO el texto legible. Mantén la estructura original. Devuelve SOLO texto plano.`;
 
     try {
-        const model = genAI.getGenerativeModel({ model: MODEL_NAME });
-        const result = await model.generateContent([
-            {
-                inlineData: {
-                    mimeType: "application/pdf",
-                    data: pdfBase64
-                }
-            },
-            prompt
-        ]);
-        return result.response.text();
+        return await fallbackGenerate("extractTextFromPDF", async (modelName) => {
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const result = await model.generateContent([
+                { inlineData: { mimeType: "application/pdf", data: pdfBase64 } },
+                prompt
+            ]);
+            return result.response.text();
+        });
     } catch (e: any) {
-        console.error('Error extracting PDF text:', e);
-        // Visual diagnostic
-        const modelList = await logAvailableModels();
-        alert(`Error al procesar PDF con Gemini (${MODEL_NAME}):\n${e.message}\n\nModelos Disponibles:\n${modelList}`);
+        console.error('Error extracting PDF text (All models failed):', e);
         return null;
     }
 };
@@ -94,23 +112,18 @@ const logAvailableModels = async (): Promise<string> => {
     if (!API_KEY) return "No API Key";
     try {
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`);
-        if (!response.ok) {
-            return `Error listing models: ${response.status} ${response.statusText}`;
-        }
+        if (!response.ok) return `Error listing models: ${response.status}`;
         const data = await response.json();
         console.log("📜 Available Gemini Models:", data);
-        if (data.models) {
-            return data.models.map((m: any) => m.name.replace('models/', '')).join(', ');
-        }
-        return "No models found in response";
+        if (data.models) return data.models.map((m: any) => m.name).join(', ');
+        return "No models found";
     } catch (e: any) {
-        console.error("Failed to list models:", e);
         return `Failed to list models: ${e.message}`;
     }
 };
 
 /**
- * Generate flashcards from extracted text using Gemini
+ * Generate flashcards with Fallback
  */
 export const generateFlashcardsFromText = async (
     text: string,
@@ -120,38 +133,31 @@ export const generateFlashcardsFromText = async (
     const genAI = getAIClient();
     if (!genAI) return null;
 
-    const prompt = `Eres un experto educador. Basándote en el siguiente contenido sobre "${topic}", genera exactamente ${count} flashcards de estudio.
-
-CONTENIDO:
-${text.slice(0, 30000)}
-
-INSTRUCCIONES:
-1. Genera flashcards educativas basadas EXCLUSIVAMENTE en el texto proporcionado.
-2. Prioriza la CALIDAD sobre la cantidad.
-3. Cada flashcard debe tener una pregunta clara y una respuesta concisa.`;
+    const prompt = `Genera ${count} flashcards sobre "${topic}" basándote en: ${text.slice(0, 10000)}... Formato JSON.`;
 
     try {
-        const model = genAI.getGenerativeModel({
-            model: MODEL_NAME,
-            generationConfig: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: SchemaType.ARRAY,
-                    items: {
-                        type: SchemaType.OBJECT,
-                        properties: {
-                            question: { type: SchemaType.STRING },
-                            answer: { type: SchemaType.STRING },
-                            category: { type: SchemaType.STRING }
-                        },
-                        required: ["question", "answer", "category"]
+        return await fallbackGenerate("generateFlashcards", async (modelName) => {
+            const model = genAI.getGenerativeModel({
+                model: modelName,
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: SchemaType.ARRAY,
+                        items: {
+                            type: SchemaType.OBJECT,
+                            properties: {
+                                question: { type: SchemaType.STRING },
+                                answer: { type: SchemaType.STRING },
+                                category: { type: SchemaType.STRING }
+                            },
+                            required: ["question", "answer", "category"]
+                        }
                     }
                 }
-            }
+            });
+            const result = await model.generateContent(prompt);
+            return JSON.parse(result.response.text());
         });
-
-        const result = await model.generateContent(prompt);
-        return JSON.parse(result.response.text());
     } catch (error) {
         console.error('Error generating flashcards:', error);
         return null;
@@ -163,23 +169,14 @@ export const generateStudyGuideFromMaterials = async (materialsContent: string[]
     const genAI = getAIClient();
     if (!genAI) return null;
 
-    const combinedText = materialsContent.map((text, i) => `--- MATERIAL ${i + 1} ---\n${text.slice(0, 20000)}`).join('\n\n');
-
-    const prompt = `
-    [SISTEMA: REGLAS CRÍTICAS DE FORMATO - NIVEL MÁXIMO]
-    1. 🚫 **PROHIBICIÓN ABSOLUTA DE TABLAS**: NO generes ninguna tabla.
-    2. 🚫 **PROHIBICIÓN DEL CARACTER "|" (PIPE)**: NO uses el símbolo "|".
-    
-    Tarea General: Actúa como una IA experta en síntesis. Crea un manual de estudio completo y experto.
-    
-    Materiales de entrada:
-    ${combinedText}
-    `;
+    const prompt = `Crea un manual de estudio basado en: ${materialsContent.map(t => t.slice(0, 5000)).join('\n')}`;
 
     try {
-        const model = genAI.getGenerativeModel({ model: MODEL_NAME });
-        const result = await model.generateContent(prompt);
-        return result.response.text();
+        return await fallbackGenerate("generateStudyGuide", async (modelName) => {
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const result = await model.generateContent(prompt);
+            return result.response.text();
+        });
     } catch (error) {
         console.error('Error generating study guide:', error);
         return null;
@@ -188,21 +185,16 @@ export const generateStudyGuideFromMaterials = async (materialsContent: string[]
 
 export const generateMaterialSummary = async (content: string, type: 'pdf' | 'text' | 'url' | 'video'): Promise<string | null> => {
     const genAI = getAIClient();
-    if (!genAI || !content || content.length < 50) return null;
+    if (!genAI || !content) return null;
 
-    const summaryPrompt = `
-    Actúa como un asistente de estudio experto.
-    Tu tarea es generar un "Micro-Resumen" para este material de estudio (${type}).
-    Máximo 3-4 viñetas. Español.
-    
-    Material:
-    ${content.slice(0, 10000)}
-    `;
+    const summaryPrompt = `Resume esto (${type}): ${content.slice(0, 5000)}`;
 
     try {
-        const model = genAI.getGenerativeModel({ model: MODEL_NAME });
-        const result = await model.generateContent(summaryPrompt);
-        return result.response.text();
+        return await fallbackGenerate("generateMaterialSummary", async (modelName) => {
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const result = await model.generateContent(summaryPrompt);
+            return result.response.text();
+        });
     } catch (error) {
         console.error('Error generating material summary:', error);
         return null;
@@ -210,7 +202,7 @@ export const generateMaterialSummary = async (content: string, type: 'pdf' | 'te
 };
 
 /**
- * Generate quiz questions from extracted text using Gemini
+ * Generate quiz with Fallback
  */
 export const generateQuizFromText = async (
     text: string,
@@ -220,37 +212,32 @@ export const generateQuizFromText = async (
     const genAI = getAIClient();
     if (!genAI) return null;
 
-    const prompt = `Eres un experto educador. Basándote en el siguiente contenido sobre "${topic}", genera exactamente ${count} preguntas de opción múltiple.
-
-CONTENIDO:
-${text.slice(0, 30000)}`;
+    const prompt = `Genera ${count} preguntas de quiz sobre "${topic}". JSON.`;
 
     try {
-        const model = genAI.getGenerativeModel({
-            model: MODEL_NAME,
-            generationConfig: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: SchemaType.ARRAY,
-                    items: {
-                        type: SchemaType.OBJECT,
-                        properties: {
-                            question: { type: SchemaType.STRING },
-                            options: {
-                                type: SchemaType.ARRAY,
-                                items: { type: SchemaType.STRING }
+        return await fallbackGenerate("generateQuiz", async (modelName) => {
+            const model = genAI.getGenerativeModel({
+                model: modelName,
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: SchemaType.ARRAY,
+                        items: {
+                            type: SchemaType.OBJECT,
+                            properties: {
+                                question: { type: SchemaType.STRING },
+                                options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+                                correctIndex: { type: SchemaType.NUMBER },
+                                explanation: { type: SchemaType.STRING }
                             },
-                            correctIndex: { type: SchemaType.NUMBER },
-                            explanation: { type: SchemaType.STRING }
-                        },
-                        required: ["question", "options", "correctIndex", "explanation"]
+                            required: ["question", "options", "correctIndex", "explanation"]
+                        }
                     }
                 }
-            }
+            });
+            const result = await model.generateContent(prompt);
+            return JSON.parse(result.response.text());
         });
-
-        const result = await model.generateContent(prompt);
-        return JSON.parse(result.response.text());
     } catch (error) {
         console.error('Error generating quiz:', error);
         return null;
@@ -258,28 +245,20 @@ ${text.slice(0, 30000)}`;
 };
 
 /**
- * Generate study summary from content
+ * Generate study summary with Fallback
  */
 export const generateStudySummary = async (text: string, topic: string): Promise<string | null> => {
     const genAI = getAIClient();
     if (!genAI) return null;
 
-    const prompt = `Resume el siguiente contenido educativo sobre "${topic}" en un formato fácil de estudiar:
-    
-CONTENIDO:
-${text.slice(0, 20000)}
-
-INSTRUCCIONES:
-1. Crea un resumen estructurado.
-2. Destaca definiciones importantes.
-3. Máximo 500 palabras.
-4. Markdown.
-`;
+    const prompt = `Resume esto: ${text.slice(0, 5000)}`;
 
     try {
-        const model = genAI.getGenerativeModel({ model: MODEL_NAME });
-        const result = await model.generateContent(prompt);
-        return result.response.text();
+        return await fallbackGenerate("generateStudySummary", async (modelName) => {
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const result = await model.generateContent(prompt);
+            return result.response.text();
+        });
     } catch (error) {
         console.error('Error generating study summary:', error);
         return null;
