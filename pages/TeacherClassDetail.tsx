@@ -738,6 +738,14 @@ const TeacherClassDetail: React.FC = () => {
                 })));
             }
 
+            // Refresh topics (to update modules view)
+            const classTopics = await getClassTopics(classId);
+            setTopics(classTopics);
+
+            // Refresh assignments (to update grades/list view)
+            const assignmentsData = await getClassAssignments(classId);
+            setAssignments(assignmentsData);
+
             setTimeout(() => {
                 setIsUploading(false);
                 setUploadProgress(0);
