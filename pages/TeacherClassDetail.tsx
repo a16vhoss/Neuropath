@@ -8,6 +8,7 @@ import {
     generateQuizFromText,
     generateStudySummary
 } from '../services/pdfProcessingService';
+import { generateFlashcardsFromYouTubeURL } from '../services/geminiService';
 import StudentProgressModal from '../components/StudentProgressModal';
 import AnnouncementCard from '../components/AnnouncementCard';
 import AssignmentCard from '../components/AssignmentCard';
@@ -115,6 +116,8 @@ const TeacherClassDetail: React.FC = () => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploadTitle, setUploadTitle] = useState('');
     const [uploadDescription, setUploadDescription] = useState('');
+    const [uploadTab, setUploadTab] = useState<'text' | 'pdf' | 'youtube'>('text');
+    const [uploadInputValue, setUploadInputValue] = useState('');
 
     const [activeTopicId, setActiveTopicId] = useState<string>('');
 
@@ -569,160 +572,150 @@ const TeacherClassDetail: React.FC = () => {
     };
 
     const handleConfirmUpload = async () => {
-        if (!selectedFile || !classId || !user) return;
+        if (!classId || !user || !uploadTitle) return;
 
         setIsUploading(true);
         setUploadStatus('uploading');
         setUploadProgress(10);
 
         try {
-            const file = selectedFile;
-            // Step 1: Upload File
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Math.random().toString(36).substring(2)}.${fileExt} `;
-            const filePath = `class-materials / ${classId}/${fileName}`;
+            let materialUrl = '';
+            let materialType = 'link'; // Default
+            let extractedText = '';
+            let flashcards: any[] = [];
+            let quizQuestions: any[] = [];
+            let fileSize = 0;
 
-            const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('materials')
-                .upload(filePath, file);
+            // --- STEP 1: PREPARE MATERIAL & CONTENT ---
 
-            if (uploadError) throw uploadError;
+            if (uploadTab === 'pdf' && selectedFile) {
+                const fileExt = selectedFile.name.split('.').pop();
+                const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+                const filePath = `class-materials/${classId}/${fileName}`;
 
-            setUploadProgress(40);
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('materials')
+                    .upload(filePath, selectedFile);
+
+                if (uploadError) throw uploadError;
+
+                materialUrl = uploadData?.path || '';
+                materialType = 'pdf';
+                fileSize = selectedFile.size;
+
+                // Extract text
+                const base64 = await new Promise<string>((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve((e.target?.result as string)?.split(',')[1]);
+                    reader.readAsDataURL(selectedFile);
+                });
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                extractedText = (await extractTextFromPDF(base64) as any) || '';
+
+            } else if (uploadTab === 'youtube') {
+                materialUrl = uploadInputValue;
+                materialType = 'video';
+                // Analyze YouTube
+                setUploadStatus('processing');
+                const result = await generateFlashcardsFromYouTubeURL(uploadInputValue);
+                extractedText = result.summary;
+                flashcards = result.flashcards;
+
+            } else if (uploadTab === 'text') {
+                extractedText = uploadInputValue;
+                materialType = 'doc'; // Treating raw text as a document/note
+            }
+
+            setUploadProgress(50);
             setUploadStatus('processing');
 
-            // Step 2: Create Material Record
+            // --- STEP 2: GENERATE CONTENT IF MISSING ---
+
+            // Generate Flashcards if not already from YouTube
+            if (flashcards.length === 0 && extractedText) {
+                flashcards = await generateFlashcardsFromText(extractedText, uploadTitle) || [];
+            }
+
+            setUploadProgress(70);
+
+            // Generate Quiz
+            // (Only if we have text/summary)
+            if (extractedText) {
+                quizQuestions = await generateQuizFromText(extractedText, uploadTitle) || [];
+            }
+
+            // --- STEP 3: SAVE TO SUPABASE ---
+
             const { data: materialRecord, error: dbError } = await supabase
                 .from('materials')
                 .insert({
                     class_id: classId,
                     name: uploadTitle,
                     description: uploadDescription,
-                    type: file.type.includes('pdf') ? 'pdf' : 'doc',
-                    url: uploadData?.path,
+                    type: materialType,
+                    url: materialUrl,
                     created_by: user.id,
-                    status: 'processing',
-                    size_bytes: file.size
+                    status: 'ready',
+                    size_bytes: fileSize,
+                    content_text: extractedText,
+                    flashcard_count: flashcards.length,
+                    quiz_count: quizQuestions.length
                 })
                 .select()
                 .single();
 
             if (dbError) throw dbError;
 
-            // Step 3: AI Processing
-            let extractedText = '';
-            let flashcardCount = 0;
-            let quizCount = 0;
+            // Save Flashcards
+            if (flashcards.length > 0) {
+                const { data: setRecord } = await supabase.from('flashcard_sets').insert({
+                    class_id: classId,
+                    material_id: materialRecord.id,
+                    title: `Flashcards: ${uploadTitle}`,
+                    description: 'Generado automáticamente por IA',
+                    is_public: true
+                }).select().single();
 
-            if (file.type.includes('pdf')) {
-                // Wrap FileReader in a promise to await it
-                await new Promise<void>((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = async (e) => {
-                        try {
-                            const base64 = (e.target?.result as string)?.split(',')[1];
-                            if (!base64) throw new Error('Failed to read file');
-
-                            setUploadProgress(50);
-
-                            // 1. Extract Text
-                            extractedText = await extractTextFromPDF(base64) || '';
-
-                            setUploadProgress(70);
-
-                            // 2. Generate Flashcards
-                            const flashcards = await generateFlashcardsFromText(extractedText, uploadTitle);
-
-                            if (flashcards && flashcards.length > 0) {
-                                flashcardCount = flashcards.length;
-                                const { data: setRecord } = await supabase.from('flashcard_sets').insert({
-                                    class_id: classId,
-                                    material_id: materialRecord.id,
-                                    title: `Flashcards: ${uploadTitle}`,
-                                    description: 'Generado automáticamente por IA',
-                                    is_public: true
-                                }).select().single();
-
-                                if (setRecord) {
-                                    await supabase.from('flashcards').insert(
-                                        flashcards.map(f => ({ set_id: setRecord.id, front: f.question, back: f.answer }))
-                                    );
-                                }
-                            }
-
-                            setUploadProgress(85);
-
-                            // 3. Generate Quiz
-                            const quizQuestions = await generateQuizFromText(extractedText, uploadTitle);
-
-                            if (quizQuestions && quizQuestions.length > 0) {
-                                quizCount = quizQuestions.length;
-                                const { data: quizRecord } = await supabase.from('quizzes').insert({
-                                    class_id: classId,
-                                    material_id: materialRecord.id,
-                                    title: `Quiz: ${uploadTitle}`,
-                                    description: 'Validación de conocimientos generada por IA'
-                                }).select().single();
-
-                                if (quizRecord) {
-                                    for (const q of quizQuestions) {
-                                        await supabase.from('quiz_questions').insert({
-                                            quiz_id: quizRecord.id,
-                                            question: q.question,
-                                            options: q.options,
-                                            correct_index: q.correctIndex,
-                                            explanation: q.explanation
-                                        });
-                                    }
-                                }
-                            }
-                            resolve();
-                        } catch (err) {
-                            console.error('AI Processing error:', err);
-                            resolve(); // Continue even if AI fails
-                        }
-                    };
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
-                });
+                if (setRecord) {
+                    await supabase.from('flashcards').insert(
+                        flashcards.map(f => ({ set_id: setRecord.id, front: f.question, back: f.answer }))
+                    );
+                }
             }
 
-            // Update status with real counts
-            await supabase
-                .from('materials')
-                .update({
-                    status: 'ready',
-                    flashcard_count: flashcardCount,
-                    quiz_count: quizCount,
-                    content_text: extractedText
-                })
-                .eq('id', materialRecord.id);
+            // Save Quiz
+            if (quizQuestions.length > 0) {
+                const { data: quizRecord } = await supabase.from('quizzes').insert({
+                    class_id: classId,
+                    material_id: materialRecord.id,
+                    title: `Quiz: ${uploadTitle}`,
+                    description: 'Validación de conocimientos generada por IA'
+                }).select().single();
 
-
-            // Step 4: Link to Assignment if Topic Active
-            if (activeTopicId) {
-                try {
-                    const newAssignment = await createAssignment({
-                        class_id: classId,
-                        title: uploadTitle,
-                        description: uploadDescription || 'Material de estudio',
-                        points: 0,
-                        topic_id: activeTopicId,
-                        type: 'material',
-                        attached_materials: [materialRecord.id],
-                        published: true,
-                        attachments: [{
-                            type: 'file',
-                            title: uploadTitle,
-                            url: uploadData?.path,
-                            mime_type: file.type
-                        }]
-                    });
-                    setAssignments(prev => [newAssignment, ...prev]);
-                    setActiveTopicId('');
-                } catch (assignError) {
-                    console.error('Error creating linked assignment:', assignError);
+                if (quizRecord) {
+                    for (const q of quizQuestions) {
+                        await supabase.from('quiz_questions').insert({
+                            quiz_id: quizRecord.id,
+                            question: q.question,
+                            options: q.options,
+                            correct_index: q.correctIndex,
+                            explanation: q.explanation
+                        });
+                    }
                 }
+            }
+
+            // Link as Assignment if Active Topic
+            // Link as Assignment if Active Topic
+            if (activeTopicId) {
+                await supabase.from('assignments').insert({
+                    topic_id: activeTopicId,
+                    title: `Material: ${uploadTitle}`,
+                    description: uploadDescription || 'Material de estudio complementario',
+                    material_id: materialRecord.id,
+                    type: 'reading',
+                    points: 0
+                });
             }
 
             setUploadProgress(100);
@@ -749,7 +742,10 @@ const TeacherClassDetail: React.FC = () => {
                 setIsUploading(false);
                 setUploadProgress(0);
                 setShowUploadModal(false);
-                setSelectedFile(null); // Reset
+                setSelectedFile(null);
+                setUploadInputValue('');
+                setUploadTitle('');
+                setUploadDescription('');
             }, 1500);
 
         } catch (error) {
@@ -1432,104 +1428,193 @@ const TeacherClassDetail: React.FC = () => {
             {/* Upload Modal */}
             {showUploadModal && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
-                        <div className="p-8">
-                            <h2 className="text-2xl font-black text-slate-900 mb-2">Subir Material</h2>
-                            <p className="text-slate-500 mb-6">La IA procesará tu archivo y generará flashcards y quizzes automáticamente.</p>
+                    <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                        {/* Header */}
+                        <div className="p-6 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex justify-between items-center">
+                            <div>
+                                <h2 className="text-2xl font-bold flex items-center gap-2">
+                                    <span className="material-symbols-outlined">auto_awesome</span> Hola, vamos a crear
+                                </h2>
+                                <p className="text-indigo-100 text-sm mt-1">Sube material y deja que la IA cree flashcards y quizzes.</p>
+                            </div>
+                            <button onClick={() => { setShowUploadModal(false); setSelectedFile(null); setUploadInputValue(''); setUploadTitle(''); }} className="text-white/80 hover:text-white bg-white/10 p-2 rounded-full hover:bg-white/20 transition-all">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
 
-                            {!selectedFile ? (
-                                <label className="block border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-all">
-                                    <span className="material-symbols-outlined text-4xl text-slate-400 mb-4">cloud_upload</span>
-                                    <p className="font-bold text-slate-700">Arrastra archivos aquí o haz clic para seleccionar</p>
-                                    <p className="text-sm text-slate-500 mt-2">PDF, PPTX, DOCX</p>
-                                    <input
-                                        type="file"
-                                        className="hidden"
-                                        onChange={(e) => handleFileSelect(e.target.files)}
-                                        accept=".pdf,.pptx,.docx"
-                                    />
-                                </label>
-                            ) : !isUploading ? (
-                                <div className="space-y-4">
-                                    <div className="bg-slate-50 p-4 rounded-xl flex items-center gap-4">
-                                        <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center text-red-600">
-                                            <span className="material-symbols-outlined">description</span>
+                        {/* Tabs */}
+                        <div className="flex border-b border-gray-100">
+                            <button
+                                onClick={() => setUploadTab('text')}
+                                className={`flex-1 py-4 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${uploadTab === 'text' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-gray-500 hover:bg-gray-50'}`}
+                            >
+                                <span className="material-symbols-outlined">description</span> Texto / Notas
+                            </button>
+                            <button
+                                onClick={() => setUploadTab('pdf')}
+                                className={`flex-1 py-4 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${uploadTab === 'pdf' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-gray-500 hover:bg-gray-50'}`}
+                            >
+                                <span className="material-symbols-outlined">picture_as_pdf</span> PDF
+                            </button>
+                            <button
+                                onClick={() => setUploadTab('youtube')}
+                                className={`flex-1 py-4 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${uploadTab === 'youtube' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-gray-500 hover:bg-gray-50'}`}
+                            >
+                                <span className="material-symbols-outlined">play_circle</span> YouTube
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                            {!isUploading ? (
+                                <>
+                                    {/* Name & Desc Inputs */}
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Título del Material</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Ej: Introducción a la Física"
+                                                value={uploadTitle}
+                                                onChange={(e) => setUploadTitle(e.target.value)}
+                                                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                                            />
                                         </div>
-                                        <div className="flex-1 overflow-hidden">
-                                            <p className="font-bold text-slate-900 truncate">{selectedFile.name}</p>
-                                            <p className="text-xs text-slate-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Descripción (opcional)</label>
+                                            <textarea
+                                                placeholder="Breve descripción..."
+                                                rows={2}
+                                                value={uploadDescription}
+                                                onChange={(e) => setUploadDescription(e.target.value)}
+                                                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all resize-none"
+                                            />
                                         </div>
-                                        <button onClick={() => setSelectedFile(null)} className="text-slate-400 hover:text-rose-500">
-                                            <span className="material-symbols-outlined">close</span>
-                                        </button>
                                     </div>
 
-                                    <div>
-                                        <label className="block text-sm font-bold text-slate-700 mb-2">Título del Material</label>
-                                        <input
-                                            type="text"
-                                            value={uploadTitle}
-                                            onChange={(e) => setUploadTitle(e.target.value)}
-                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                                        />
+                                    {/* Content Input Area */}
+                                    <div className="bg-gray-50 p-6 rounded-xl border border-dashed border-gray-300">
+                                        {uploadTab === 'text' && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Pega tus apuntes aquí</label>
+                                                <textarea
+                                                    className="w-full h-48 p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all text-sm"
+                                                    placeholder="Copia y pega texto de Wikipedia, Word, o tus notas..."
+                                                    value={uploadInputValue}
+                                                    onChange={(e) => setUploadInputValue(e.target.value)}
+                                                ></textarea>
+                                            </div>
+                                        )}
+
+                                        {uploadTab === 'pdf' && (
+                                            <div className="text-center py-4">
+                                                {!selectedFile ? (
+                                                    <>
+                                                        <span className="material-symbols-outlined text-5xl text-gray-300 mb-4">cloud_upload</span>
+                                                        <p className="text-gray-600 font-medium mb-2">Sube tu PDF</p>
+                                                        <p className="text-xs text-gray-400 mb-4">Máx 10MB. Se extraerá el texto automáticamente.</p>
+                                                        <input
+                                                            type="file"
+                                                            accept=".pdf"
+                                                            onChange={(e) => handleFileSelect(e.target.files)}
+                                                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-all"
+                                                        />
+                                                    </>
+                                                ) : (
+                                                    <div className="bg-white p-4 rounded-xl flex items-center gap-4 border border-indigo-100 shadow-sm">
+                                                        <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center text-red-600">
+                                                            <span className="material-symbols-outlined">picture_as_pdf</span>
+                                                        </div>
+                                                        <div className="flex-1 text-left overflow-hidden">
+                                                            <p className="font-bold text-gray-900 truncate">{selectedFile.name}</p>
+                                                            <p className="text-xs text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                                                        </div>
+                                                        <button onClick={() => setSelectedFile(null)} className="text-gray-400 hover:text-red-500">
+                                                            <span className="material-symbols-outlined">close</span>
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {uploadTab === 'youtube' && (
+                                            <div>
+                                                <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-100 rounded-lg p-4 mb-4">
+                                                    <div className="flex items-start gap-3">
+                                                        <span className="material-symbols-outlined text-red-600 text-2xl">smart_toy</span>
+                                                        <div>
+                                                            <p className="text-sm font-medium text-red-800 mb-1">Análisis de Video</p>
+                                                            <p className="text-xs text-red-600">
+                                                                Pega el enlace de un video educativo y generaremos todo el contenido.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">Enlace de YouTube</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="https://youtube.com/watch?v=..."
+                                                    value={uploadInputValue}
+                                                    onChange={(e) => setUploadInputValue(e.target.value)}
+                                                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-bold text-slate-700 mb-2">Descripción (opcional)</label>
-                                        <textarea
-                                            value={uploadDescription}
-                                            onChange={(e) => setUploadDescription(e.target.value)}
-                                            rows={2}
-                                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none resize-none"
-                                            placeholder="Breve descripción del contenido..."
-                                        />
-                                    </div>
-                                    <button
-                                        onClick={handleConfirmUpload}
-                                        disabled={!uploadTitle.trim()}
-                                        className="w-full bg-primary text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
-                                    >
-                                        Subir y Procesar con IA
-                                    </button>
-                                </div>
+                                </>
                             ) : (
-                                <div className="text-center py-8">
-                                    <div className="w-16 h-16 mx-auto mb-4">
-                                        <div className="w-full h-full border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                                <div className="text-center py-12">
+                                    <div className="w-20 h-20 mx-auto mb-6 relative">
+                                        <div className="absolute inset-0 border-4 border-indigo-100 rounded-full"></div>
+                                        <div className="absolute inset-0 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                                        <span className="absolute inset-0 flex items-center justify-center material-symbols-outlined text-3xl text-indigo-600 animate-pulse">
+                                            auto_awesome
+                                        </span>
                                     </div>
-                                    <p className="font-bold text-slate-900 mb-2">
+                                    <p className="font-bold text-xl text-gray-900 mb-2">
                                         {uploadStatus === 'uploading' && 'Subiendo archivo...'}
-                                        {uploadStatus === 'processing' && '🤖 IA procesando contenido...'}
-                                        {uploadStatus === 'done' && '✅ ¡Procesamiento completado!'}
-                                        {uploadStatus === 'error' && '❌ Error al procesar'}
+                                        {uploadStatus === 'processing' && 'La IA está trabajando su magia...'}
+                                        {uploadStatus === 'done' && '¡Listo! Material Creado'}
+                                        {uploadStatus === 'error' && 'Ups, ocurrió un error'}
                                     </p>
-                                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
+                                    <p className="text-gray-500 mb-6 max-w-xs mx-auto">
+                                        {uploadStatus === 'processing' && 'Estamos analizando el contenido, generando resumen, flashcards y el quiz de evaluación.'}
+                                        {uploadStatus === 'done' && 'Redirigiendo...'}
+                                    </p>
+
+                                    <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden max-w-sm mx-auto">
                                         <div
-                                            className={`h-full rounded-full transition-all ${uploadStatus === 'error' ? 'bg-rose-500' : uploadStatus === 'done' ? 'bg-emerald-500' : 'bg-primary'}`}
+                                            className={`h-full rounded-full transition-all duration-500 ease-out ${uploadStatus === 'error' ? 'bg-red-500' : uploadStatus === 'done' ? 'bg-emerald-500' : 'bg-indigo-600'}`}
                                             style={{ width: `${uploadProgress}%` }}
                                         ></div>
                                     </div>
-                                    <p className="text-sm text-slate-500">
-                                        {uploadStatus === 'processing' && 'Generando flashcards y quizzes...'}
-                                        {uploadStatus === 'done' && 'Flashcards y quizzes listos para tus estudiantes'}
-                                        {uploadStatus === 'error' && 'Intenta de nuevo con otro archivo'}
-                                    </p>
                                 </div>
                             )}
                         </div>
-                        <div className="bg-slate-50 p-4 flex justify-end gap-3">
-                            <button
-                                onClick={() => {
-                                    setShowUploadModal(false);
-                                    setIsUploading(false);
-                                    setUploadProgress(0);
-                                    setActiveTopicId('');
-                                    setSelectedFile(null);
-                                }}
-                                className="px-4 py-2 text-slate-600 font-medium hover:text-slate-800"
-                            >
-                                {uploadStatus === 'done' ? 'Cerrar' : 'Cancelar'}
-                            </button>
-                        </div>
+
+                        {/* Footer (Only if not uploading) */}
+                        {!isUploading && (
+                            <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+                                <button
+                                    onClick={() => { setShowUploadModal(false); setSelectedFile(null); setUploadInputValue(''); setUploadTitle(''); }}
+                                    className="px-6 py-2.5 rounded-xl font-medium text-gray-600 hover:bg-gray-200 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleConfirmUpload}
+                                    disabled={
+                                        !uploadTitle.trim() ||
+                                        (uploadTab === 'pdf' && !selectedFile) ||
+                                        ((uploadTab === 'text' || uploadTab === 'youtube') && !uploadInputValue.trim())
+                                    }
+                                    className="px-8 py-2.5 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-200 transition-all transform active:scale-95 flex items-center gap-2"
+                                >
+                                    <span className="material-symbols-outlined">auto_fix</span>
+                                    Crear Material
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
