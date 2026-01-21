@@ -1004,9 +1004,9 @@ const TeacherClassDetail: React.FC = () => {
                             </button>
                         </div>
 
-                        {assignments.length > 0 ? (
+                        {assignments.filter(a => ['assignment', 'exam'].includes(a.type)).length > 0 ? (
                             <div className="grid gap-4">
-                                {assignments.map((assignment) => (
+                                {assignments.filter(a => ['assignment', 'exam'].includes(a.type)).map((assignment) => (
                                     <AssignmentCard
                                         key={assignment.id}
                                         assignment={assignment}
