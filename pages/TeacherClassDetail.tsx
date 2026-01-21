@@ -666,6 +666,16 @@ const TeacherClassDetail: React.FC = () => {
 
             if (dbError) throw dbError;
 
+            // Generate Study Guide Summary
+            let studyGuide = 'Generado automáticamente por IA';
+            if (extractedText) {
+                const generatedGuide = await generateStudySummary(extractedText, uploadTitle);
+                if (generatedGuide) studyGuide = generatedGuide;
+            }
+
+            // Save Quiz (Legacy/Separate system - wrapped in try/catch to avoid breaking flow)
+            // ... (keeping legacy quiz if needed, but focused on Study Set here)
+
             // Save Study Set & Flashcards (New System)
             if (flashcards.length > 0 || extractedText) {
                 try {
@@ -675,7 +685,7 @@ const TeacherClassDetail: React.FC = () => {
                         materialRecord.id, // Source material ID
                         user.id,
                         uploadTitle,
-                        'Generado automáticamente por IA'
+                        studyGuide
                     );
 
                     // Insert Flashcards linked to this set

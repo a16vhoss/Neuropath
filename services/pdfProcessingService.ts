@@ -8,7 +8,7 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/
 /**
  * Call Gemini API
  */
-const callGemini = async (prompt: string, pdfBase64?: string): Promise<string | null> => {
+const callGemini = async (prompt: string, pdfBase64?: string, options: { jsonMode?: boolean } = {}): Promise<string | null> => {
     if (!API_KEY) {
         console.error('Gemini API key not found');
         return null;
@@ -37,10 +37,15 @@ const callGemini = async (prompt: string, pdfBase64?: string): Promise<string | 
             });
         }
 
+        const body: any = { contents };
+        if (options.jsonMode) {
+            body.generationConfig = { response_mime_type: 'application/json' };
+        }
+
         const response = await fetch(`${GEMINI_API_URL}?key=${API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents })
+            body: JSON.stringify(body)
         });
 
         if (!response.ok) {
@@ -98,7 +103,7 @@ FORMATO DE RESPUESTA (JSON válido):
 Devuelve SOLO el JSON, sin texto adicional.`;
 
     try {
-        const response = await callGemini(prompt);
+        const response = await callGemini(prompt, undefined, { jsonMode: true });
         if (!response) return null;
 
         // Clean and parse JSON response
@@ -291,7 +296,7 @@ FORMATO DE RESPUESTA (JSON válido):
 Devuelve SOLO el JSON, sin texto adicional.`;
 
     try {
-        const response = await callGemini(prompt);
+        const response = await callGemini(prompt, undefined, { jsonMode: true });
         if (!response) return null;
 
         const cleanJson = response.replace(/```json\n?|\n?```/g, '').trim();
