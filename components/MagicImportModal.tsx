@@ -3,14 +3,17 @@ import React, { useState } from 'react';
 import { extractTextFromPDF } from '../services/pdfProcessingService';
 import { generateStudySetFromContext, generateFlashcardsFromYouTubeURL } from '../services/geminiService';
 import { useAuth } from '../contexts/AuthContext';
-import { createStudySet, addFlashcardsBatch, addMaterialToStudySet } from '../services/supabaseClient';
+import { createStudySet, addFlashcardsBatch, addMaterialToStudySet, createClassStudySet, supabase } from '../services/supabaseClient';
+import { createAssignment } from '../services/ClassroomService';
 
 interface MagicImportModalProps {
     onClose: () => void;
     onSuccess: (newSet: any) => void;
+    classId?: string;
+    moduleId?: string;
 }
 
-const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess }) => {
+const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess, classId, moduleId }) => {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<'text' | 'pdf' | 'youtube'>('text');
     const [inputValue, setInputValue] = useState('');
@@ -88,26 +91,138 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
                 throw new Error("No se pudieron generar flashcards. Intenta con otro contenido.");
             }
 
-            // 3. Save to Supabase - with timeout to prevent hanging
+            // 3. Save to Supabase
             const saveTimeout = new Promise((_, reject) =>
                 setTimeout(() => reject(new Error("Tiempo de espera agotado al guardar. Verifica tu conexión.")), 15000)
             );
 
             const saveContent = async () => {
                 setStatus('Guardando set de estudio...');
-                // Create the set first
-                const newSet = await createStudySet(user.id, {
-                    name: name,
-                    description: `Generado con IA desde ${activeTab.toUpperCase()}`,
-                    topics: ['IA', activeTab],
-                    icon: activeTab === 'youtube' ? 'play_circle' : (activeTab === 'pdf' ? 'picture_as_pdf' : 'description')
-                });
 
-                if (!newSet?.id) throw new Error("Error al crear el set de estudio (ID no retornado).");
+                let newSet: any;
+                let newAssignment: any = null;
+                let materialId: string | null = null;
+                let finalSummary = '';
+
+                // Determine summary
+                const youtubeAnalysis = (window as any).__youtubeAnalysis;
+                if (activeTab === 'youtube' && youtubeAnalysis) {
+                    finalSummary = youtubeAnalysis.summary;
+                } else {
+                    // For text/pdf, we should ideally generate a summary too, but for now use context or a placeholder if missing
+                    // Note: generateStudySetFromContext doesn't return a summary field currently, unlike youtube/web
+                    // We can use the processedContent as the 'summary' or content_text essentially
+                    finalSummary = `Generado automáticamente desde ${activeTab}`;
+                }
+
+                // If CLASS MODE
+                if (classId) {
+                    // A. Upload File to Storage (if PDF)
+                    let fileUrl = '';
+                    if (activeTab === 'pdf' && selectedFile) {
+                        setStatus('Subiendo archivo...');
+                        const fileExt = selectedFile.name.split('.').pop();
+                        const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+                        const filePath = `${classId}/${fileName}`;
+
+                        const { error: uploadError } = await supabase.storage
+                            .from('materials')
+                            .upload(filePath, selectedFile);
+
+                        if (uploadError) throw uploadError;
+
+                        const { data: { publicUrl } } = supabase.storage
+                            .from('materials')
+                            .getPublicUrl(filePath);
+
+                        fileUrl = publicUrl;
+                    } else if (activeTab === 'youtube' && youtubeAnalysis) {
+                        fileUrl = youtubeAnalysis.videoUrl;
+                    }
+
+                    // B. Create Material Record
+                    setStatus('Creando material de clase...');
+                    const { data: materialRecord, error: matError } = await supabase
+                        .from('materials')
+                        .insert({
+                            class_id: classId,
+                            name: name,
+                            type: activeTab === 'youtube' ? 'video' : (activeTab === 'pdf' ? 'pdf' : 'link'), // 'link' as fallback for text/notes? or maybe create a PDF/Doc for notes? 
+                            // For pure text notes, we might not have a URL. Let's assume 'link' type but empty link or handled as 'note'
+                            // TeacherClassDetail uses 'pdf', 'video', 'pptx', 'link'. 
+                            // If Text, maybe treat as 'link' (generic resource) or we need a new type?
+                            // For now, if text, we don't have a fileUrl. 
+                            file_url: fileUrl,
+                            content_text: processedContent.substring(0, 50000),
+                            status: 'ready',
+                            generated_content: {
+                                flashcards: cardData.length,
+                                quizzes: 0,
+                                guides: finalSummary ? 1 : 0
+                            }
+                        })
+                        .select()
+                        .single();
+
+                    if (matError) throw matError;
+                    materialId = materialRecord.id;
+
+                    // C. Create Assignment (Linked to Module or General)
+                    // Always create assignment so it appears in the class feed
+                    setStatus('Creando asignación...');
+                    const assignmentDesc = 'Material de estudio generado automáticamente con IA';
+                    const assignmentData: any = {
+                        class_id: classId,
+                        title: name,
+                        description: assignmentDesc,
+                        type: 'material',
+                        points: 0,
+                        published: true,
+                        allow_late_submissions: false,
+                        late_penalty_percent: 0,
+                        attached_materials: [materialId!]
+                    };
+
+                    if (moduleId) {
+                        assignmentData.topic_id = moduleId;
+                    }
+
+                    newAssignment = await createAssignment(assignmentData);
+                    // (newSet as any) = { ...newSet || {}, linkedAssignmentId: newAssignment.id }; // This line is being replaced
+
+                    // D. Create Class Study Set
+                    setStatus('Configurando set de estudio...');
+                    // createClassStudySet(classId, materialId, teacherId, title, description)
+                    newSet = await createClassStudySet(
+                        classId,
+                        materialId!,
+                        user.id,
+                        name,
+                        `Generado con IA desde ${activeTab.toUpperCase()}`
+                    );
+
+                    // Attach assignment ID to newSet for redirection
+                    if ((newSet as any) && (newSet === undefined || newSet === null)) {
+                        // If newSet is somehow null, handle it. But createClassStudySet throws on error.
+                    } else if (newAssignment) {
+                        (newSet as any).linkedAssignmentId = newAssignment.id;
+                    }
+
+                } else {
+                    // PERSONAL MODE (Original Logic)
+                    // Create the set first
+                    newSet = await createStudySet(user.id, {
+                        name: name,
+                        description: `Generado con IA desde ${activeTab.toUpperCase()}`,
+                        topics: ['IA', activeTab],
+                        icon: activeTab === 'youtube' ? 'play_circle' : (activeTab === 'pdf' ? 'picture_as_pdf' : 'description')
+                    });
+                }
+
+                if (!newSet?.id) throw new Error("Error al crear el set de estudio.");
 
                 // Add flashcards in batch
                 setStatus(`Guardando ${cardData.length} flashcards...`);
-
                 const flashcardsToInsert = cardData.map((card: any) => ({
                     study_set_id: newSet.id,
                     question: card.question,
@@ -117,11 +232,12 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
 
                 await addFlashcardsBatch(flashcardsToInsert);
 
-                // 4. Save the source material with detailed summary for YouTube
-                setStatus('Guardando material original...');
+                // 4. Save the source material content INSIDE the Study Set (for Resumen tab)
+                setStatus('Finalizando...');
                 try {
-                    // Get YouTube analysis data if available
                     const youtubeAnalysis = (window as any).__youtubeAnalysis;
+                    // For Class Mode, we already created the "Class Material". 
+                    // But we ALSO want the "Study Set Material" for the 'Resumen' tab in the study view.
 
                     if (activeTab === 'youtube' && youtubeAnalysis) {
                         await addMaterialToStudySet({
@@ -143,12 +259,11 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess 
                             file_url: '',
                             content_text: processedContent,
                             flashcards_generated: cardData.length,
-                            summary: `Material importado automáticamente desde ${activeTab}`
+                            summary: finalSummary || `Material importado automáticamente desde ${activeTab}`
                         });
                     }
                 } catch (matError) {
-                    console.error('Error saving material:', matError);
-                    // Don't fail the whole process if material save fails
+                    console.error('Error saving study set material:', matError);
                 }
 
                 return newSet;

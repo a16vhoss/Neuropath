@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, getClassMaterials, getClassEnrollments, uploadMaterial, createClassStudySet } from '../services/supabaseClient';
+import MagicImportModal from '../components/MagicImportModal';
+import { supabase, getClassMaterials, getClassEnrollments, uploadMaterial, createClassStudySet, getClassStudySet } from '../services/supabaseClient';
 import {
     extractTextFromPDF,
     generateFlashcardsFromText,
@@ -149,73 +150,73 @@ const TeacherClassDetail: React.FC = () => {
     const [viewingAssignment, setViewingAssignment] = useState<Assignment | null>(null);
 
     // Load class data
-    useEffect(() => {
-        const loadClassData = async () => {
-            if (!classId) return;
+    const loadClassData = useCallback(async () => {
+        if (!classId) return;
 
-            try {
-                // Get class info
-                const { data: cls } = await supabase
-                    .from('classes')
-                    .select('id, name, code, topics')
-                    .eq('id', classId)
-                    .single();
+        try {
+            // Get class info
+            const { data: cls } = await supabase
+                .from('classes')
+                .select('id, name, code, topics')
+                .eq('id', classId)
+                .single();
 
-                if (cls) {
-                    setClassData(cls);
-                }
-
-                // Get topics
-                setLoadingTopics(true);
-                const classTopics = await getClassTopics(classId);
-                setTopics(classTopics);
-                setLoadingTopics(false);
-
-                // Get materials
-                setLoadingMaterials(true);
-                const mats = await getClassMaterials(classId);
-                if (mats) {
-                    setMaterials(mats.map((m: any) => ({
-                        id: m.id,
-                        name: m.name,
-                        type: m.type || 'pdf',
-                        status: m.status || 'ready',
-                        uploadedAt: new Date(m.created_at).toLocaleDateString(),
-                        generatedContent: {
-                            flashcards: m.flashcard_count || 0,
-                            quizzes: m.quiz_count || 0,
-                            guides: 0
-                        }
-                    })));
-                }
-                setLoadingMaterials(false);
-
-                // Get enrolled students
-                setLoadingStudents(true);
-                const enrollments = await getClassEnrollments(classId);
-                if (enrollments) {
-                    setStudents(enrollments.map((e: any) => ({
-                        id: e.profiles?.id || e.student_id,
-                        name: e.profiles?.full_name || 'Estudiante',
-                        email: e.profiles?.email || '',
-                        avatar: e.profiles?.avatar_url || e.student_id.slice(0, 8),
-                        progress: e.progress || 0,
-                        lastActive: e.profiles?.updated_at
-                            ? getTimeAgo(new Date(e.profiles.updated_at))
-                            : 'Desconocido',
-                        status: e.progress < 30 ? 'risk' : e.progress < 50 ? 'inactive' : 'ok'
-                    })));
-                }
-                setLoadingStudents(false);
-            } catch (error) {
-                console.error('Error loading class data:', error);
-                setLoadingMaterials(false);
-                setLoadingStudents(false);
+            if (cls) {
+                setClassData(cls);
             }
-        };
 
-        loadClassData();
+            // Get topics
+            setLoadingTopics(true);
+            const classTopics = await getClassTopics(classId);
+            setTopics(classTopics);
+            setLoadingTopics(false);
+
+            // Get materials
+            setLoadingMaterials(true);
+            const mats = await getClassMaterials(classId);
+            if (mats) {
+                setMaterials(mats.map((m: any) => ({
+                    id: m.id,
+                    name: m.name,
+                    type: m.type || 'pdf',
+                    status: m.status || 'ready',
+                    uploadedAt: new Date(m.created_at).toLocaleDateString(),
+                    generatedContent: {
+                        flashcards: m.flashcard_count || 0,
+                        quizzes: m.quiz_count || 0,
+                        guides: 0
+                    }
+                })));
+            }
+            setLoadingMaterials(false);
+
+            // Get enrolled students
+            setLoadingStudents(true);
+            const enrollments = await getClassEnrollments(classId);
+            if (enrollments) {
+                setStudents(enrollments.map((e: any) => ({
+                    id: e.profiles?.id || e.student_id,
+                    name: e.profiles?.full_name || 'Estudiante',
+                    email: e.profiles?.email || '',
+                    avatar: e.profiles?.avatar_url || e.student_id.slice(0, 8),
+                    progress: e.progress || 0,
+                    lastActive: e.profiles?.updated_at
+                        ? getTimeAgo(new Date(e.profiles.updated_at))
+                        : 'Desconocido',
+                    status: e.progress < 30 ? 'risk' : e.progress < 50 ? 'inactive' : 'ok'
+                })));
+            }
+            setLoadingStudents(false);
+        } catch (error) {
+            console.error('Error loading class data:', error);
+            setLoadingMaterials(false);
+            setLoadingStudents(false);
+        }
     }, [classId]);
+
+    useEffect(() => {
+        loadClassData();
+    }, [loadClassData]);
 
     // Load exams
     useEffect(() => {
@@ -274,29 +275,30 @@ const TeacherClassDetail: React.FC = () => {
     }, [loadAnnouncements]);
 
     // Load assignments and submissions
-    useEffect(() => {
-        const loadAssignmentsData = async () => {
-            if (!classId) return;
-            setLoadingAssignments(true);
-            try {
-                const assignmentsData = await getClassAssignments(classId);
-                setAssignments(assignmentsData);
+    const loadAssignmentsData = useCallback(async () => {
+        if (!classId) return;
+        setLoadingAssignments(true);
+        try {
+            const assignmentsData = await getClassAssignments(classId);
+            setAssignments(assignmentsData);
 
-                // Load all submissions for grading
-                const allSubmissions: AssignmentSubmission[] = [];
-                for (const assignment of assignmentsData) {
-                    const subs = await getAssignmentSubmissions(assignment.id);
-                    allSubmissions.push(...subs);
-                }
-                setSubmissions(allSubmissions);
-            } catch (error) {
-                console.error('Error loading assignments:', error);
-            } finally {
-                setLoadingAssignments(false);
+            // Load all submissions for grading
+            const allSubmissions: AssignmentSubmission[] = [];
+            for (const assignment of assignmentsData) {
+                const subs = await getAssignmentSubmissions(assignment.id);
+                allSubmissions.push(...subs);
             }
-        };
-        loadAssignmentsData();
+            setSubmissions(allSubmissions);
+        } catch (error) {
+            console.error('Error loading assignments:', error);
+        } finally {
+            setLoadingAssignments(false);
+        }
     }, [classId]);
+
+    useEffect(() => {
+        loadAssignmentsData();
+    }, [loadAssignmentsData]);
 
     // Load scheduled exams
     useEffect(() => {
@@ -1498,198 +1500,22 @@ const TeacherClassDetail: React.FC = () => {
                 />
             )}
 
-            {/* Upload Modal */}
+            {/* Upload Modal (Magic Import) */}
             {showUploadModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                        {/* Header */}
-                        <div className="p-6 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex justify-between items-center">
-                            <div>
-                                <h2 className="text-2xl font-bold flex items-center gap-2">
-                                    <span className="material-symbols-outlined">auto_awesome</span> Hola, vamos a crear
-                                </h2>
-                                <p className="text-indigo-100 text-sm mt-1">Sube material y deja que la IA cree flashcards y quizzes.</p>
-                            </div>
-                            <button onClick={() => { setShowUploadModal(false); setSelectedFile(null); setUploadInputValue(''); setUploadTitle(''); }} className="text-white/80 hover:text-white bg-white/10 p-2 rounded-full hover:bg-white/20 transition-all">
-                                <span className="material-symbols-outlined">close</span>
-                            </button>
-                        </div>
-
-                        {/* Tabs */}
-                        <div className="flex border-b border-gray-100">
-                            <button
-                                onClick={() => setUploadTab('text')}
-                                className={`flex-1 py-4 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${uploadTab === 'text' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-gray-500 hover:bg-gray-50'}`}
-                            >
-                                <span className="material-symbols-outlined">description</span> Texto / Notas
-                            </button>
-                            <button
-                                onClick={() => setUploadTab('pdf')}
-                                className={`flex-1 py-4 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${uploadTab === 'pdf' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-gray-500 hover:bg-gray-50'}`}
-                            >
-                                <span className="material-symbols-outlined">picture_as_pdf</span> PDF
-                            </button>
-                            <button
-                                onClick={() => setUploadTab('youtube')}
-                                className={`flex-1 py-4 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${uploadTab === 'youtube' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-gray-500 hover:bg-gray-50'}`}
-                            >
-                                <span className="material-symbols-outlined">play_circle</span> YouTube
-                            </button>
-                        </div>
-
-                        {/* Body */}
-                        <div className="p-6 overflow-y-auto flex-1 space-y-6">
-                            {!isUploading ? (
-                                <>
-                                    {/* Name & Desc Inputs */}
-                                    <div className="grid grid-cols-1 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Título del Material</label>
-                                            <input
-                                                type="text"
-                                                placeholder="Ej: Introducción a la Física"
-                                                value={uploadTitle}
-                                                onChange={(e) => setUploadTitle(e.target.value)}
-                                                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Descripción (opcional)</label>
-                                            <textarea
-                                                placeholder="Breve descripción..."
-                                                rows={2}
-                                                value={uploadDescription}
-                                                onChange={(e) => setUploadDescription(e.target.value)}
-                                                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all resize-none"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Content Input Area */}
-                                    <div className="bg-gray-50 p-6 rounded-xl border border-dashed border-gray-300">
-                                        {uploadTab === 'text' && (
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Pega tus apuntes aquí</label>
-                                                <textarea
-                                                    className="w-full h-48 p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all text-sm"
-                                                    placeholder="Copia y pega texto de Wikipedia, Word, o tus notas..."
-                                                    value={uploadInputValue}
-                                                    onChange={(e) => setUploadInputValue(e.target.value)}
-                                                ></textarea>
-                                            </div>
-                                        )}
-
-                                        {uploadTab === 'pdf' && (
-                                            <div className="text-center py-4">
-                                                {!selectedFile ? (
-                                                    <>
-                                                        <span className="material-symbols-outlined text-5xl text-gray-300 mb-4">cloud_upload</span>
-                                                        <p className="text-gray-600 font-medium mb-2">Sube tu PDF</p>
-                                                        <p className="text-xs text-gray-400 mb-4">Máx 10MB. Se extraerá el texto automáticamente.</p>
-                                                        <input
-                                                            type="file"
-                                                            accept=".pdf"
-                                                            onChange={(e) => handleFileSelect(e.target.files)}
-                                                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-all"
-                                                        />
-                                                    </>
-                                                ) : (
-                                                    <div className="bg-white p-4 rounded-xl flex items-center gap-4 border border-indigo-100 shadow-sm">
-                                                        <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center text-red-600">
-                                                            <span className="material-symbols-outlined">picture_as_pdf</span>
-                                                        </div>
-                                                        <div className="flex-1 text-left overflow-hidden">
-                                                            <p className="font-bold text-gray-900 truncate">{selectedFile.name}</p>
-                                                            <p className="text-xs text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                                                        </div>
-                                                        <button onClick={() => setSelectedFile(null)} className="text-gray-400 hover:text-red-500">
-                                                            <span className="material-symbols-outlined">close</span>
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {uploadTab === 'youtube' && (
-                                            <div>
-                                                <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-100 rounded-lg p-4 mb-4">
-                                                    <div className="flex items-start gap-3">
-                                                        <span className="material-symbols-outlined text-red-600 text-2xl">smart_toy</span>
-                                                        <div>
-                                                            <p className="text-sm font-medium text-red-800 mb-1">Análisis de Video</p>
-                                                            <p className="text-xs text-red-600">
-                                                                Pega el enlace de un video educativo y generaremos todo el contenido.
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">Enlace de YouTube</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="https://youtube.com/watch?v=..."
-                                                    value={uploadInputValue}
-                                                    onChange={(e) => setUploadInputValue(e.target.value)}
-                                                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="text-center py-12">
-                                    <div className="w-20 h-20 mx-auto mb-6 relative">
-                                        <div className="absolute inset-0 border-4 border-indigo-100 rounded-full"></div>
-                                        <div className="absolute inset-0 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                                        <span className="absolute inset-0 flex items-center justify-center material-symbols-outlined text-3xl text-indigo-600 animate-pulse">
-                                            auto_awesome
-                                        </span>
-                                    </div>
-                                    <p className="font-bold text-xl text-gray-900 mb-2">
-                                        {uploadStatus === 'uploading' && 'Subiendo archivo...'}
-                                        {uploadStatus === 'processing' && 'La IA está trabajando su magia...'}
-                                        {uploadStatus === 'done' && '¡Listo! Material Creado'}
-                                        {uploadStatus === 'error' && 'Ups, ocurrió un error'}
-                                    </p>
-                                    <p className="text-gray-500 mb-6 max-w-xs mx-auto">
-                                        {uploadStatus === 'processing' && 'Estamos analizando el contenido, generando resumen, flashcards y el quiz de evaluación.'}
-                                        {uploadStatus === 'done' && 'Redirigiendo...'}
-                                    </p>
-
-                                    <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden max-w-sm mx-auto">
-                                        <div
-                                            className={`h-full rounded-full transition-all duration-500 ease-out ${uploadStatus === 'error' ? 'bg-red-500' : uploadStatus === 'done' ? 'bg-emerald-500' : 'bg-indigo-600'}`}
-                                            style={{ width: `${uploadProgress}%` }}
-                                        ></div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Footer (Only if not uploading) */}
-                        {!isUploading && (
-                            <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
-                                <button
-                                    onClick={() => { setShowUploadModal(false); setSelectedFile(null); setUploadInputValue(''); setUploadTitle(''); }}
-                                    className="px-6 py-2.5 rounded-xl font-medium text-gray-600 hover:bg-gray-200 transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={handleConfirmUpload}
-                                    disabled={
-                                        !uploadTitle.trim() ||
-                                        (uploadTab === 'pdf' && !selectedFile) ||
-                                        ((uploadTab === 'text' || uploadTab === 'youtube') && !uploadInputValue.trim())
-                                    }
-                                    className="px-8 py-2.5 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-200 transition-all transform active:scale-95 flex items-center gap-2"
-                                >
-                                    <span className="material-symbols-outlined">auto_fix</span>
-                                    Crear Material
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <MagicImportModal
+                    isOpen={showUploadModal}
+                    onClose={() => setShowUploadModal(false)}
+                    onSuccess={(newSet: any) => {
+                        loadClassData();
+                        loadAssignmentsData();
+                        setShowUploadModal(false);
+                        if (newSet && newSet.linkedAssignmentId) {
+                            navigate(`/class/${classId}/item/${newSet.linkedAssignmentId}`);
+                        }
+                    }}
+                    classId={classId}
+                    moduleId={activeTopicId} // Pass activeTopicId if matches logic
+                />
             )}
 
             {/* Create Exam Modal */}
