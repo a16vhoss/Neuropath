@@ -30,6 +30,13 @@ const ClassItemDetail: React.FC = () => {
     const [isGradingModalOpen, setIsGradingModalOpen] = useState(false);
     const [submissionsList, setSubmissionsList] = useState<any[]>([]);
 
+    // Study Set / Material States
+    const [materials, setMaterials] = useState<any[]>([]);
+    const [flashcards, setFlashcards] = useState<any[]>([]);
+    const [currentFlashIndex, setCurrentFlashIndex] = useState(0);
+    const [isFlipped, setIsFlipped] = useState(false);
+    const [materialLoading, setMaterialLoading] = useState(false);
+
     // Edit State
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState<{
@@ -60,10 +67,14 @@ const ClassItemDetail: React.FC = () => {
             const itemData = await getAssignment(itemId);
             setItem(itemData);
 
-            // Load submission if student
             if (!isTeacher && user) {
                 const sub = await getStudentSubmission(itemId, user.id);
                 setSubmission(sub);
+            }
+
+            // If it's a material, load its related data
+            if (itemData.type === 'material') {
+                await loadMaterialData(itemData);
             }
 
         } catch (err: any) {
@@ -72,6 +83,145 @@ const ClassItemDetail: React.FC = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const loadMaterialData = async (assignment: Assignment) => {
+        if (!assignment.attached_materials || assignment.attached_materials.length === 0) return;
+
+        setMaterialLoading(true);
+        try {
+            // Fetch materials
+            const { data: mats, error: matsError } = await supabase
+                .from('materials')
+                .select('*')
+                .in('id', assignment.attached_materials);
+
+            if (matsError) throw matsError;
+            setMaterials(mats || []);
+
+            // Fetch flashcards for these materials
+            const { data: flashes, error: flashesError } = await supabase
+                .from('flashcards')
+                .select('*')
+                .in('material_id', assignment.attached_materials);
+
+            if (flashesError) throw flashesError;
+            setFlashcards(flashes || []);
+
+        } catch (err) {
+            console.error('Error loading material/flashcards:', err);
+        } finally {
+            setMaterialLoading(false);
+        }
+    };
+
+    const renderStudySet = () => {
+        if (flashcards.length === 0) return (
+            <div className="bg-white p-12 rounded-3xl border-2 border-dashed border-slate-200 text-center">
+                <div className="bg-slate-50 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-400">
+                    <span className="material-symbols-outlined text-3xl">style</span>
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 mb-2">No hay flashcards generadas</h3>
+                <p className="text-slate-500 max-w-xs mx-auto text-sm">Este material aún no tiene flashcards. Si eres profesor, puedes intentar regenerar el material.</p>
+            </div>
+        );
+
+        const currentCard = flashcards[currentFlashIndex];
+
+        return (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {/* Flashcard Carousel */}
+                <div className="flex flex-col items-center">
+                    <div className="w-full max-w-xl card-perspective h-80 relative group">
+                        <div
+                            onClick={() => setIsFlipped(!isFlipped)}
+                            className={`w-full h-full relative card-inner cursor-pointer ${isFlipped ? 'card-flipped' : ''}`}
+                        >
+                            {/* Front */}
+                            <div className="absolute inset-0 backface-hidden bg-white rounded-3xl shadow-xl border border-slate-100 flex flex-col items-center justify-center p-12 text-center">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Pregunta</span>
+                                <p className="text-2xl font-bold text-slate-900 leading-tight">
+                                    {currentCard.question}
+                                </p>
+                                <span className="absolute bottom-6 text-slate-400 text-sm font-medium flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-sm">touch_app</span>
+                                    Click para ver respuesta
+                                </span>
+                            </div>
+
+                            {/* Back */}
+                            <div className="absolute inset-0 backface-hidden bg-primary rounded-3xl shadow-xl flex flex-col items-center justify-center p-12 text-center rotate-y-180">
+                                <span className="text-xs font-bold text-white/60 uppercase tracking-widest mb-4">Respuesta</span>
+                                <p className="text-xl font-medium text-white leading-relaxed">
+                                    {currentCard.answer}
+                                </p>
+                                <span className="absolute bottom-6 text-white/60 text-sm font-medium">Click para volver</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Controls */}
+                    <div className="flex items-center gap-8 mt-8">
+                        <button
+                            onClick={() => {
+                                setCurrentFlashIndex(prev => Math.max(0, prev - 1));
+                                setIsFlipped(false);
+                            }}
+                            disabled={currentFlashIndex === 0}
+                            className="p-3 rounded-full bg-white shadow-md border border-slate-100 text-slate-600 hover:text-primary transition disabled:opacity-30 flex items-center justify-center"
+                        >
+                            <span className="material-symbols-outlined">chevron_left</span>
+                        </button>
+
+                        <div className="text-slate-500 font-bold bg-white px-4 py-1 rounded-full border border-slate-100 shadow-sm">
+                            {currentFlashIndex + 1} <span className="opacity-40 mx-1">/</span> {flashcards.length}
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                setCurrentFlashIndex(prev => Math.min(flashcards.length - 1, prev + 1));
+                                setIsFlipped(false);
+                            }}
+                            disabled={currentFlashIndex === flashcards.length - 1}
+                            className="p-3 rounded-full bg-white shadow-md border border-slate-100 text-slate-600 hover:text-primary transition disabled:opacity-30 flex items-center justify-center"
+                        >
+                            <span className="material-symbols-outlined">chevron_right</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Study Tools Card */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button
+                        onClick={() => navigate(`/student/adaptive/${materials[0]?.id}`)}
+                        className="bg-gradient-to-br from-indigo-500 to-blue-600 p-6 rounded-3xl text-white shadow-lg shadow-indigo-900/20 cursor-pointer hover:scale-[1.02] transition active:scale-95 group text-left"
+                    >
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="bg-white/20 p-2 rounded-xl">
+                                <span className="material-symbols-outlined">quiz</span>
+                            </div>
+                            <span className="material-symbols-outlined opacity-0 group-hover:opacity-100 transition translate-x-[-8px] group-hover:translate-x-0">arrow_forward</span>
+                        </div>
+                        <h3 className="text-xl font-black mb-1">Cuestionario IA</h3>
+                        <p className="text-white/80 text-sm">Prueba tus conocimientos con un quiz adaptativo de 5 preguntas.</p>
+                    </button>
+
+                    <button
+                        onClick={() => navigate(`/student/study-set/${materials[0]?.id}`)}
+                        className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm cursor-pointer hover:border-primary/30 hover:shadow-md transition active:scale-95 group text-left"
+                    >
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="bg-slate-100 p-2 rounded-xl text-slate-600 group-hover:bg-primary/10 group-hover:text-primary transition">
+                                <span className="material-symbols-outlined">style</span>
+                            </div>
+                            <span className="material-symbols-outlined opacity-0 group-hover:opacity-100 transition text-primary translate-x-[-8px] group-hover:translate-x-0">arrow_forward</span>
+                        </div>
+                        <h3 className="text-xl font-black text-slate-900 mb-1">Sesión Focalizada</h3>
+                        <p className="text-slate-500 text-sm">Inicia una sesión de estudio completa con el algoritmo FSRS.</p>
+                    </button>
+                </div>
+            </div>
+        );
     };
 
     const handleTogglePublish = async () => {
@@ -497,6 +647,18 @@ const ClassItemDetail: React.FC = () => {
 
                         <hr className="border-slate-100" />
 
+                        {/* Study Set Section for Materials */}
+                        {item.type === 'material' && (
+                            <div className="mt-4">
+                                <div className="flex items-center gap-2 mb-6">
+                                    <span className="material-symbols-outlined text-primary">auto_awesome</span>
+                                    <h2 className="text-xl font-black text-slate-900">Tu Set de Estudio</h2>
+                                </div>
+                                {renderStudySet()}
+                                <hr className="border-slate-100 my-8" />
+                            </div>
+                        )}
+
                         {/* Description */}
                         <div className="prose prose-slate max-w-none">
                             <h3 className="text-lg font-bold text-slate-900 mb-4">Descripción</h3>
@@ -773,8 +935,8 @@ const ClassItemDetail: React.FC = () => {
                                                     </div>
                                                 </div>
                                                 <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${sub.status === 'graded' ? 'bg-emerald-100 text-emerald-700' :
-                                                        sub.status === 'turned_in' ? 'bg-blue-100 text-blue-700' :
-                                                            'bg-amber-100 text-amber-700'
+                                                    sub.status === 'turned_in' ? 'bg-blue-100 text-blue-700' :
+                                                        'bg-amber-100 text-amber-700'
                                                     }`}>
                                                     {sub.status === 'graded' ? 'Calificado' : sub.status === 'turned_in' ? 'Entregado' : 'En Progreso'}
                                                 </div>
