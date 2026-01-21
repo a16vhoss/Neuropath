@@ -1007,3 +1007,144 @@ export async function getClassPerformanceSummary(classId: string) {
     };
 }
 
+
+// ... (imports remain the same)
+
+// ============================================
+// ANALYTICS ENHANCEMENTS
+// ============================================
+
+export async function getClassHeatmapData(classId: string) {
+    // 1. Get Topics
+    const topics = await getClassTopics(classId);
+
+    // 2. Get Students (Profiles)
+    const { data: enrollments } = await supabase
+        .from('enrollments')
+        .select(`
+            student_id,
+            profiles:profiles!student_id(id, full_name, avatar_url)
+        `)
+        .eq('class_id', classId);
+
+    // 3. Get Assignments (with topic info)
+    const { data: assignments } = await supabase
+        .from('assignments')
+        .select('id, topic_id, points')
+        .eq('class_id', classId)
+        .eq('published', true);
+
+    const assignmentIds = (assignments || []).map(a => a.id);
+
+    // 4. Get Submissions
+    const { data: submissions } = await supabase
+        .from('assignment_submissions')
+        .select('student_id, assignment_id, grade')
+        .in('assignment_id', assignmentIds.length > 0 ? assignmentIds : ['no-ids']);
+
+    // 5. Calculate scores per topic per student
+    const studentData = (enrollments || []).map((enrollment: any) => {
+        const student = enrollment.profiles;
+        if (!student) return null;
+
+        const scores: Record<string, number> = {}; // topicId -> avg score
+
+        topics.forEach(topic => {
+            // Find assignments for this topic
+            const topicAssignments = (assignments || []).filter(a => a.topic_id === topic.id);
+            if (topicAssignments.length === 0) {
+                scores[topic.id] = 0;
+                return;
+            }
+
+            // Calculate grade for this topic
+            let totalPossible = 0;
+            let totalEarned = 0;
+
+            topicAssignments.forEach(assignment => {
+                const sub = (submissions || []).find(s =>
+                    s.assignment_id === assignment.id &&
+                    s.student_id === student.id
+                );
+
+                if (sub && sub.grade !== null) {
+                    totalEarned += sub.grade;
+                    totalPossible += assignment.points;
+                }
+            });
+
+            scores[topic.id] = totalPossible > 0 ? Math.round((totalEarned / totalPossible) * 100) : 0;
+        });
+
+        // Calculate overall average
+        // Find all assignments that have been graded for this student
+        const studentGradedAssignments = (assignments || []).filter(a => {
+            const sub = (submissions || []).find(s => s.assignment_id === a.id && s.student_id === student.id);
+            return sub && sub.grade !== null;
+        });
+
+        const totalPointsEarned = studentGradedAssignments.reduce((sum, a) => {
+            const sub = (submissions || []).find(s => s.assignment_id === a.id && s.student_id === student.id);
+            return sum + (sub?.grade || 0);
+        }, 0);
+
+        const totalPointsPossible = studentGradedAssignments.reduce((sum, a) => sum + a.points, 0);
+
+        const overallAvg = totalPointsPossible > 0 ? Math.round((totalPointsEarned / totalPointsPossible) * 100) : 0;
+
+        return {
+            id: student.id,
+            name: student.full_name || 'Estudiante',
+            avatar: student.avatar_url,
+            scores,
+            totalAvg: overallAvg,
+            isAtRisk: overallAvg < 60 // Simple logic, matches risk logic
+        };
+    }).filter(Boolean);
+
+    return { topics, students: studentData };
+}
+
+export async function getClassProgressTrend(classId: string) {
+    // 1. Get assignments ordered by due_date
+    const { data: assignments } = await supabase
+        .from('assignments')
+        .select('id, title, due_date, points')
+        .eq('class_id', classId)
+        .eq('published', true)
+        .order('due_date', { ascending: true }); // Oldest first
+
+    if (!assignments || assignments.length === 0) return [];
+
+    const assignmentIds = assignments.map(a => a.id);
+
+    // 2. Get grades for these assignments
+    const { data: submissions } = await supabase
+        .from('assignment_submissions')
+        .select('assignment_id, grade')
+        .in('assignment_id', assignmentIds);
+
+    // 3. Calculate avg per assignment
+    const trend = assignments.map(assignment => {
+        const assSubs = (submissions || []).filter(s => s.assignment_id === assignment.id && s.grade !== null);
+
+        let percentage = 0;
+        if (assSubs.length > 0) {
+            const avgGrade = assSubs.reduce((sum, s) => sum + (s.grade || 0), 0) / assSubs.length;
+            percentage = assignment.points > 0 ? (avgGrade / assignment.points) * 100 : 0;
+        }
+
+        return {
+            name: assignment.title.length > 15 ? assignment.title.substring(0, 12) + '...' : assignment.title,
+            progress: Math.round(percentage),
+            target: 80 // Benchmark
+        };
+    }).filter(item => item.progress > 0); // Only show assignments with grades
+
+    // If no grades yet, return simple empty structure to avoid chart errors
+    if (trend.length === 0) {
+        return [{ name: 'Inicio', progress: 0, target: 80 }];
+    }
+
+    return trend;
+}

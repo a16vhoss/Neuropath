@@ -191,7 +191,7 @@ const TeacherClassDetail: React.FC = () => {
                         id: e.profiles?.id || e.student_id,
                         name: e.profiles?.full_name || 'Estudiante',
                         email: e.profiles?.email || '',
-                        avatar: e.student_id.slice(0, 8),
+                        avatar: e.profiles?.avatar_url || e.student_id.slice(0, 8),
                         progress: e.progress || 0,
                         lastActive: e.profiles?.updated_at
                             ? getTimeAgo(new Date(e.profiles.updated_at))
