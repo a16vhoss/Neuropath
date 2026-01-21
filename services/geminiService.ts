@@ -145,21 +145,10 @@ export const generateFlashcardsFromYouTubeURL = async (url: string) => {
  * Generate Flashcards from Web URL (Placeholder / Simple Text logic)
  */
 export const generateFlashcardsFromWebURL = async (url: string) => {
-  // Note: Fetching web content client-side often hits CORS.
-  // Ideally this would be server-side. For now, we will assume
-  // we can't easily fetch arbitrary URLs client-side without a proxy.
-  // We'll implement a "best effort" or mock for now, OR rely on the user pasting text.
-  // If the requirement is strict, we'd need a proxy function in Supabase.
-
-  // For this 'fix', we will just implement it to avoid build errors, 
-  // maybe try to fetch if CORS allows, else fail gracefully.
   try {
     const response = await fetch(url);
     const text = await response.text();
-    // Very basic scraping (extract body text) - likely to be messy HTML
-    // Use a simple regex to strip tags? Or just pass to Gemini if it's not too huge?
     const cleanText = text.replace(/<[^>]*>?/gm, ' ').slice(0, 20000); // Strip HTML tags
-
     return await generateStudySetFromContext(cleanText);
   } catch (error) {
     console.warn("Could not fetch web URL directly (likely CORS):", error);
@@ -211,5 +200,136 @@ export const autoCategorizeFlashcards = async (flashcards: any[]) => {
   } catch (error) {
     console.error("Error auto-categorizing:", error);
     return flashcards;
+  }
+};
+
+
+/**
+ * Get AI Tutor Response
+ */
+export const getTutorResponse = async (
+  message: string,
+  context: string,
+  topic?: string,
+  mode: 'standard' | 'hint' | 'analogy' = 'standard',
+  currentCardContext?: string
+): Promise<string> => {
+  const genAI = getGeminiSDK();
+  if (!genAI) return "Lo siento, no puedo conectar con mi cerebro IA en este momento.";
+
+  try {
+    const modelName = await getBestGeminiModel();
+    const model = genAI.getGenerativeModel({ model: modelName });
+
+    let systemInstruction = `Eres un tutor de IA experto y paciente, especializado en el método Socrático. ayúdame a entender.`;
+
+    if (context) systemInstruction += `\nUsa este contexto de la clase: ${context.slice(0, 20000)}`;
+    if (topic) systemInstruction += `\nEstamos estudiando: ${topic}`;
+    if (currentCardContext) systemInstruction += `\nEl estudiante está viendo esta tarjeta/pregunta: ${currentCardContext}`;
+
+    if (mode === 'hint') {
+      systemInstruction += `\nEL ESTUDIANTE PIDIÓ UNA PISTA. NO des la respuesta. Da una pista sutil para guiarlo.`;
+    } else if (mode === 'analogy') {
+      systemInstruction += `\nEXPLICA CON UNA ANALOGÍA o METÁFORA creativa.`;
+    } else {
+      systemInstruction += `\nResponde de forma concisa y educativa. Si el estudiante hace una pregunta, guíalo.`;
+    }
+
+    const result = await model.generateContent([
+      systemInstruction,
+      message
+    ]);
+
+    return result.response.text();
+
+  } catch (error) {
+    console.error("Error getting tutor response:", error);
+    return "Lo siento, tuve un problema pensando la respuesta.";
+  }
+};
+
+/**
+ * Generate Quiz Questions from Text
+ */
+export const generateQuizQuestions = async (text: string, count: number = 5): Promise<any[]> => {
+  const genAI = getGeminiSDK();
+  if (!genAI) return [];
+
+  try {
+    const modelName = await getBestGeminiModel();
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              question: { type: SchemaType.STRING },
+              options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+              correctAnswer: { type: SchemaType.STRING }, // index or text? Let's use text for simplicity here or update StudySession to match
+              explanation: { type: SchemaType.STRING }
+            },
+            required: ["question", "options", "correctAnswer", "explanation"]
+          }
+        }
+      }
+    });
+
+    const prompt = `Genera ${count} preguntas de opción múltiple basadas en este texto: ${text.slice(0, 10000)}.`;
+
+    const result = await model.generateContent(prompt);
+    return JSON.parse(result.response.text());
+
+  } catch (error) {
+    console.error("Error generating quiz:", error);
+    return [];
+  }
+};
+
+/**
+ * Generate Podcast Script from Context
+ */
+export const generatePodcastScript = async (context: string) => {
+  const genAI = getGeminiSDK();
+  if (!genAI) return [];
+
+  try {
+    const modelName = await getBestGeminiModel();
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        // Return JSON array of {speaker, text}
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              speaker: { type: SchemaType.STRING },
+              text: { type: SchemaType.STRING }
+            },
+            required: ["speaker", "text"]
+          }
+        }
+      }
+    });
+
+    const prompt = `
+        Crea un guion de podcast educativo (estilo conversación) sobre el siguiente tema.
+        Dos presentadores: "Alex" (Experto/Profesor) y "Sam" (Curioso/Estudiante).
+        
+        Contexto: "${context.slice(0, 15000)}"
+        
+        Haz que sea dinámico, entretenido, con analogías. Duración breve (aprox 10-15 líneas de diálogo).
+        Idioma: Español.
+        `;
+
+    const result = await model.generateContent(prompt);
+    return JSON.parse(result.response.text());
+  } catch (error) {
+    console.error("Error generating podcast script:", error);
+    return [];
   }
 };
