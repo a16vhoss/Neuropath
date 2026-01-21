@@ -11,7 +11,7 @@ const getAIClient = () => {
     return new GoogleGenAI({ apiKey: API_KEY });
 };
 
-const MODEL_NAME = "gemini-1.5-flash";
+const MODEL_NAME = "gemini-1.5-flash-001";
 
 /**
  * Call Gemini API using SDK
