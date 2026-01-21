@@ -10,9 +10,9 @@ import {
     gradeSubmission
 } from '../services/ClassroomService'; // Verify imports
 import { Assignment } from '../services/ClassroomService';
-import { supabase, getClassStudySet } from '../services/supabaseClient';
+import { supabase, getClassStudySet, createClassStudySet } from '../services/supabaseClient';
 import StudySetDetail from './StudySetDetail';
-import { extractTextFromPDF, generateStudySummary } from '../services/pdfProcessingService';
+import { extractTextFromPDF, generateStudySummary, generateFlashcardsFromText } from '../services/pdfProcessingService';
 
 const ClassItemDetail: React.FC = () => {
     const { classId, itemId } = useParams<{ classId: string; itemId: string }>();
@@ -139,6 +139,103 @@ const ClassItemDetail: React.FC = () => {
         }
     };
 
+    const [converting, setConverting] = useState(false);
+
+    const handleRegenerateFlashcards = async () => {
+        if (!materials[0]) return;
+        setConverting(true);
+        try {
+            const material = materials[0];
+            let text = material.content_text || '';
+
+            // If no text but has file (PDF/Image), try to extract
+            if (!text && material.type === 'pdf' && material.url) {
+                const { data: fileData, error: dlError } = await supabase.storage
+                    .from('materials')
+                    .download(material.url);
+
+                if (dlError) throw dlError;
+
+                if (fileData) {
+                    const base64 = await new Promise<string>((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve((e.target?.result as string)?.split(',')[1]);
+                        reader.readAsDataURL(fileData);
+                    });
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    text = (await extractTextFromPDF(base64) as any) || '';
+
+                    // Update material text if we extracted it
+                    if (text) {
+                        await supabase.from('materials')
+                            .update({ content_text: text })
+                            .eq('id', material.id);
+                    }
+                }
+            }
+
+            if (!text && material.type === 'video' && material.url) {
+                // For video we might need to re-run video logic (simplified here to just warn)
+                alert("No se puede regenerar video sin texto previo. Intente resubir.");
+                return;
+            }
+
+            if (!text) {
+                alert("No se pudo extraer texto del material.");
+                return;
+            }
+
+            const flashes = await generateFlashcardsFromText(text, material.name) || [];
+
+            if (flashes.length > 0) {
+                // Determine study set ID
+                let targetSetId = linkedStudySetId;
+
+                // If checking fails, just insert linked to material (triggers will handle study set hopefully if created)
+                // But we MUST have study_set_id for them to show in the View
+                if (!targetSetId) {
+                    // Verify if a set exists
+                    const { data: set } = await getClassStudySet(material.id);
+                    if (set) {
+                        targetSetId = set.id;
+                    } else {
+                        // Create set if missing!
+                        const newSet = await createClassStudySet(
+                            item!.class_id,
+                            material.id,
+                            user!.id,
+                            material.name,
+                            'Generado tras regeneración'
+                        );
+                        targetSetId = newSet.id;
+                    }
+                }
+
+                if (targetSetId) {
+                    const payload = flashes.map(f => ({
+                        study_set_id: targetSetId,
+                        material_id: material.id,
+                        question: f.question,
+                        answer: f.answer,
+                        category: 'General'
+                    }));
+
+                    await supabase.from('flashcards').insert(payload);
+                    await loadItem(); // Refresh
+                    alert(`¡Éxito! Se generaron ${flashes.length} flashcards.`);
+                }
+            } else {
+                alert("La IA no pudo generar preguntas sobre este texto.");
+            }
+
+        } catch (error) {
+            console.error(error);
+            alert("Error al regenerar.");
+        } finally {
+            setConverting(false);
+        }
+    };
+
     const renderStudySet = () => {
         if (flashcards.length === 0) return (
             <div className="bg-white p-12 rounded-3xl border-2 border-dashed border-slate-200 text-center">
@@ -146,7 +243,27 @@ const ClassItemDetail: React.FC = () => {
                     <span className="material-symbols-outlined text-3xl">style</span>
                 </div>
                 <h3 className="text-lg font-bold text-slate-900 mb-2">No hay flashcards generadas</h3>
-                <p className="text-slate-500 max-w-xs mx-auto text-sm">Este material aún no tiene flashcards. Si eres profesor, puedes intentar regenerar el material.</p>
+                <p className="text-slate-500 max-w-xs mx-auto text-sm mb-6">Este material aún no tiene flashcards. Si eres profesor, puedes intentar regenerar el material.</p>
+
+                {profile?.role === 'teacher' && (
+                    <button
+                        onClick={handleRegenerateFlashcards}
+                        disabled={converting}
+                        className="bg-primary text-white px-6 py-2 rounded-xl font-bold hover:opacity-90 transition flex items-center gap-2 mx-auto disabled:opacity-50"
+                    >
+                        {converting ? (
+                            <>
+                                <span className="animate-spin material-symbols-outlined text-sm">sync</span>
+                                Regenerando...
+                            </>
+                        ) : (
+                            <>
+                                <span className="material-symbols-outlined text-sm">auto_fix_high</span>
+                                Regenerar con IA
+                            </>
+                        )}
+                    </button>
+                )}
             </div>
         );
 
