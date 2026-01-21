@@ -615,34 +615,60 @@ const ClassItemDetail: React.FC = () => {
 
             {/* Main Content */}
             <div className="max-w-5xl mx-auto px-6 py-8">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Left Column: Content */}
-                    <div className="lg:col-span-2 space-y-8">
+                <div className={`grid grid-cols-1 ${(!isTeacher && item.type === 'material') ? 'lg:grid-cols-1' : 'lg:grid-cols-3'} gap-8`}>
+                    {/* Left Column: Content (Full width for Student Materials) */}
+                    <div className={`${(!isTeacher && item.type === 'material') ? 'lg:col-span-1' : 'lg:col-span-2'} space-y-8`}>
                         {/* Header Info */}
-                        <div>
-                            <div className="flex items-center gap-3 mb-4">
-                                <span className={`p-2 rounded-lg ${item.type === 'assignment' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>
-                                    <span className="material-symbols-outlined">
-                                        {item.type === 'assignment' ? 'assignment' : 'folder_open'}
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                            <div>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <span className={`p-2 rounded-lg ${item.type === 'assignment' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>
+                                        <span className="material-symbols-outlined">
+                                            {item.type === 'assignment' ? 'assignment' : 'folder_open'}
+                                        </span>
                                     </span>
-                                </span>
-                                <h1 className="text-3xl font-bold text-slate-900">{item.title}</h1>
+                                    <h1 className="text-3xl font-bold text-slate-900">{item.title}</h1>
+                                </div>
+
+                                <div className="flex items-center gap-6 text-slate-500 text-sm">
+                                    {item.due_date && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-lg">event</span>
+                                            <span>Entrega: {new Date(item.due_date).toLocaleString()}</span>
+                                        </div>
+                                    )}
+                                    {item.points !== undefined && item.type === 'assignment' && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-lg">stars</span>
+                                            <span>{item.points} Puntos</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
-                            <div className="flex items-center gap-6 text-slate-500 text-sm">
-                                {item.due_date && (
-                                    <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-lg">event</span>
-                                        <span>Entrega: {new Date(item.due_date).toLocaleString()}</span>
-                                    </div>
-                                )}
-                                {item.points !== undefined && item.type === 'assignment' && (
-                                    <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-lg">stars</span>
-                                        <span>{item.points} Puntos</span>
-                                    </div>
-                                )}
-                            </div>
+                            {/* Student Material Header Actions */}
+                            {!isTeacher && item.type === 'material' && (
+                                <div className="flex flex-wrap gap-3 mt-4 lg:mt-0 lg:ml-auto">
+                                    <button
+                                        onClick={() => {
+                                            if (item.id) navigate(`/student/adaptive/${item.id}`);
+                                        }}
+                                        className="bg-indigo-600 text-white font-bold px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition flex items-center gap-2 shadow-sm"
+                                    >
+                                        <span className="material-symbols-outlined">quiz</span>
+                                        Cuestionario IA
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (item.id) navigate(`/student/study-set/${item.id}`);
+                                        }}
+                                        className="bg-white text-indigo-700 border border-indigo-200 font-bold px-5 py-2.5 rounded-xl hover:bg-indigo-50 transition flex items-center gap-2"
+                                    >
+                                        <span className="material-symbols-outlined">psychology</span>
+                                        Sesión Focalizada
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         <hr className="border-slate-100" />
@@ -650,12 +676,22 @@ const ClassItemDetail: React.FC = () => {
                         {/* Study Set Section for Materials */}
                         {item.type === 'material' && (
                             <div className="mt-4">
-                                <div className="flex items-center gap-2 mb-6">
-                                    <span className="material-symbols-outlined text-primary">auto_awesome</span>
-                                    <h2 className="text-xl font-black text-slate-900">Tu Set de Estudio</h2>
-                                </div>
-                                {renderStudySet()}
-                                <hr className="border-slate-100 my-8" />
+                                {(!isTeacher && item.type === 'material') ? (
+                                    /* Clean View for Student */
+                                    <div className="mb-8">
+                                        {renderStudySet()}
+                                    </div>
+                                ) : (
+                                    /* Standard View with Title for Teacher */
+                                    <>
+                                        <div className="flex items-center gap-2 mb-6">
+                                            <span className="material-symbols-outlined text-primary">auto_awesome</span>
+                                            <h2 className="text-xl font-black text-slate-900">Tu Set de Estudio</h2>
+                                        </div>
+                                        {renderStudySet()}
+                                        <hr className="border-slate-100 my-8" />
+                                    </>
+                                )}
                             </div>
                         )}
 
@@ -726,9 +762,9 @@ const ClassItemDetail: React.FC = () => {
                         )}
                     </div>
 
-                    {/* Right Column: Actions (Submission, etc) */}
-                    <div className="lg:col-span-1">
-                        {!isTeacher && item.type === 'assignment' && (
+                    {/* Right Column: Actions (Submission, etc) - Hidden for Student Material View */}
+                    <div className={(!isTeacher && item.type === 'material') ? 'hidden' : 'lg:col-span-1'}>
+                        {(!isTeacher && item.type === 'assignment') && (
                             <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 sticky top-24">
                                 <h3 className="font-bold text-slate-900 mb-4 text-lg">Tu Entrega</h3>
                                 {!submission ? (
