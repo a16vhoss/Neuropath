@@ -694,6 +694,29 @@ const TeacherClassDetail: React.FC = () => {
 
                         if (fcError) console.error("Error saving flashcards:", fcError);
                     }
+
+                    // Sub-Step: Also add the source material to the "Materials" tab of the Study Set
+                    if (studySet) {
+                        try {
+                            let studySetType = 'manual';
+                            if (materialType === 'pdf') studySetType = 'pdf';
+                            else if (materialType === 'video') studySetType = 'url';
+                            else if (materialType === 'doc') studySetType = 'notes';
+
+                            await supabase.from('study_set_materials').insert({
+                                study_set_id: studySet.id,
+                                name: uploadTitle,
+                                type: studySetType,
+                                file_url: materialUrl || null,
+                                content_text: extractedText || null,
+                                flashcards_generated: flashcards.length,
+                                summary: extractedText ? extractedText.substring(0, 200) + '...' : null
+                            });
+                        } catch (matError) {
+                            console.error("Error linking material to study set tab:", matError);
+                        }
+                    }
+
                 } catch (studySetError) {
                     console.error("Error creating study set:", studySetError);
                 }
