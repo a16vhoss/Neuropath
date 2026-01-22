@@ -27,7 +27,12 @@ const StudentAchievements: React.FC = () => {
             try {
                 setLoading(true);
 
-                // 1. Load User Stats
+                // 1. Load Detailed User Stats
+                const statsDetail = await GamificationService.getDetailedUserStats(user.id);
+                // We map the detailed stats to the simpler UserStats interface for the summary cards if needed,
+                // or extend the state to hold the detailed one.
+                // For now, let's keep the existing basic stats call for the summary cards to be safe,
+                // or assume getUserStats is enough for basic cards (xp, streak, level).
                 const userStats = await GamificationService.getUserStats(user.id);
                 setStats(userStats);
 
@@ -37,11 +42,40 @@ const StudentAchievements: React.FC = () => {
 
                 const mergedAchievements = allAchievements.map(ach => {
                     const earnedRecord = myAchievements.find(ma => ma.achievement_id === ach.id);
+                    
+                    // Calculate real progress
+                    let progress = 0;
+                    if (earnedRecord) {
+                        progress = 100;
+                    } else {
+                        // Calculate based on requirement type
+                        let currentValue = 0;
+                         switch (ach.requirement_type) {
+                            case 'streak_days':
+                                currentValue = statsDetail.streak_days;
+                                break;
+                            case 'sessions_count':
+                                currentValue = statsDetail.sessions_count;
+                                break;
+                            case 'daily_minutes':
+                                currentValue = statsDetail.daily_minutes;
+                                break;
+                            case 'perfect_quiz':
+                                currentValue = statsDetail.perfect_quiz;
+                                break;
+                            case 'topics_mastered':
+                                currentValue = statsDetail.topics_mastered;
+                                break;
+                            // Add cases for other types
+                        }
+                        progress = Math.min(Math.round((currentValue / ach.requirement_value) * 100), 100);
+                    }
+
                     return {
                         ...ach,
                         earned: !!earnedRecord,
                         earnedDate: earnedRecord ? new Date(earnedRecord.earned_at).toLocaleDateString() : undefined,
-                        progress: earnedRecord ? 100 : 0 // Todo: Calculate real progress
+                        progress: progress
                     };
                 });
                 setAchievements(mergedAchievements);

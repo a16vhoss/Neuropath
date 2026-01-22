@@ -137,5 +137,112 @@ export const GamificationService = {
 
         if (updateError) throw updateError;
         return newStreak;
+    },
+
+    async getDetailedUserStats(userId: string) {
+        // 1. Get basic stats
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('streak_days, xp, level')
+            .eq('id', userId)
+            .single();
+
+        // 2. Count total sessions
+        const { count: sessionsCount } = await supabase
+            .from('study_sessions')
+            .select('*', { count: 'exact', head: true })
+            .eq('student_id', userId);
+
+        // 3. Count perfect quizzes
+        const { count: perfectQuizzes } = await supabase
+            .from('quiz_attempts')
+            .select('*', { count: 'exact', head: true })
+            .eq('student_id', userId)
+            .eq('score', 100); // Assuming 100 is max score, need to verify logic
+
+        // 4. Calculate today's minutes
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        
+        const { data: todaySessions } = await supabase
+            .from('study_sessions')
+            .select('duration_seconds')
+            .eq('student_id', userId)
+            .gte('completed_at', startOfDay.toISOString());
+
+        const todayMinutes = (todaySessions || []).reduce((sum, s) => sum + (s.duration_seconds || 0), 0) / 60;
+
+        // 5. Count mastered topics (dummy logic for now, using unique categories from flashcards could be complex)
+        // For simplicity, we'll count unique completed classes with >80% progress
+        const { count: masteredTopics } = await supabase
+            .from('enrollments')
+            .select('*', { count: 'exact', head: true })
+            .eq('student_id', userId)
+            .gte('progress', 80);
+
+        return {
+            streak_days: profile?.streak_days || 0,
+            sessions_count: sessionsCount || 0,
+            perfect_quiz: perfectQuizzes || 0,
+            daily_minutes: Math.round(todayMinutes),
+            topics_mastered: masteredTopics || 0,
+            help_count: 0 // Placeholder as community features are not fully implemented
+        };
+    },
+
+    async checkAndUnlockAchievements(userId: string) {
+        // 1. Get current stats
+        const stats = await this.getDetailedUserStats(userId);
+        
+        // 2. Get unearned achievements
+        const { data: allAchievements } = await supabase.from('achievements').select('*');
+        const { data: earnedAchievements } = await supabase
+            .from('student_achievements')
+            .select('achievement_id')
+            .eq('student_id', userId);
+            
+        const earnedIds = new Set((earnedAchievements || []).map(a => a.achievement_id));
+        const unearned = (allAchievements || []).filter(a => !earnedIds.has(a.id));
+        
+        const unlocked: Achievement[] = [];
+
+        // 3. Check criteria
+        for (const achievement of unearned) {
+            let thresholdMet = false;
+            
+            switch (achievement.requirement_type) {
+                case 'streak_days':
+                    if (stats.streak_days >= achievement.requirement_value) thresholdMet = true;
+                    break;
+                case 'sessions_count':
+                    if (stats.sessions_count >= achievement.requirement_value) thresholdMet = true;
+                    break;
+                case 'daily_minutes':
+                    if (stats.daily_minutes >= achievement.requirement_value) thresholdMet = true;
+                    break;
+                case 'perfect_quiz':
+                    if (stats.perfect_quiz >= achievement.requirement_value) thresholdMet = true;
+                    break;
+                case 'topics_mastered':
+                    if (stats.topics_mastered >= achievement.requirement_value) thresholdMet = true;
+                    break;
+                 // Add more cases as needed
+            }
+
+            if (thresholdMet) {
+                // Award achievement
+                await supabase.from('student_achievements').insert({
+                    student_id: userId,
+                    achievement_id: achievement.id
+                });
+                
+                // Award XP
+                await this.awardXP(userId, achievement.xp_reward);
+                
+                unlocked.push(achievement);
+            }
+        }
+        
+        return unlocked;
     }
 };

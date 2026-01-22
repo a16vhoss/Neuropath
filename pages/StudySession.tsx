@@ -662,20 +662,26 @@ const StudySession: React.FC = () => {
       }
 
       // Update streak
-      console.log('Calling updateStreak');
-      const newStreak = await GamificationService.updateStreak(user.id);
-      console.log('updateStreak result - new streak:', newStreak);
-
-      // Show confetti for good performance
-      if (xpEarned >= 50) {
+      await GamificationService.updateStreak(user.id);
+      
+      // Check for unlocked achievements
+      const unlocked = await GamificationService.checkAndUnlockAchievements(user.id);
+      
+      if (unlocked.length > 0) {
+        // Trigger confetti again for achievement
         setShowConfetti(true);
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        setTimeout(() => setShowConfetti(false), 5000);
+        
+        // Show alert/toast for the first unlocked achievement
+        const ach = unlocked[0];
+        alert(`🏆 ¡Logro Desbloqueado: ${ach.name}!\n\n${ach.description}\n+${ach.xp_reward} XP`);
       }
+      
+      navigate(-1);
     } catch (error) {
       console.error('ERROR in handleEndSession:', error);
+      navigate(-1);
     }
-
-    navigate(-1);
   };
 
   const formatTime = (seconds: number) => {
