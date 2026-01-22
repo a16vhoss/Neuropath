@@ -810,7 +810,7 @@ const StudentDashboard: React.FC = () => {
       }
 
       {/* Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50 pb-safe md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50 pb-[env(safe-area-inset-bottom)] md:hidden">
         <div className="max-w-lg mx-auto px-4">
           <div className="flex justify-around items-center py-2">
             <button
