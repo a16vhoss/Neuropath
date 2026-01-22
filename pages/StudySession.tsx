@@ -724,7 +724,7 @@ const StudySession: React.FC = () => {
       )}
 
       {/* Header */}
-      <header className="relative z-40 p-4 md:p-6 flex items-center justify-between text-white">
+      <header className="relative z-40 px-4 py-3 md:p-6 flex items-center justify-between text-white shrink-0">
         <button onClick={handleEndSession} className="flex items-center gap-2 font-medium hover:opacity-80">
           <span className="material-symbols-outlined">close</span>
           <span className="hidden md:inline">Finalizar Sesión</span>
@@ -771,7 +771,7 @@ const StudySession: React.FC = () => {
 
       {/* Mode Selector */}
       {!loading && (
-        <div className="flex justify-center px-4 mb-6 w-full">
+        <div className="flex justify-center px-4 mb-2 md:mb-6 w-full shrink-0">
           <div className="flex overflow-x-auto max-w-full p-1 rounded-xl bg-white/20 scrollbar-hide">
             {[
               { id: 'flashcards', label: 'Flashcards', icon: 'style' },
@@ -805,7 +805,7 @@ const StudySession: React.FC = () => {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center justify-center px-2 md:px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] md:pb-8 w-full min-h-0">
+      <main className="flex-1 flex flex-col items-center justify-center px-2 md:px-4 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:pb-8 w-full min-h-0">
 
         {/* No Cards Due - Caught Up Screen */}
         {noCardsDue && (
@@ -912,7 +912,7 @@ const StudySession: React.FC = () => {
 
             {/* Rating Buttons */}
             {isFlipped && (
-              <div className="mt-4 md:mt-8 w-full max-w-lg">
+              <div className="mt-2 md:mt-8 w-full max-w-lg shrink-0">
                 <SRSRatingButtons
                   onRate={(rating) => {
                     handleRate(rating);
@@ -1010,7 +1010,7 @@ const StudySession: React.FC = () => {
 
             {/* Rating Buttons (Adaptive Mode style) */}
             {isFlipped && (
-              <div className="mt-4 md:mt-8 w-full max-w-lg">
+              <div className="mt-2 md:mt-8 w-full max-w-lg shrink-0">
                 <SRSRatingButtons
                   onRate={handleRate}
                   disabled={isProcessing}
