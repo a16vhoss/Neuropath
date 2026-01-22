@@ -369,68 +369,70 @@ const StudentDashboard: React.FC = () => {
                   </div>
                 )}
 
-                {/* Classes Grid */}
-                <section>
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                      <span className="w-1.5 h-6 bg-primary rounded-full"></span> Mis Clases
-                    </h2>
-                    <button onClick={() => setShowJoinModal(true)} className="text-sm font-bold text-primary flex items-center gap-1 hover:underline">
-                      <span className="material-symbols-outlined text-lg">add</span> Unirse a Clase
-                    </button>
-                  </div>
+                  {/* Classes Grid */}
+                  <section>
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                        <span className="w-1.5 h-6 bg-primary rounded-full"></span> Mis Clases
+                      </h2>
+                      <button onClick={() => setShowJoinModal(true)} className="text-sm font-bold text-primary flex items-center gap-1 hover:underline">
+                        <span className="material-symbols-outlined text-lg">add</span> Unirse a Clase
+                      </button>
+                    </div>
 
-                  {loadingClasses ? (
-                    <div className="grid md:grid-cols-2 gap-6">
-                      {[1, 2].map((i) => (
-                        <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm animate-pulse">
-                          <div className="flex items-center gap-4 mb-4">
-                            <div className="w-12 h-12 rounded-xl bg-slate-200"></div>
-                            <div className="flex-1">
-                              <div className="h-5 bg-slate-200 rounded w-3/4 mb-2"></div>
-                              <div className="h-3 bg-slate-100 rounded w-1/2"></div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : classes.length > 0 ? (
-                    <div className="grid md:grid-cols-2 gap-6">
-                      {classes.map((course, i) => {
-                        const color = courseColors[i % courseColors.length];
-                        const icon = courseIcons[i % courseIcons.length];
-                        return (
-                          <div
-                            key={course.id}
-                            onClick={() => navigate(`/student/class/${course.id}`)}
-                            className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                          >
+                    {loadingClasses ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+                        {[1, 2].map((i) => (
+                          <div key={i} className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-sm animate-pulse">
                             <div className="flex items-center gap-4 mb-4">
-                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color === 'blue' ? 'text-blue-600 bg-blue-50' :
-                                color === 'violet' ? 'text-violet-600 bg-violet-50' :
-                                  color === 'emerald' ? 'text-emerald-600 bg-emerald-50' :
-                                    color === 'amber' ? 'text-amber-600 bg-amber-50' :
-                                      'text-rose-600 bg-rose-50'
-                                }`}>
-                                <span className="material-symbols-outlined text-2xl">{icon}</span>
+                              <div className="w-12 h-12 rounded-xl bg-slate-200"></div>
+                              <div className="flex-1">
+                                <div className="h-5 bg-slate-200 rounded w-3/4 mb-2"></div>
+                                <div className="h-3 bg-slate-100 rounded w-1/2"></div>
                               </div>
-                              <div>
-                                <h3 className="font-bold text-lg">{course.name}</h3>
-                                <p className="text-xs text-slate-500">Código: {course.code}</p>
-                              </div>
-                            </div>
-                            <div className="flex justify-between items-center text-xs font-bold text-slate-400 mb-2">
-                              <span>Progreso</span>
-                              <span className="text-primary">{course.progress}%</span>
-                            </div>
-                            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="bg-primary h-full rounded-full transition-all" style={{ width: `${course.progress}%` }}></div>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
+                        ))}
+                      </div>
+                    ) : classes.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+                        {classes.map((course, i) => {
+                          const color = courseColors[i % courseColors.length];
+                          const icon = courseIcons[i % courseIcons.length];
+                          return (
+                            <div
+                              key={course.id}
+                              onClick={() => navigate(`/student/class/${course.id}`)}
+                              className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer h-full flex flex-col justify-between"
+                            >
+                              <div className="flex items-center gap-3 md:gap-4 mb-4">
+                                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${color === 'blue' ? 'text-blue-600 bg-blue-50' :
+                                  color === 'violet' ? 'text-violet-600 bg-violet-50' :
+                                    color === 'emerald' ? 'text-emerald-600 bg-emerald-50' :
+                                      color === 'amber' ? 'text-amber-600 bg-amber-50' :
+                                        'text-rose-600 bg-rose-50'
+                                  }`}>
+                                  <span className="material-symbols-outlined text-xl sm:text-2xl">{icon}</span>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h3 className="font-bold text-base sm:text-lg truncate">{course.name}</h3>
+                                  <p className="text-xs text-slate-500 truncate">Código: {course.code}</p>
+                                </div>
+                              </div>
+                              <div className="mt-auto">
+                                <div className="flex justify-between items-center text-xs font-bold text-slate-400 mb-2">
+                                  <span>Progreso</span>
+                                  <span className="text-primary">{course.progress}%</span>
+                                </div>
+                                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className="bg-primary h-full rounded-full transition-all" style={{ width: `${course.progress}%` }}></div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
                     <div className="bg-white p-8 rounded-2xl border border-slate-100 text-center">
                       <span className="material-symbols-outlined text-4xl text-slate-300 mb-4">folder_open</span>
                       <p className="text-slate-500">No estás inscrito en ninguna clase aún</p>
@@ -468,72 +470,81 @@ const StudentDashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Study Sets Grid */}
-                <section>
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                      <span className="w-1.5 h-6 bg-violet-500 rounded-full"></span> Mis Sets de Estudio
-                    </h2>
-                  </div>
+                  {/* Study Sets Grid */}
+                  <section>
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                        <span className="w-1.5 h-6 bg-violet-500 rounded-full"></span> Mis Sets de Estudio
+                      </h2>
+                    </div>
 
-                  {loadingSets ? (
-                    <div className="grid md:grid-cols-2 gap-6">
-                      {[1, 2].map((i) => (
-                        <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm animate-pulse">
-                          <div className="flex items-center gap-4 mb-4">
-                            <div className="w-12 h-12 rounded-xl bg-slate-200"></div>
-                            <div className="flex-1">
-                              <div className="h-5 bg-slate-200 rounded w-3/4 mb-2"></div>
-                              <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+                    {loadingSets ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+                        {[1, 2].map((i) => (
+                          <div key={i} className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-sm animate-pulse">
+                            <div className="flex items-center gap-4 mb-4">
+                              <div className="w-12 h-12 rounded-xl bg-slate-200 flex-shrink-0"></div>
+                              <div className="flex-1 min-w-0">
+                                <div className="h-5 bg-slate-200 rounded w-3/4 mb-2"></div>
+                                <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : studySets.length > 0 ? (
-                    <div className="grid md:grid-cols-2 gap-6">
-                      {studySets.map((set) => (
-                        <div
-                          key={set.id}
-                          onClick={() => navigate(`/student/set/${set.id}`)}
-                          className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
-                        >
-                          <div className="flex items-center gap-4 mb-4">
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${set.color === 'blue' ? 'text-blue-600 bg-blue-50' :
-                              set.color === 'violet' ? 'text-violet-600 bg-violet-50' :
-                                set.color === 'emerald' ? 'text-emerald-600 bg-emerald-50' :
-                                  set.color === 'amber' ? 'text-amber-600 bg-amber-50' :
-                                    'text-rose-600 bg-rose-50'
-                              }`}>
-                              <span className="material-symbols-outlined text-2xl">{set.icon}</span>
+                        ))}
+                      </div>
+                    ) : studySets.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+                        {studySets.map((set) => (
+                          <div
+                            key={set.id}
+                            onClick={() => navigate(`/student/set/${set.id}`)}
+                            className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer group flex flex-col justify-between h-full"
+                          >
+                            <div className="flex items-start justify-between gap-3 mb-4">
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${set.color === 'blue' ? 'text-blue-600 bg-blue-50' :
+                                  set.color === 'violet' ? 'text-violet-600 bg-violet-50' :
+                                    set.color === 'emerald' ? 'text-emerald-600 bg-emerald-50' :
+                                      set.color === 'amber' ? 'text-amber-600 bg-amber-50' :
+                                        'text-rose-600 bg-rose-50'
+                                  }`}>
+                                  <span className="material-symbols-outlined text-xl sm:text-2xl">{set.icon}</span>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h3 className="font-bold text-base sm:text-lg group-hover:text-primary transition-colors truncate" title={set.name}>{set.name}</h3>
+                                  <p className="text-xs text-slate-500">{set.flashcard_count || 0} flashcards</p>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center flex-shrink-0">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingStudySet(set);
+                                  }}
+                                  className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+                                  title="Editar"
+                                >
+                                  <span className="material-symbols-outlined text-lg">edit</span>
+                                </button>
+                              </div>
                             </div>
-                            <div className="flex-1">
-                              <h3 className="font-bold text-lg group-hover:text-primary transition-colors">{set.name}</h3>
-                              <p className="text-xs text-slate-500">{set.flashcard_count || 0} flashcards</p>
+                            
+                            <div className="flex items-center justify-between mt-auto pt-2">
+                              <div className="flex flex-wrap gap-1.5">
+                                {set.topics && set.topics.length > 0 && set.topics.slice(0, 2).map((topic, i) => (
+                                  <span key={i} className="bg-slate-100 text-slate-600 text-[10px] sm:text-xs px-2 py-0.5 rounded-full truncate max-w-[80px]">{topic}</span>
+                                ))}
+                                {set.topics && set.topics.length > 2 && (
+                                   <span className="text-[10px] text-slate-400">+{set.topics.length - 2}</span>
+                                )}
+                              </div>
+                              <span className="material-symbols-outlined text-slate-300 group-hover:text-primary transition-colors text-lg sm:text-xl">arrow_forward</span>
                             </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingStudySet(set);
-                              }}
-                              className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors mr-2"
-                              title="Editar"
-                            >
-                              <span className="material-symbols-outlined text-lg">edit</span>
-                            </button>
-                            <span className="material-symbols-outlined text-slate-300 group-hover:text-primary transition-colors">arrow_forward</span>
                           </div>
-                          {set.topics && set.topics.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5">
-                              {set.topics.slice(0, 3).map((topic, i) => (
-                                <span key={i} className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full">{topic}</span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
+                        ))}
+                      </div>
+                    ) : (
                     <div className="bg-white p-12 rounded-2xl border border-slate-100 text-center">
                       <div className="w-16 h-16 bg-violet-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                         <span className="material-symbols-outlined text-3xl text-violet-600">library_books</span>
