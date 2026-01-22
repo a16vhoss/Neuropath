@@ -20,6 +20,7 @@ import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromM
 import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL, autoCategorizeFlashcards } from '../services/geminiService';
 import CumulativeReportsCard from '../components/CumulativeReportsCard';
 import VisualProgressionMap from '../components/VisualProgressionMap';
+import StudyGuideRenderer from '../components/StudyGuideRenderer';
 
 interface Flashcard {
     id: string;
@@ -130,7 +131,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
     // People tab state
     const [classMembers, setClassMembers] = useState<any[]>([]);
     const [loadingMembers, setLoadingMembers] = useState(false);
-    
+
     // Ranking state
     const [rankingData, setRankingData] = useState<RankingMember[]>([]);
     const [loadingRanking, setLoadingRanking] = useState(false);
@@ -138,7 +139,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
     useEffect(() => {
         if (activeTab === 'people') {
             // If class-based, we might fetch members, but we prefer ranking now
-            if (studySet?.class_id) fetchClassMembers(); 
+            if (studySet?.class_id) fetchClassMembers();
             fetchRanking();
         }
     }, [activeTab, studySet]);
@@ -869,7 +870,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                         {rankingData.map((member, index) => {
                                             const rank = index + 1;
                                             const isTop3 = rank <= 3;
-                                            
+
                                             let rankIcon = <span className="text-slate-500 font-bold text-lg">{rank}</span>;
                                             if (rank === 1) rankIcon = <span className="text-3xl">🥇</span>;
                                             if (rank === 2) rankIcon = <span className="text-3xl">🥈</span>;
@@ -910,8 +911,8 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                                 )}
                                                             </div>
                                                             <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                                <div 
-                                                                    className="h-full bg-emerald-500 rounded-full transition-all duration-1000" 
+                                                                <div
+                                                                    className="h-full bg-emerald-500 rounded-full transition-all duration-1000"
                                                                     style={{ width: `${masteryPercent}%` }}
                                                                 ></div>
                                                             </div>
@@ -919,11 +920,10 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                     </td>
                                                     <td className="py-4 px-4 align-middle">
                                                         {member.quizzes_taken > 0 ? (
-                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                                                                member.quiz_average >= 90 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                                                member.quiz_average >= 70 ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                                                'bg-amber-50 text-amber-700 border-amber-200'
-                                                            }`}>
+                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${member.quiz_average >= 90 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                                    member.quiz_average >= 70 ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                                                        'bg-amber-50 text-amber-700 border-amber-200'
+                                                                }`}>
                                                                 {Math.round(member.quiz_average)}%
                                                                 <span className="ml-1 text-[10px] opacity-70">({member.quizzes_taken})</span>
                                                             </span>
@@ -1050,21 +1050,21 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                 <textarea
                                     value={editDescription}
                                     onChange={(e) => setEditDescription(e.target.value)}
-                                    className="w-full p-4 bg-slate-50 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-slate-700 min-h-[200px]"
+                                    className="w-full p-4 bg-slate-50 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-slate-700 min-h-[400px] font-mono text-sm leading-relaxed"
                                     placeholder="La guía de estudio aparecerá aquí automáticamente..."
                                 />
                             ) : (
-                                <div className="prose prose-slate max-w-none">
+                                <div className="max-w-none">
                                     {studySet.description ? (
-                                        <div className="whitespace-pre-wrap text-slate-600 bg-slate-50 p-6 rounded-xl border border-slate-100">
-                                            {studySet.description}
+                                        <div className="bg-white">
+                                            <StudyGuideRenderer content={studySet.description} />
                                         </div>
                                     ) : (
                                         <div className="flex flex-col items-center justify-center py-12 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center">
                                             <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">magic_button</span>
                                             <p className="text-slate-500 font-medium">No hay guía de estudio aún</p>
                                             <p className="text-sm text-slate-400 mt-1 max-w-md">
-                                                Sube materiales (PDF, Notas, Enlaces) y usa el botón "Regenerar" para crear una guía de estudio automática.
+                                                Sube materiales (PDF, Notas, Enlaces) y usa el botón "Regenerar" para crear una guía de estudio automática con el nuevo Arquitecto Pedagógico.
                                             </p>
                                         </div>
                                     )}

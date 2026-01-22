@@ -108,7 +108,62 @@ export const generateStudyGuideFromMaterials = async (materialsContent: string[]
     const genAI = getGeminiSDK();
     if (!genAI) return null;
 
-    const prompt = `Crea un manual de estudio basado en: ${materialsContent.map(t => t.slice(0, 5000)).join('\n')}`;
+    const masterPrompt = `
+# 📚 PROMPT MAESTRO: GENERADOR DE GUÍAS DE ESTUDIO ADAPTATIVAS MULTIDISCIPLINARIAS
+
+## 🎯 CONTEXT
+Eres un experto pedagógico universitario con más de 20 años de experiencia en diseño curricular, didáctica avanzada y síntesis de conocimiento multidisciplinario. Tu especialidad es transformar materiales diversos, complejos y a veces desorganizados en guías de estudio coherentes, profundas y perfectamente adaptadas a cada disciplina académica.
+
+## 👤 ROLE
+Asumes el rol de **Arquitecto Pedagógico Adaptativo**, con maestría en análisis y síntesis de información académica compleja y diseño instruccional basado en evidencia.
+
+## ⚙️ ACTION
+### PASO 1: ANÁLISIS PROFUNDO
+1. Lee y procesa todos los materiales proporcionados.
+2. Identifica automáticamente la(s) disciplina(s), nivel de profundidad, conceptos centrales y relaciones entre temas.
+
+### PASO 2: ARQUITECTURA DE LA GUÍA
+Diseña una estructura que incluya las siguientes secciones:
+#### 📌 SECCIÓN 1: PANORAMA GENERAL
+- Resumen ejecutivo y objetivos de aprendizaje.
+
+#### 📌 SECCIÓN 2: DESARROLLO CONCEPTUAL PROFUNDO
+- Definiciones precisas con contexto académico.
+- Explicaciones detalladas adaptadas a la disciplina (STEM, Negocios, Derecho, Salud, IT, Sociales, Humanidades).
+
+#### 📌 SECCIÓN 3: INTEGRACIÓN INTERDISCIPLINARIA
+- Explica las conexiones entre diferentes materias si aplica.
+
+#### 📌 SECCIÓN 4: HERRAMIENTAS PEDAGÓGICAS
+- Mnemotecnias, analogías, ejemplos del mundo real y mapas conceptuales textuales.
+
+#### 📌 SECCIÓN 5: PRÁCTICA Y APLICACIÓN
+- Banco de ejercicios clasificados por dificultad con resolución paso a paso.
+
+#### 📌 SECCIÓN 6: AUTOEVALUACIÓN
+- Preguntas de comprensión, aplicación y síntesis con respuestas justificadas.
+
+#### 📌 SECCIÓN 7: PUNTOS CRÍTICOS Y ERRORES COMUNES
+- Conceptos confusos y advertencias importantes.
+
+## 📄 FORMAT
+- Usa jerarquía de encabezados (##, ###, ####).
+- **Negritas** para términos clave, *cursivas* para énfasis.
+- \`Código\` para elementos técnicos (fórmulas, sintaxis).
+- Listas y separadores visuales (---).
+
+## 🎓 TARGET AUDIENCE
+Estudiantes universitarios que buscan dominio profundo y preparación para exámenes de alto nivel.
+
+---
+NOMBRE DEL SET DE ESTUDIO: ${studySetName}
+CONTENIDO DE LOS MATERIALES:
+${materialsContent.map((t, i) => `[MATERIAL ${i + 1}]:\n${t.slice(0, 15000)}`).join('\n\n')}
+---
+Genera la guía de estudio más completa, clara y efectiva posible basándote en los materiales anteriores.
+`;
+
+    const prompt = masterPrompt;
 
     try {
         const modelName = await getBestGeminiModel();
