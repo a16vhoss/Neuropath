@@ -268,30 +268,6 @@ const StudentDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex flex-col">
-      {/* Mobile Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 py-3 px-6 flex justify-around md:hidden z-50">
-        <button className="flex flex-col items-center text-primary font-bold">
-          <span className="material-symbols-outlined">dashboard</span>
-          <span className="text-[10px]">Inicio</span>
-        </button>
-        <button onClick={() => setActiveTab(activeTab === 'classes' ? 'personal' : 'classes')} className="flex flex-col items-center text-slate-400">
-          <span className="material-symbols-outlined">{activeTab === 'classes' ? 'auto_stories' : 'school'}</span>
-          <span className="text-[10px]">{activeTab === 'classes' ? 'Personal' : 'Clases'}</span>
-        </button>
-        <button onClick={() => navigate('/student/battles')} className="flex flex-col items-center text-slate-400">
-          <span className="material-symbols-outlined">swords</span>
-          <span className="text-[10px]">Batallas</span>
-        </button>
-        <button onClick={() => navigate('/student/achievements')} className="flex flex-col items-center text-slate-400">
-          <span className="material-symbols-outlined">emoji_events</span>
-          <span className="text-[10px]">Logros</span>
-        </button>
-        <button onClick={signOut} className="flex flex-col items-center text-slate-400">
-          <span className="material-symbols-outlined">logout</span>
-          <span className="text-[10px]">Salir</span>
-        </button>
-      </nav>
-
       <main className="flex-1 p-6 md:p-12 max-w-7xl mx-auto w-full space-y-8 pb-24 md:pb-12">
         {/* Header */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
@@ -823,36 +799,43 @@ const StudentDashboard: React.FC = () => {
       }
 
       {/* Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50 pb-safe">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50 pb-safe md:hidden">
         <div className="max-w-lg mx-auto px-4">
           <div className="flex justify-around items-center py-2">
             <button
               onClick={() => setActiveTab('classes')}
-              className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors ${activeTab === 'classes' ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-primary'}`}
+              className={`flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-colors ${activeTab === 'classes' ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-primary'}`}
             >
               <span className="material-symbols-outlined text-2xl">home</span>
-              <span className="text-xs font-medium">Inicio</span>
+              <span className="text-[10px] font-medium">Inicio</span>
             </button>
             <button
               onClick={() => setActiveTab('personal')}
-              className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors ${activeTab === 'personal' ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-primary'}`}
+              className={`flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-colors ${activeTab === 'personal' ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-primary'}`}
             >
               <span className="material-symbols-outlined text-2xl">auto_stories</span>
-              <span className="text-xs font-medium">Mis Sets</span>
+              <span className="text-[10px] font-medium">Mis Sets</span>
+            </button>
+            <button
+              onClick={() => navigate('/student/battles')}
+              className="flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-colors text-slate-500 hover:text-primary"
+            >
+              <span className="material-symbols-outlined text-2xl">swords</span>
+              <span className="text-[10px] font-medium">Batallas</span>
             </button>
             <button
               onClick={() => navigate('/student/achievements')}
-              className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors text-slate-500 hover:text-primary"
+              className="flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-colors text-slate-500 hover:text-primary"
             >
               <span className="material-symbols-outlined text-2xl">emoji_events</span>
-              <span className="text-xs font-medium">Logros</span>
+              <span className="text-[10px] font-medium">Logros</span>
             </button>
             <button
               onClick={() => signOut()}
-              className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-colors text-slate-500 hover:text-rose-500"
+              className="flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-colors text-slate-500 hover:text-rose-500"
             >
               <span className="material-symbols-outlined text-2xl">logout</span>
-              <span className="text-xs font-medium">Salir</span>
+              <span className="text-[10px] font-medium">Salir</span>
             </button>
           </div>
         </div>

@@ -771,8 +771,8 @@ const StudySession: React.FC = () => {
 
       {/* Mode Selector */}
       {!loading && (
-        <div className="flex justify-center px-4 mb-6">
-          <div className="inline-flex p-1 rounded-xl bg-white/20">
+        <div className="flex justify-center px-4 mb-6 w-full">
+          <div className="flex overflow-x-auto max-w-full p-1 rounded-xl bg-white/20 scrollbar-hide">
             {[
               { id: 'flashcards', label: 'Flashcards', icon: 'style' },
               { id: 'quiz', label: 'Quiz', icon: 'quiz' },
@@ -791,7 +791,7 @@ const StudySession: React.FC = () => {
                   setScore(0);
                   setNoCardsDue(false);
                 }}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold text-sm transition-all ${mode === m.id
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap flex-shrink-0 ${mode === m.id
                   ? 'bg-white text-primary shadow-sm'
                   : 'text-white/80 hover:text-white hover:bg-white/10'
                   }`}
@@ -888,24 +888,24 @@ const StudySession: React.FC = () => {
             {/* Flashcard */}
             <div
               onClick={() => setIsFlipped(!isFlipped)}
-              className="w-full max-w-lg aspect-[4/3] cursor-pointer perspective-1000"
+              className="w-full max-w-lg aspect-[3/4] md:aspect-[4/3] cursor-pointer perspective-1000"
             >
               <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
                 {/* Front */}
-                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden">
-                  <div className="flex items-center gap-3 mb-4">
+                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden overflow-y-auto hide-scrollbar">
+                  <div className="flex items-center gap-3 mb-4 flex-shrink-0">
                     <span className="bg-indigo-100 text-indigo-600 text-xs font-bold px-3 py-1 rounded-full uppercase">{flashcards[currentIndex]?.category}</span>
                     <span className="bg-amber-100 text-amber-600 text-xs font-bold px-2 py-1 rounded-full">Sesión Diaria</span>
                   </div>
-                  <h2 className="text-2xl md:text-3xl font-black text-center text-slate-900 leading-snug">{flashcards[currentIndex]?.question}</h2>
-                  <p className="text-sm text-slate-400 mt-6 flex items-center gap-1">
+                  <h2 className="text-xl md:text-3xl font-black text-center text-slate-900 leading-snug overflow-y-auto max-h-full py-2">{flashcards[currentIndex]?.question}</h2>
+                  <p className="text-sm text-slate-400 mt-6 flex items-center gap-1 flex-shrink-0">
                     <span className="material-symbols-outlined text-sm">touch_app</span> Toca para girar
                   </p>
                 </div>
                 {/* Back */}
-                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden rotate-y-180">
-                  <span className="bg-emerald-100 text-emerald-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4">Respuesta</span>
-                  <p className="text-lg md:text-xl text-center text-slate-700 leading-relaxed">{flashcards[currentIndex]?.answer}</p>
+                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden rotate-y-180 overflow-y-auto hide-scrollbar">
+                  <span className="bg-emerald-100 text-emerald-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4 flex-shrink-0">Respuesta</span>
+                  <p className="text-lg md:text-xl text-center text-slate-700 leading-relaxed overflow-y-auto max-h-full py-2">{flashcards[currentIndex]?.answer}</p>
                 </div>
               </div>
             </div>
@@ -979,12 +979,12 @@ const StudySession: React.FC = () => {
           <>
             <div
               onClick={() => setIsFlipped(!isFlipped)}
-              className="w-full max-w-lg aspect-[4/3] cursor-pointer perspective-1000"
+              className="w-full max-w-lg aspect-[3/4] md:aspect-[4/3] cursor-pointer perspective-1000"
             >
               <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
                 {/* Front */}
-                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden">
-                  <div className="flex items-center gap-3 mb-4">
+                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden overflow-y-auto hide-scrollbar">
+                  <div className="flex items-center gap-3 mb-4 flex-shrink-0">
                     <span className="bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1 rounded-full uppercase">{flashcards[currentIndex]?.category}</span>
                     {currentMasteryResult && (
                       <DifficultyLevelIndicator
@@ -995,15 +995,15 @@ const StudySession: React.FC = () => {
                       />
                     )}
                   </div>
-                  <h2 className="text-2xl md:text-3xl font-black text-center text-slate-900 leading-snug">{flashcards[currentIndex]?.question}</h2>
-                  <p className="text-sm text-slate-400 mt-6 flex items-center gap-1">
+                  <h2 className="text-xl md:text-3xl font-black text-center text-slate-900 leading-snug overflow-y-auto max-h-full py-2">{flashcards[currentIndex]?.question}</h2>
+                  <p className="text-sm text-slate-400 mt-6 flex items-center gap-1 flex-shrink-0">
                     <span className="material-symbols-outlined text-sm">touch_app</span> Toca para girar
                   </p>
                 </div>
                 {/* Back */}
-                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden rotate-y-180">
-                  <span className="bg-emerald-100 text-emerald-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4">Respuesta</span>
-                  <p className="text-lg md:text-xl text-center text-slate-700 leading-relaxed">{flashcards[currentIndex]?.answer}</p>
+                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden rotate-y-180 overflow-y-auto hide-scrollbar">
+                  <span className="bg-emerald-100 text-emerald-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4 flex-shrink-0">Respuesta</span>
+                  <p className="text-lg md:text-xl text-center text-slate-700 leading-relaxed overflow-y-auto max-h-full py-2">{flashcards[currentIndex]?.answer}</p>
                 </div>
               </div>
             </div>

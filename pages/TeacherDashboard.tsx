@@ -24,6 +24,7 @@ const TeacherDashboard: React.FC = () => {
   const [newClass, setNewClass] = useState({ name: '', code: '', description: '', topics: [] as string[], examDate: '' });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [classes, setClasses] = useState<ClassInfo[]>([]);
   const [loadingClasses, setLoadingClasses] = useState(true);
@@ -135,12 +136,40 @@ const TeacherDashboard: React.FC = () => {
   const displayName = profile?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Profesor';
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] flex flex-col md:flex-row">
+    <div className="min-h-screen bg-[#F9FAFB] flex flex-col md:flex-row relative">
+      {/* Mobile Header */}
+      <div className="md:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-30">
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-primary text-2xl font-bold">neurology</span>
+          <span className="font-extrabold text-lg tracking-tighter text-slate-900">MHS</span>
+        </div>
+        <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-600 hover:bg-slate-50 rounded-lg">
+          <span className="material-symbols-outlined">menu</span>
+        </button>
+      </div>
+
+      {/* Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/50 z-40 md:hidden glass"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-full md:w-64 bg-white border-r border-slate-200 flex flex-col">
-        <div className="p-6 flex items-center gap-2 border-b border-slate-100">
-          <span className="material-symbols-outlined text-primary text-3xl font-bold">neurology</span>
-          <span className="font-extrabold text-xl tracking-tighter text-slate-900">MHS</span>
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 flex flex-col transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none
+        md:translate-x-0 md:static md:inset-auto
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="p-6 flex items-center justify-between border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-3xl font-bold">neurology</span>
+            <span className="font-extrabold text-xl tracking-tighter text-slate-900">MHS</span>
+          </div>
+          <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-slate-400 hover:text-slate-600">
+            <span className="material-symbols-outlined">close</span>
+          </button>
         </div>
         <nav className="flex-1 p-4 space-y-2">
           <div
