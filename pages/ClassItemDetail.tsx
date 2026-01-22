@@ -67,15 +67,32 @@ const ClassItemDetail: React.FC = () => {
 
     useEffect(() => {
         const fetchLinkedSet = async () => {
-            if (item && item.type === 'material' && !isTeacher) {
+            if (item && item.type === 'material') {
                 setLoadingStudySet(true);
                 const materialId = item.attached_materials?.[0];
                 if (materialId) {
                     try {
-                        const set = await getClassStudySet(materialId);
+                        let set = await getClassStudySet(materialId);
+
+                        // If no set exists (and we firmly want to show the Set view), create one automatically for the student
+                        if (!set && user) {
+                            try {
+                                set = await createClassStudySet(
+                                    item.class_id,
+                                    materialId,
+                                    user.id,
+                                    item.title,
+                                    'Set de estudio personal generado desde material de clase'
+                                );
+                            } catch (createErr) {
+                                console.error("Error auto-creating study set:", createErr);
+                            }
+                        }
+
                         if (set) setLinkedStudySetId(set.id);
+
                     } catch (e) {
-                        console.log("Study set not found yet, utilizing fallback view.");
+                        console.log("Error checking study set:", e);
                     }
                 }
                 setLoadingStudySet(false);
@@ -622,14 +639,14 @@ const ClassItemDetail: React.FC = () => {
         </div>
     );
 
-    // Student View: Full Study Set Experience
-    if (linkedStudySetId && !isTeacher && item.type === 'material') {
+    // Full Study Set Experience (for both Students and Teachers)
+    if (linkedStudySetId && item.type === 'material') {
         return (
             <div className="min-h-screen bg-slate-50">
                 {/* Header Context */}
                 <div className="bg-white border-b border-slate-200 sticky top-0 z-20 px-6 py-4 flex items-center gap-4">
                     <button
-                        onClick={() => navigate(`/student/class/${classId}`)}
+                        onClick={() => navigate(isTeacher ? `/teacher/class/${classId}` : `/student/class/${classId}`)}
                         className="flex items-center gap-2 text-slate-500 hover:text-primary transition font-medium"
                     >
                         <span className="material-symbols-outlined">arrow_back</span>
