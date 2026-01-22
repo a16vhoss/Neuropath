@@ -82,7 +82,7 @@ const TeacherAnalytics: React.FC = () => {
       <main className="flex-1 p-8 space-y-8">
         <header className="flex items-center gap-4">
           <button
-            onClick={() => navigate(`/teacher/classes/${classId}`)}
+            onClick={() => navigate(`/teacher/class/${classId}`)}
             className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center transition-colors"
           >
             <span className="material-symbols-outlined">arrow_back</span>
