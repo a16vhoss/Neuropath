@@ -1,6 +1,6 @@
 import { SchemaType } from "@google/generative-ai";
 import { getBestGeminiModel, getGeminiSDK } from "./geminiModelManager";
-import { YoutubeTranscript } from 'youtube-transcript';
+import { getYoutubeTranscript } from "./youtubeService";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -118,13 +118,11 @@ export const generateStudySetFromContext = async (context: string) => {
  */
 export const generateFlashcardsFromYouTubeURL = async (url: string) => {
   try {
-    // 1. Get Transcript
-    const transcriptItems = await YoutubeTranscript.fetchTranscript(url, { lang: 'es' });
-    if (!transcriptItems || transcriptItems.length === 0) {
-      throw new Error("No transcript found (or not in Spanish)");
+    // 1. Get Transcript via Proxy (CORS safe)
+    const fullText = await getYoutubeTranscript(url);
+    if (!fullText) {
+      throw new Error("No se pudo obtener la transcripción del video.");
     }
-
-    const fullText = transcriptItems.map(item => item.text).join(' ');
 
     // 2. Generate Flashcards from Transcript
     const flashcards = await generateStudySetFromContext(fullText);
