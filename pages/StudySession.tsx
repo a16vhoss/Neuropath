@@ -699,7 +699,7 @@ const StudySession: React.FC = () => {
   }
 
   return (
-    <div className={`min-h-[100dvh] h-[100dvh] flex flex-col relative overflow-hidden ${mode === 'cramming' ? 'bg-gradient-to-br from-rose-600 to-orange-500' : 'gradient-hero'}`}>
+    <div className={`fixed inset-0 w-full h-full flex flex-col overflow-hidden ${mode === 'cramming' ? 'bg-gradient-to-br from-rose-600 to-orange-500' : 'gradient-hero'}`}>
       {/* Confetti Animation */}
       {showConfetti && (
         <div className="fixed inset-0 pointer-events-none z-50">

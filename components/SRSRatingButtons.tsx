@@ -131,7 +131,7 @@ const SRSRatingButtons: React.FC<SRSRatingButtonsProps> = ({
                         disabled={disabled}
                         className={`
                             flex flex-col items-center justify-center
-                            py-3 px-2 sm:py-4 sm:px-4
+                            py-2 px-1 sm:py-4 sm:px-4
                             rounded-xl text-white font-medium
                             transition-all duration-150
                             ${config.color}
