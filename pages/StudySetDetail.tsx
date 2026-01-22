@@ -67,6 +67,7 @@ interface RankingMember {
     full_name: string;
     avatar_url?: string;
     flashcards_mastered: number;
+    avg_mastery: number; // New field
     total_flashcards: number;
     quiz_average: number;
     quizzes_taken: number;
@@ -859,7 +860,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                         <tr className="border-b border-slate-100 text-slate-500 text-sm">
                                             <th className="py-3 px-4 font-medium w-16">#</th>
                                             <th className="py-3 px-4 font-medium">Estudiante</th>
-                                            <th className="py-3 px-4 font-medium">Flashcards (Mastery)</th>
+                                            <th className="py-3 px-4 font-medium">Dominio General (Avg)</th>
                                             <th className="py-3 px-4 font-medium">Quiz Promedio</th>
                                             <th className="py-3 px-4 font-medium text-right">Puntaje</th>
                                         </tr>
@@ -874,9 +875,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                             if (rank === 2) rankIcon = <span className="text-3xl">🥈</span>;
                                             if (rank === 3) rankIcon = <span className="text-3xl">🥉</span>;
 
-                                            const masteryPercent = member.total_flashcards > 0 
-                                                ? Math.round((member.flashcards_mastered / member.total_flashcards) * 100) 
-                                                : 0;
+                                            const masteryPercent = Math.round(member.avg_mastery || 0);
 
                                             return (
                                                 <tr key={member.student_id} className={`hover:bg-slate-50 transition ${member.student_id === user?.id ? 'bg-indigo-50/50' : ''}`}>
@@ -905,8 +904,10 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                     <td className="py-4 px-4 align-middle">
                                                         <div className="w-full max-w-[140px]">
                                                             <div className="flex justify-between text-xs mb-1">
-                                                                <span className="font-medium text-slate-700">{member.flashcards_mastered} / {member.total_flashcards}</span>
-                                                                <span className="text-slate-500">{masteryPercent}%</span>
+                                                                <span className="font-medium text-slate-700">{masteryPercent}% Dominio</span>
+                                                                {member.flashcards_mastered > 0 && (
+                                                                    <span className="text-emerald-600 font-bold" title="Cartas dominadas">{member.flashcards_mastered} Master</span>
+                                                                )}
                                                             </div>
                                                             <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                                                                 <div 
