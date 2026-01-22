@@ -679,6 +679,16 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
     const isEditor = studySet && user ? ((studySet.editors || []).includes(user.id) || isOwner) : false;
     const canEdit = !readOnly && isEditor;
 
+    // Debug permissions
+    console.log("StudySet Permissions:", {
+        setName: studySet.name,
+        userId: user?.id,
+        ownerId: studySet.student_id,
+        teacherId: studySet.teacher_id,
+        isOwner,
+        canEdit
+    });
+
     return (
         <div className={embedded ? "" : "min-h-screen bg-slate-50"}>
             {/* Header */}

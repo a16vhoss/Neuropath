@@ -757,10 +757,15 @@ export const getStudySetWithDetails = async (studySetId: string) => {
 
     if (setError) throw setError;
 
-    // Supabase returns nested object for joints, let's flatten it for easier use
+    // Supabase returns nested object or array for joins
+    const teacherData = (studySetData as any).teacher_id;
+    const teacherId = Array.isArray(teacherData)
+        ? teacherData[0]?.teacher_id
+        : teacherData?.teacher_id;
+
     const studySet = {
         ...studySetData,
-        teacher_id: (studySetData as any).teacher_id?.teacher_id
+        teacher_id: teacherId
     };
 
     // 1. Fetch Flashcards (Robustly)
