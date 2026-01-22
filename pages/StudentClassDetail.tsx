@@ -324,10 +324,7 @@ const StudentClassDetail: React.FC = () => {
                                         key={assignment.id}
                                         assignment={assignment}
                                         isTeacher={false}
-                                        onClick={() => {
-                                            // Future: Implement assignment detail/submission view
-                                            alert('Detalle de tarea próximamente');
-                                        }}
+                                        onClick={() => navigate(`/student/class/${classId}/item/${assignment.id}`)}
                                     />
                                 );
                             })
