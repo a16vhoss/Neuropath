@@ -290,7 +290,7 @@ const StudentClassDetail: React.FC = () => {
                             <h2 className="text-2xl font-bold text-slate-900">Materiales de Clase</h2>
                         </div>
 
-                        {topics.length > 0 ? (
+                        {topics.length > 0 || assignments.filter(a => !a.topic_id).length > 0 ? (
                             <div className="space-y-4">
                                 {topics.map(topic => (
                                     <TopicSection
@@ -301,6 +301,21 @@ const StudentClassDetail: React.FC = () => {
                                         onAssignmentClick={(assignment) => navigate(`/student/class/${classId}/item/${assignment.id}`)}
                                     />
                                 ))}
+                                {assignments.filter(a => !a.topic_id).length > 0 && (
+                                    <div className="mt-8 border-t border-slate-200 pt-8">
+                                        <h3 className="text-lg font-bold text-slate-700 mb-4">Otros Materiales</h3>
+                                        <div className="space-y-2">
+                                            {assignments.filter(a => !a.topic_id).map(assignment => (
+                                                <AssignmentCard
+                                                    key={assignment.id}
+                                                    assignment={assignment}
+                                                    isTeacher={false}
+                                                    onClick={() => navigate(`/student/class/${classId}/item/${assignment.id}`)}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             <div className="text-center py-12 bg-white rounded-2xl border border-slate-100">
