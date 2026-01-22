@@ -351,8 +351,17 @@ const TeacherClassDetail: React.FC = () => {
 
     // Delete assignment handler
     const handleDeleteAssignment = async (id: string) => {
+        const assignment = assignments.find(a => a.id === id);
         if (!window.confirm('¿Estás seguro de eliminar este elemento?')) return;
+
         try {
+            // If it's a material type, we also want to delete the underlying material record
+            if (assignment?.type === 'material' && assignment.attached_materials && assignment.attached_materials.length > 0) {
+                const materialId = assignment.attached_materials[0];
+                await supabase.from('materials').delete().eq('id', materialId);
+                setMaterials(prev => prev.filter(m => m.id !== materialId));
+            }
+
             await deleteAssignment(id);
             setAssignments(prev => prev.filter(a => a.id !== id));
         } catch (error) {
@@ -900,7 +909,7 @@ const TeacherClassDetail: React.FC = () => {
                             {[
                                 { label: 'Estudiantes', value: totalStudents.toString(), icon: 'groups', color: 'blue' },
                                 { label: 'Progreso Promedio', value: `${avgProgress}%`, icon: 'trending_up', color: 'emerald' },
-                                { label: 'Materiales', value: materials.length.toString(), icon: 'folder', color: 'violet' },
+                                { label: 'Materiales', value: assignments.filter(a => a.type === 'material').length.toString(), icon: 'folder', color: 'violet' },
                                 { label: 'En Riesgo', value: atRiskCount.toString(), icon: 'warning', color: 'rose' }
                             ].map((stat, i) => (
                                 <div key={i} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
