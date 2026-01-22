@@ -888,7 +888,7 @@ const StudySession: React.FC = () => {
             {/* Flashcard */}
             <div
               onClick={() => setIsFlipped(!isFlipped)}
-              className="w-full max-w-lg aspect-[3/4] md:aspect-[4/3] cursor-pointer perspective-1000"
+              className="w-full max-w-lg h-[60vh] md:h-auto md:aspect-[4/3] cursor-pointer perspective-1000"
             >
               <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
                 {/* Front */}

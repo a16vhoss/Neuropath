@@ -403,10 +403,10 @@ const StudentDashboard: React.FC = () => {
                             <div
                               key={course.id}
                               onClick={() => navigate(`/student/class/${course.id}`)}
-                              className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer h-full flex flex-col justify-between"
+                              className="bg-white p-3 sm:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer h-full flex flex-col justify-between"
                             >
                               <div className="flex items-center gap-3 md:gap-4 mb-4">
-                                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${color === 'blue' ? 'text-blue-600 bg-blue-50' :
+                                <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${color === 'blue' ? 'text-blue-600 bg-blue-50' :
                                   color === 'violet' ? 'text-violet-600 bg-violet-50' :
                                     color === 'emerald' ? 'text-emerald-600 bg-emerald-50' :
                                       color === 'amber' ? 'text-amber-600 bg-amber-50' :
@@ -415,7 +415,7 @@ const StudentDashboard: React.FC = () => {
                                   <span className="material-symbols-outlined text-xl sm:text-2xl">{icon}</span>
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <h3 className="font-bold text-base sm:text-lg truncate">{course.name}</h3>
+                                  <h3 className="font-bold text-sm sm:text-lg truncate">{course.name}</h3>
                                   <p className="text-xs text-slate-500 truncate">Código: {course.code}</p>
                                 </div>
                               </div>
@@ -498,11 +498,11 @@ const StudentDashboard: React.FC = () => {
                           <div
                             key={set.id}
                             onClick={() => navigate(`/student/set/${set.id}`)}
-                            className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer group flex flex-col justify-between h-full"
+                            className="bg-white p-3 sm:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer h-full flex flex-col justify-between"
                           >
                             <div className="flex items-start justify-between gap-3 mb-4">
                               <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${set.color === 'blue' ? 'text-blue-600 bg-blue-50' :
+                                <div className={`w-9 h-9 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${set.color === 'blue' ? 'text-blue-600 bg-blue-50' :
                                   set.color === 'violet' ? 'text-violet-600 bg-violet-50' :
                                     set.color === 'emerald' ? 'text-emerald-600 bg-emerald-50' :
                                       set.color === 'amber' ? 'text-amber-600 bg-amber-50' :
@@ -511,7 +511,7 @@ const StudentDashboard: React.FC = () => {
                                   <span className="material-symbols-outlined text-xl sm:text-2xl">{set.icon}</span>
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <h3 className="font-bold text-base sm:text-lg group-hover:text-primary transition-colors truncate" title={set.name}>{set.name}</h3>
+                                  <h3 className="font-bold text-sm sm:text-lg group-hover:text-primary transition-colors truncate" title={set.name}>{set.name}</h3>
                                   <p className="text-xs text-slate-500">{set.flashcard_count || 0} flashcards</p>
                                 </div>
                               </div>
