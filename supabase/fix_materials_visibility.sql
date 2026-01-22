@@ -15,6 +15,9 @@ DROP POLICY IF EXISTS "Users can view materials from their own study sets" ON pu
 DROP POLICY IF EXISTS "Users can insert materials into their own study sets" ON public.study_set_materials;
 DROP POLICY IF EXISTS "Users can delete materials from their own study sets" ON public.study_set_materials;
 DROP POLICY IF EXISTS "Users can update materials in their own study sets" ON public.study_set_materials;
+DROP POLICY IF EXISTS "View Materials Policy" ON public.study_set_materials;
+DROP POLICY IF EXISTS "Manage Materials Policy" ON public.study_set_materials;
+DROP POLICY IF EXISTS "Insert Materials Policy" ON public.study_set_materials;
 
 -- 2. Asegurar RLS
 ALTER TABLE public.study_set_materials ENABLE ROW LEVEL SECURITY;
@@ -79,3 +82,4 @@ FOR INSERT WITH CHECK (
         )
     )
 );
+
