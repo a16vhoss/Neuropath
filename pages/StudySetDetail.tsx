@@ -675,7 +675,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
     }
 
     const isOwner = studySet && user ? studySet.student_id === user.id : false;
-    const isEditor = studySet && user ? (studySet.editors?.includes(user.id) || isOwner) : false;
+    const isEditor = studySet && user ? ((studySet.editors || []).includes(user.id) || isOwner) : false;
     const canEdit = !readOnly && isEditor;
 
     return (
@@ -965,20 +965,22 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                         Auto-generada con IA
                                     </span>
                                 </h3>
-                                <button
-                                    onClick={() => regenerateStudyGuide()}
-                                    disabled={generatingGuide}
-                                    className={`text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-medium ${generatingGuide
-                                        ? 'bg-indigo-50 text-indigo-400 cursor-not-allowed'
-                                        : 'text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50'
-                                        }`}
-                                    title="Regenerar buscando nuevo contenido en todos los materiales"
-                                >
-                                    <span className={`material-symbols-outlined text-sm ${generatingGuide ? 'animate-spin' : ''}`}>
-                                        {generatingGuide ? 'sync' : 'refresh'}
-                                    </span>
-                                    {generatingGuide ? 'Generando...' : 'Regenerar Guía'}
-                                </button>
+                                {canEdit && (
+                                    <button
+                                        onClick={() => regenerateStudyGuide()}
+                                        disabled={generatingGuide}
+                                        className={`text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-medium ${generatingGuide
+                                            ? 'bg-indigo-50 text-indigo-400 cursor-not-allowed'
+                                            : 'text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50'
+                                            }`}
+                                        title="Regenerar buscando nuevo contenido en todos los materiales"
+                                    >
+                                        <span className={`material-symbols-outlined text-sm ${generatingGuide ? 'animate-spin' : ''}`}>
+                                            {generatingGuide ? 'sync' : 'refresh'}
+                                        </span>
+                                        {generatingGuide ? 'Generando...' : 'Regenerar Guía'}
+                                    </button>
+                                )}
                             </div>
 
                             {isEditingName ? (

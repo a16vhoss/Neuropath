@@ -129,10 +129,16 @@ export const generateFlashcardsFromYouTubeURL = async (url: string) => {
     // 2. Generate Flashcards from Transcript
     const flashcards = await generateStudySetFromContext(fullText);
 
+    // Simple video title extraction from URL (just a fallback)
+    const videoTitle = "Video de YouTube (" + (new URL(url).searchParams.get('v') || 'ID desconocido') + ")";
+
     // Return both flashcards and the summary text (transcript)
     return {
       flashcards,
-      summary: fullText.slice(0, 1000) + "..." // Simple summary for now
+      summary: fullText.slice(0, 1000) + "...",
+      videoUrl: url,
+      videoTitle,
+      channelName: "YouTube"
     };
 
   } catch (error) {
@@ -149,7 +155,15 @@ export const generateFlashcardsFromWebURL = async (url: string) => {
     const response = await fetch(url);
     const text = await response.text();
     const cleanText = text.replace(/<[^>]*>?/gm, ' ').slice(0, 20000); // Strip HTML tags
-    return await generateStudySetFromContext(cleanText);
+
+    const flashcards = await generateStudySetFromContext(cleanText);
+
+    return {
+      flashcards,
+      summary: cleanText.slice(0, 1000) + "...",
+      pageTitle: "Página Web (" + new URL(url).hostname + ")",
+      sourceUrl: url
+    };
   } catch (error) {
     console.warn("Could not fetch web URL directly (likely CORS):", error);
     throw new Error("No se pudo acceder a la URL web (posible restricción CORS). Intenta copiar y pegar el texto manualmente.");
