@@ -746,13 +746,22 @@ export const deleteMaterialFromStudySet = async (materialId: string) => {
 
 // Get study set with full details (materials + flashcard count)
 export const getStudySetWithDetails = async (studySetId: string) => {
-    const { data: studySet, error: setError } = await supabase
+    const { data: studySetData, error: setError } = await supabase
         .from('study_sets')
-        .select('*')
+        .select(`
+            *,
+            teacher_id:classes(teacher_id)
+        `)
         .eq('id', studySetId)
         .single();
 
     if (setError) throw setError;
+
+    // Supabase returns nested object for joints, let's flatten it for easier use
+    const studySet = {
+        ...studySetData,
+        teacher_id: (studySetData as any).teacher_id?.teacher_id
+    };
 
     // 1. Fetch Flashcards (Robustly)
     let flashcardsQuery = supabase

@@ -59,6 +59,7 @@ interface StudySetFull {
     class_id?: string;
     student_id: string; // Owner ID
     editors?: string[];
+    teacher_id?: string;
 }
 
 type TabType = 'overview' | 'flashcards' | 'materials' | 'reports' | 'people';
@@ -674,7 +675,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
         );
     }
 
-    const isOwner = studySet && user ? studySet.student_id === user.id : false;
+    const isOwner = studySet && user ? (studySet.student_id === user.id || studySet.teacher_id === user.id) : false;
     const isEditor = studySet && user ? ((studySet.editors || []).includes(user.id) || isOwner) : false;
     const canEdit = !readOnly && isEditor;
 
