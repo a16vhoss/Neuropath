@@ -76,6 +76,10 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
     const navigate = useNavigate();
     const { user } = useAuth();
 
+    // Derived permissions
+    // Note: studySet isn't loaded yet on first render, so we check inside render or after load
+    // But we need derived state. We'll compute it during render.
+
 
     const [studySet, setStudySet] = useState<StudySetFull | null>(null);
     const [loading, setLoading] = useState(true);
@@ -670,6 +674,10 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
         );
     }
 
+    const isOwner = studySet && user ? studySet.student_id === user.id : false;
+    const isEditor = studySet && user ? (studySet.editors?.includes(user.id) || isOwner) : false;
+    const canEdit = !readOnly && isEditor;
+
     return (
         <div className={embedded ? "" : "min-h-screen bg-slate-50"}>
             {/* Header */}
@@ -711,7 +719,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                         <h1 className="text-xl font-bold text-slate-900">{studySet.name}</h1>
                                         <p className="text-sm text-slate-500">{studySet.flashcard_count} flashcards</p>
                                     </div>
-                                    {!readOnly && (
+                                    {canEdit && (
                                         <button
                                             onClick={() => setIsEditingName(true)}
                                             className="p-1 hover:bg-slate-100 rounded-lg text-slate-400"
@@ -738,7 +746,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                 <span className="material-symbols-outlined">timer</span>
                                 Simulacro
                             </button>
-                            {!readOnly && (
+                            {!readOnly && isOwner && (
                                 <button
                                     onClick={handleDeleteSet}
                                     className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition"
@@ -898,51 +906,53 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                             </div>
                         </div>
 
-                        {/* Quick Actions */}
-                        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                            <h3 className="font-bold text-slate-900 mb-4">⚡ Acciones Rápidas</h3>
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                                <label className={`flex flex-col items-center gap-2 p-4 rounded-xl cursor-pointer transition border border-dashed border-emerald-200 ${uploading ? 'bg-slate-50' : 'bg-emerald-50 hover:bg-emerald-100'}`}>
-                                    <span className="material-symbols-outlined text-3xl text-emerald-600">upload_file</span>
-                                    <span className="font-medium text-sm text-emerald-700 text-center">
-                                        {uploading ? uploadProgress : 'Subir PDF'}
-                                    </span>
-                                    <input type="file" accept=".pdf" onChange={handleFileUpload} className="hidden" disabled={uploading} />
-                                </label>
+                        {/* Quick Actions - Only for editors */}
+                        {canEdit && (
+                            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                                <h3 className="font-bold text-slate-900 mb-4">⚡ Acciones Rápidas</h3>
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                    <label className={`flex flex-col items-center gap-2 p-4 rounded-xl cursor-pointer transition border border-dashed border-emerald-200 ${uploading ? 'bg-slate-50' : 'bg-emerald-50 hover:bg-emerald-100'}`}>
+                                        <span className="material-symbols-outlined text-3xl text-emerald-600">upload_file</span>
+                                        <span className="font-medium text-sm text-emerald-700 text-center">
+                                            {uploading ? uploadProgress : 'Subir PDF'}
+                                        </span>
+                                        <input type="file" accept=".pdf" onChange={handleFileUpload} className="hidden" disabled={uploading} />
+                                    </label>
+
+                                    <button
+                                        onClick={() => setShowTextModal(true)}
+                                        className="flex flex-col items-center gap-2 p-4 bg-orange-50 hover:bg-orange-100 rounded-xl transition border border-dashed border-orange-200"
+                                    >
+                                        <span className="material-symbols-outlined text-3xl text-orange-600">description</span>
+                                        <span className="font-medium text-sm text-orange-700 text-center">Pegar Texto</span>
+                                    </button>
+
+                                    <button
+                                        onClick={() => { setUrlType('youtube'); setShowUrlModal(true); }}
+                                        className="flex flex-col items-center gap-2 p-4 bg-red-50 hover:bg-red-100 rounded-xl transition border border-dashed border-red-200"
+                                    >
+                                        <span className="material-symbols-outlined text-3xl text-red-600">play_circle</span>
+                                        <span className="font-medium text-sm text-red-700 text-center">YouTube</span>
+                                    </button>
+
+                                    <button
+                                        onClick={() => { setUrlType('website'); setShowUrlModal(true); }}
+                                        className="flex flex-col items-center gap-2 p-4 bg-blue-50 hover:bg-blue-100 rounded-xl transition border border-dashed border-blue-200"
+                                    >
+                                        <span className="material-symbols-outlined text-3xl text-blue-600">link</span>
+                                        <span className="font-medium text-sm text-blue-700 text-center">Enlace</span>
+                                    </button>
+                                </div>
 
                                 <button
-                                    onClick={() => setShowTextModal(true)}
-                                    className="flex flex-col items-center gap-2 p-4 bg-orange-50 hover:bg-orange-100 rounded-xl transition border border-dashed border-orange-200"
+                                    onClick={() => { setActiveTab('flashcards'); setShowAddFlashcard(true); }}
+                                    className="w-full mt-4 flex items-center justify-center gap-2 p-3 text-slate-600 hover:bg-slate-50 rounded-xl transition text-sm font-medium border border-slate-200"
                                 >
-                                    <span className="material-symbols-outlined text-3xl text-orange-600">description</span>
-                                    <span className="font-medium text-sm text-orange-700 text-center">Pegar Texto</span>
-                                </button>
-
-                                <button
-                                    onClick={() => { setUrlType('youtube'); setShowUrlModal(true); }}
-                                    className="flex flex-col items-center gap-2 p-4 bg-red-50 hover:bg-red-100 rounded-xl transition border border-dashed border-red-200"
-                                >
-                                    <span className="material-symbols-outlined text-3xl text-red-600">play_circle</span>
-                                    <span className="font-medium text-sm text-red-700 text-center">YouTube</span>
-                                </button>
-
-                                <button
-                                    onClick={() => { setUrlType('website'); setShowUrlModal(true); }}
-                                    className="flex flex-col items-center gap-2 p-4 bg-blue-50 hover:bg-blue-100 rounded-xl transition border border-dashed border-blue-200"
-                                >
-                                    <span className="material-symbols-outlined text-3xl text-blue-600">link</span>
-                                    <span className="font-medium text-sm text-blue-700 text-center">Enlace</span>
+                                    <span className="material-symbols-outlined text-lg">add_circle</span>
+                                    Agregar flashcard manual
                                 </button>
                             </div>
-
-                            <button
-                                onClick={() => { setActiveTab('flashcards'); setShowAddFlashcard(true); }}
-                                className="w-full mt-4 flex items-center justify-center gap-2 p-3 text-slate-600 hover:bg-slate-50 rounded-xl transition text-sm font-medium border border-slate-200"
-                            >
-                                <span className="material-symbols-outlined text-lg">add_circle</span>
-                                Agregar flashcard manual
-                            </button>
-                        </div>
+                        )}
 
 
                         {/* Study Guide (formerly Description) */}
@@ -1022,22 +1032,26 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-slate-900">Flashcards</h3>
                             <div className="flex gap-2">
-                                <button
-                                    onClick={handleAutoCategorize}
-                                    disabled={uploading || studySet.flashcards.length === 0}
-                                    className="flex items-center gap-2 bg-indigo-100 text-indigo-700 font-medium px-4 py-2 rounded-xl hover:bg-indigo-200 transition disabled:opacity-50"
-                                    title="Organizar automáticamente con IA"
-                                >
-                                    <span className="material-symbols-outlined text-lg">auto_awesome</span>
-                                    {uploading ? 'Categorizando...' : 'Auto-Categorizar'}
-                                </button>
-                                <button
-                                    onClick={() => setShowAddFlashcard(true)}
-                                    className="flex items-center gap-2 bg-primary text-white font-medium px-4 py-2 rounded-xl hover:bg-blue-700 transition"
-                                >
-                                    <span className="material-symbols-outlined">add</span>
-                                    Nueva Flashcard
-                                </button>
+                                {canEdit && (
+                                    <button
+                                        onClick={handleAutoCategorize}
+                                        disabled={uploading || studySet.flashcards.length === 0}
+                                        className="flex items-center gap-2 bg-indigo-100 text-indigo-700 font-medium px-4 py-2 rounded-xl hover:bg-indigo-200 transition disabled:opacity-50"
+                                        title="Organizar automáticamente con IA"
+                                    >
+                                        <span className="material-symbols-outlined text-lg">auto_awesome</span>
+                                        {uploading ? 'Categorizando...' : 'Auto-Categorizar'}
+                                    </button>
+                                )}
+                                {canEdit && (
+                                    <button
+                                        onClick={() => setShowAddFlashcard(true)}
+                                        className="flex items-center gap-2 bg-primary text-white font-medium px-4 py-2 rounded-xl hover:bg-blue-700 transition"
+                                    >
+                                        <span className="material-symbols-outlined">add</span>
+                                        Nueva Flashcard
+                                    </button>
+                                )}
                             </div>
                         </div>
 
@@ -1095,20 +1109,24 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                 >
                                                     <span className="material-symbols-outlined text-sm">bar_chart</span>
                                                 </button>
-                                                <button
-                                                    onClick={() => setEditingFlashcard(card)}
-                                                    className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition"
-                                                    title="Editar"
-                                                >
-                                                    <span className="material-symbols-outlined text-sm">edit</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteFlashcard(card.id)}
-                                                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition"
-                                                    title="Eliminar"
-                                                >
-                                                    <span className="material-symbols-outlined text-sm">delete</span>
-                                                </button>
+                                                {canEdit && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => setEditingFlashcard(card)}
+                                                            className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition"
+                                                            title="Editar"
+                                                        >
+                                                            <span className="material-symbols-outlined text-sm">edit</span>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteFlashcard(card.id)}
+                                                            className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                                                            title="Eliminar"
+                                                        >
+                                                            <span className="material-symbols-outlined text-sm">delete</span>
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -1123,11 +1141,13 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                     <div>
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-slate-900">Materiales Subidos</h3>
-                            <label className={`flex items-center gap-2 font-medium px-4 py-2 rounded-xl cursor-pointer transition ${uploading ? 'bg-slate-200 text-slate-500' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}>
-                                <span className="material-symbols-outlined">upload</span>
-                                {uploading ? 'Procesando...' : 'Subir PDF'}
-                                <input type="file" accept=".pdf" onChange={handleFileUpload} className="hidden" disabled={uploading} />
-                            </label>
+                            {canEdit && (
+                                <label className={`flex items-center gap-2 font-medium px-4 py-2 rounded-xl cursor-pointer transition ${uploading ? 'bg-slate-200 text-slate-500' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}>
+                                    <span className="material-symbols-outlined">upload</span>
+                                    {uploading ? 'Procesando...' : 'Subir PDF'}
+                                    <input type="file" accept=".pdf" onChange={handleFileUpload} className="hidden" disabled={uploading} />
+                                </label>
+                            )}
                         </div>
 
                         {uploadProgress && (
@@ -1248,14 +1268,16 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
 
                                             <div className="flex-1"></div>
 
-                                            <button
-                                                className="inline-flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition ml-auto"
-                                                onClick={() => handleDeleteMaterial(material)}
-                                                title="Eliminar material y sus flashcards"
-                                            >
-                                                <span className="material-symbols-outlined text-sm">delete</span>
-                                                Eliminar
-                                            </button>
+                                            {canEdit && (
+                                                <button
+                                                    className="inline-flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition ml-auto"
+                                                    onClick={() => handleDeleteMaterial(material)}
+                                                    title="Eliminar material y sus flashcards"
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">delete</span>
+                                                    Eliminar
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
