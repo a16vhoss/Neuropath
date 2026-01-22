@@ -53,7 +53,7 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess,
                 if (!processedContent) throw new Error("No se pudo extraer texto del PDF.");
 
                 setStatus(`Analizando ${processedContent.length} caracteres con Gemini...`);
-                cardData = await generateStudySetFromContext(processedContent, 'pdf');
+                cardData = await generateStudySetFromContext(processedContent);
 
             } else if (activeTab === 'text') {
                 processedContent = inputValue;
@@ -61,7 +61,7 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess,
                 if (!processedContent.trim()) throw new Error("Escribe o pega el texto a analizar.");
 
                 setStatus(`Analizando ${processedContent.length} caracteres con Gemini...`);
-                cardData = await generateStudySetFromContext(processedContent, 'text');
+                cardData = await generateStudySetFromContext(processedContent);
 
             } else if (activeTab === 'youtube') {
                 if (!inputValue.trim()) throw new Error("Ingresa un enlace de YouTube.");
@@ -233,37 +233,37 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess,
                 await addFlashcardsBatch(flashcardsToInsert);
 
                 // 4. Save the source material content INSIDE the Study Set (for Resumen tab)
-                setStatus('Finalizando...');
-                try {
-                    const youtubeAnalysis = (window as any).__youtubeAnalysis;
-                    // For Class Mode, we already created the "Class Material". 
-                    // But we ALSO want the "Study Set Material" for the 'Resumen' tab in the study view.
-
-                    if (activeTab === 'youtube' && youtubeAnalysis) {
-                        await addMaterialToStudySet({
-                            study_set_id: newSet.id,
-                            name: youtubeAnalysis.videoTitle || 'Video de YouTube',
-                            type: 'url',
-                            file_url: youtubeAnalysis.videoUrl,
-                            content_text: `Canal: ${youtubeAnalysis.channelName}\n\n${youtubeAnalysis.summary}`,
-                            flashcards_generated: cardData.length,
-                            summary: youtubeAnalysis.summary
-                        });
-                        // Clean up
-                        delete (window as any).__youtubeAnalysis;
-                    } else if (processedContent) {
-                        await addMaterialToStudySet({
-                            study_set_id: newSet.id,
-                            name: activeTab === 'pdf' && selectedFile ? selectedFile.name : `Material Original (${activeTab})`,
-                            type: activeTab === 'pdf' ? 'pdf' : 'notes',
-                            file_url: '',
-                            content_text: processedContent,
-                            flashcards_generated: cardData.length,
-                            summary: finalSummary || `Material importado automáticamente desde ${activeTab}`
-                        });
+                // In Class Mode, this is handled by createClassStudySet automatically.
+                if (!classId) {
+                    setStatus('Finalizando...');
+                    try {
+                        const youtubeAnalysis = (window as any).__youtubeAnalysis;
+                        if (activeTab === 'youtube' && youtubeAnalysis) {
+                            await addMaterialToStudySet({
+                                study_set_id: newSet.id,
+                                name: youtubeAnalysis.videoTitle || 'Video de YouTube',
+                                type: 'url',
+                                file_url: youtubeAnalysis.videoUrl,
+                                content_text: `Canal: ${youtubeAnalysis.channelName}\n\n${youtubeAnalysis.summary}`,
+                                flashcards_generated: cardData.length,
+                                summary: youtubeAnalysis.summary
+                            });
+                            // Clean up
+                            delete (window as any).__youtubeAnalysis;
+                        } else if (processedContent) {
+                            await addMaterialToStudySet({
+                                study_set_id: newSet.id,
+                                name: activeTab === 'pdf' && selectedFile ? selectedFile.name : `Material Original (${activeTab})`,
+                                type: activeTab === 'pdf' ? 'pdf' : 'notes',
+                                file_url: '',
+                                content_text: processedContent,
+                                flashcards_generated: cardData.length,
+                                summary: finalSummary || `Material importado automáticamente desde ${activeTab}`
+                            });
+                        }
+                    } catch (matError) {
+                        console.error('Error saving study set material:', matError);
                     }
-                } catch (matError) {
-                    console.error('Error saving study set material:', matError);
                 }
 
                 return newSet;
