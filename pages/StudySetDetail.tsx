@@ -12,7 +12,8 @@ import {
     deleteMaterialFromStudySet,
     addFlashcardsBatch,
     supabase,
-    createMaterialWithFlashcards
+    createMaterialWithFlashcards,
+    getClassEnrollments
 } from '../services/supabaseClient';
 import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary } from '../services/pdfProcessingService';
 import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL, autoCategorizeFlashcards } from '../services/geminiService';
@@ -54,9 +55,10 @@ interface StudySetFull {
     materials: Material[];
     flashcard_count: number;
     material_count: number;
+    class_id?: string;
 }
 
-type TabType = 'overview' | 'flashcards' | 'materials' | 'reports';
+type TabType = 'overview' | 'flashcards' | 'materials' | 'reports' | 'people';
 
 interface StudySetDetailProps {
     studySetId?: string;
@@ -103,6 +105,29 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
 
     // Track expanded summaries
     const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
+
+    // People tab state
+    const [classMembers, setClassMembers] = useState<any[]>([]);
+    const [loadingMembers, setLoadingMembers] = useState(false);
+
+    useEffect(() => {
+        if (activeTab === 'people' && studySet?.class_id) {
+            fetchClassMembers();
+        }
+    }, [activeTab, studySet]);
+
+    const fetchClassMembers = async () => {
+        if (!studySet?.class_id) return;
+        setLoadingMembers(true);
+        try {
+            const enrollments = await getClassEnrollments(studySet.class_id);
+            setClassMembers(enrollments || []);
+        } catch (error) {
+            console.error("Error loading class members", error);
+        } finally {
+            setLoadingMembers(false);
+        }
+    };
 
     useEffect(() => {
         if (studySetId) {
@@ -702,7 +727,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
 
                     {/* Tabs */}
                     <div className="flex gap-6 mt-4 border-t border-slate-100 pt-4">
-                        {(['overview', 'flashcards', 'materials', 'reports'] as TabType[]).map((tab) => (
+                        {(['overview', 'flashcards', 'materials', 'reports', 'people'] as TabType[]).map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
@@ -715,6 +740,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                 {tab === 'flashcards' && `Flashcards (${studySet.flashcard_count})`}
                                 {tab === 'materials' && `Materiales (${studySet.material_count})`}
                                 {tab === 'reports' && 'Reportes'}
+                                {tab === 'people' && 'Personas'}
                             </button>
                         ))}
                     </div>
@@ -723,6 +749,83 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
 
             {/* Content */}
             <main className="max-w-5xl mx-auto px-4 py-6">
+                {/* People Tab */}
+                {activeTab === 'people' && (
+                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h3 className="font-bold text-slate-900 text-lg">Personas con acceso</h3>
+                                <p className="text-slate-500 text-sm">Usuarios que pueden ver y estudiar este set.</p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    // Simple share for now -> Copy URL
+                                    navigator.clipboard.writeText(window.location.href);
+                                    alert("Enlace copiado al portapapeles");
+                                }}
+                                className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-4 py-2 rounded-lg font-bold transition flex items-center gap-2"
+                            >
+                                <span className="material-symbols-outlined">share</span>
+                                Compartir
+                            </button>
+                        </div>
+
+                        {loadingMembers ? (
+                            <div className="py-12 text-center text-slate-400">
+                                <span className="material-symbols-outlined animate-spin text-2xl mb-2">sync</span>
+                                <p>Cargando lista...</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {studySet?.class_id ? (
+                                    <>
+                                        <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex items-center gap-3">
+                                            <div className="bg-white p-2 rounded-full shadow-sm">
+                                                <span className="material-symbols-outlined text-blue-500">school</span>
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-blue-800">Acceso por Clase</p>
+                                                <p className="text-sm text-blue-600">Todos los miembros de la clase tienen acceso automático.</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {classMembers.map((enrollment: any) => (
+                                                <div key={enrollment.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 transition">
+                                                    <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
+                                                        {enrollment.profiles?.avatar_url ? (
+                                                            <img src={enrollment.profiles.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <span className="material-symbols-outlined text-slate-400">person</span>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-slate-900 text-sm">{enrollment.profiles?.full_name || 'Estudiante'}</p>
+                                                        <p className="text-xs text-slate-500">Estudiante</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {classMembers.length === 0 && (
+                                            <p className="text-center text-slate-500 py-8">No hay estudiantes inscritos aún.</p>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                                            <span className="material-symbols-outlined text-3xl text-slate-400">lock_open</span>
+                                        </div>
+                                        <h3 className="font-bold text-slate-900">Set Personal</h3>
+                                        <p className="text-slate-500 max-w-sm mx-auto mt-2 text-sm">
+                                            Este set es privado, pero puedes compartirlo enviando el enlace a otros usuarios.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
                     <div className="grid md:grid-cols-2 gap-6">
