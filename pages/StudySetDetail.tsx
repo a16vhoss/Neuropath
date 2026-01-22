@@ -62,6 +62,18 @@ interface StudySetFull {
     teacher_id?: string;
 }
 
+interface RankingMember {
+    student_id: string;
+    full_name: string;
+    avatar_url?: string;
+    flashcards_mastered: number;
+    total_flashcards: number;
+    quiz_average: number;
+    quizzes_taken: number;
+    last_active: string;
+    ranking_score: number;
+}
+
 type TabType = 'overview' | 'flashcards' | 'materials' | 'reports' | 'people';
 
 interface StudySetDetailProps {
@@ -117,12 +129,34 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
     // People tab state
     const [classMembers, setClassMembers] = useState<any[]>([]);
     const [loadingMembers, setLoadingMembers] = useState(false);
+    
+    // Ranking state
+    const [rankingData, setRankingData] = useState<RankingMember[]>([]);
+    const [loadingRanking, setLoadingRanking] = useState(false);
 
     useEffect(() => {
-        if (activeTab === 'people' && studySet?.class_id) {
-            fetchClassMembers();
+        if (activeTab === 'people') {
+            // If class-based, we might fetch members, but we prefer ranking now
+            if (studySet?.class_id) fetchClassMembers(); 
+            fetchRanking();
         }
     }, [activeTab, studySet]);
+
+    const fetchRanking = async () => {
+        if (!studySetId) return;
+        setLoadingRanking(true);
+        try {
+            const { data, error } = await supabase.rpc('get_study_set_ranking', {
+                p_study_set_id: studySetId
+            });
+            if (error) throw error;
+            setRankingData(data || []);
+        } catch (error) {
+            console.error('Error fetching ranking:', error);
+        } finally {
+            setLoadingRanking(false);
+        }
+    };
 
     const fetchClassMembers = async () => {
         if (!studySet?.class_id) return;
@@ -793,17 +827,16 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
 
             {/* Content */}
             <main className="max-w-5xl mx-auto px-4 py-6">
-                {/* People Tab */}
+                {/* People Tab (Ranking) */}
                 {activeTab === 'people' && (
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <div className="flex justify-between items-center mb-6">
                             <div>
-                                <h3 className="font-bold text-slate-900 text-lg">Personas con acceso</h3>
-                                <p className="text-slate-500 text-sm">Usuarios que pueden ver y estudiar este set.</p>
+                                <h3 className="font-bold text-slate-900 text-lg">Ranking del Set 🏆</h3>
+                                <p className="text-slate-500 text-sm">Competencia basada en aprendizaje de flashcards (60%) y quizzes (40%).</p>
                             </div>
                             <button
                                 onClick={() => {
-                                    // Simple share for now -> Copy URL
                                     navigator.clipboard.writeText(window.location.href);
                                     alert("Enlace copiado al portapapeles");
                                 }}
@@ -814,86 +847,104 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                             </button>
                         </div>
 
-                        {loadingMembers ? (
+                        {loadingRanking ? (
                             <div className="py-12 text-center text-slate-400">
                                 <span className="material-symbols-outlined animate-spin text-2xl mb-2">sync</span>
-                                <p>Cargando lista...</p>
+                                <p>Cargando ranking...</p>
                             </div>
                         ) : (
-                            <div className="space-y-4">
-                                {studySet?.class_id ? (
-                                    <>
-                                        <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex items-center gap-3">
-                                            <div className="bg-white p-2 rounded-full shadow-sm">
-                                                <span className="material-symbols-outlined text-blue-500">school</span>
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-blue-800">Acceso por Clase</p>
-                                                <p className="text-sm text-blue-600">Todos los miembros de la clase tienen acceso automático.</p>
-                                            </div>
-                                        </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-slate-100 text-slate-500 text-sm">
+                                            <th className="py-3 px-4 font-medium w-16">#</th>
+                                            <th className="py-3 px-4 font-medium">Estudiante</th>
+                                            <th className="py-3 px-4 font-medium">Flashcards (Mastery)</th>
+                                            <th className="py-3 px-4 font-medium">Quiz Promedio</th>
+                                            <th className="py-3 px-4 font-medium text-right">Puntaje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {rankingData.map((member, index) => {
+                                            const rank = index + 1;
+                                            const isTop3 = rank <= 3;
+                                            
+                                            let rankIcon = <span className="text-slate-500 font-bold text-lg">{rank}</span>;
+                                            if (rank === 1) rankIcon = <span className="text-3xl">🥇</span>;
+                                            if (rank === 2) rankIcon = <span className="text-3xl">🥈</span>;
+                                            if (rank === 3) rankIcon = <span className="text-3xl">🥉</span>;
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {classMembers.map((enrollment: any) => {
-                                                const isOwner = studySet.student_id === user?.id;
-                                                const memberId = enrollment.student_id;
-                                                const isMe = memberId === user?.id;
-                                                const isEditor = studySet.editors?.includes(memberId) || memberId === studySet.student_id;
-                                                const isSetOwner = memberId === studySet.student_id;
+                                            const masteryPercent = member.total_flashcards > 0 
+                                                ? Math.round((member.flashcards_mastered / member.total_flashcards) * 100) 
+                                                : 0;
 
-                                                return (
-                                                    <div key={enrollment.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 transition group">
+                                            return (
+                                                <tr key={member.student_id} className={`hover:bg-slate-50 transition ${member.student_id === user?.id ? 'bg-indigo-50/50' : ''}`}>
+                                                    <td className="py-4 px-4 align-middle">
+                                                        <div className="flex justify-center w-8">
+                                                            {rankIcon}
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 px-4 align-middle">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
-                                                                {enrollment.profiles?.avatar_url ? (
-                                                                    <img src={enrollment.profiles.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center overflow-hidden border-2 ${isTop3 ? 'border-amber-400' : 'border-slate-200'}`}>
+                                                                {member.avatar_url ? (
+                                                                    <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
                                                                 ) : (
                                                                     <span className="material-symbols-outlined text-slate-400">person</span>
                                                                 )}
                                                             </div>
                                                             <div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <p className="font-bold text-slate-900 text-sm">{enrollment.profiles?.full_name || 'Estudiante'}</p>
-                                                                    {isSetOwner && (
-                                                                        <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">PROPIETARIO</span>
-                                                                    )}
-                                                                    {!isSetOwner && isEditor && (
-                                                                        <span className="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded font-bold">EDITOR</span>
-                                                                    )}
-                                                                </div>
-                                                                <p className="text-xs text-slate-500">Estudiante</p>
+                                                                <p className="font-bold text-slate-900 text-sm">{member.full_name}</p>
+                                                                {member.student_id === user?.id && (
+                                                                    <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold">TÚ</span>
+                                                                )}
                                                             </div>
                                                         </div>
-
-                                                        {isOwner && !isMe && !isSetOwner && (
-                                                            <button
-                                                                onClick={() => handleToggleEditor(memberId, enrollment.profiles?.full_name)}
-                                                                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition ${isEditor
-                                                                    ? 'bg-rose-50 text-rose-600 hover:bg-rose-100'
-                                                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                                                            >
-                                                                {isEditor ? 'Quitar Editor' : 'Hacer Editor'}
-                                                            </button>
+                                                    </td>
+                                                    <td className="py-4 px-4 align-middle">
+                                                        <div className="w-full max-w-[140px]">
+                                                            <div className="flex justify-between text-xs mb-1">
+                                                                <span className="font-medium text-slate-700">{member.flashcards_mastered} / {member.total_flashcards}</span>
+                                                                <span className="text-slate-500">{masteryPercent}%</span>
+                                                            </div>
+                                                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                                <div 
+                                                                    className="h-full bg-emerald-500 rounded-full transition-all duration-1000" 
+                                                                    style={{ width: `${masteryPercent}%` }}
+                                                                ></div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 px-4 align-middle">
+                                                        {member.quizzes_taken > 0 ? (
+                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                                                                member.quiz_average >= 90 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                                member.quiz_average >= 70 ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                                                'bg-amber-50 text-amber-700 border-amber-200'
+                                                            }`}>
+                                                                {Math.round(member.quiz_average)}%
+                                                                <span className="ml-1 text-[10px] opacity-70">({member.quizzes_taken})</span>
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-slate-400 text-xs">-</span>
                                                         )}
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                        {classMembers.length === 0 && (
-                                            <p className="text-center text-slate-500 py-8">No hay estudiantes inscritos aún.</p>
+                                                    </td>
+                                                    <td className="py-4 px-4 align-middle text-right">
+                                                        <span className="font-mono font-bold text-slate-900">{Math.round(member.ranking_score)}</span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {rankingData.length === 0 && (
+                                            <tr>
+                                                <td colSpan={5} className="py-12 text-center text-slate-500">
+                                                    No hay datos de actividad aún. ¡Sé el primero en estudiar!
+                                                </td>
+                                            </tr>
                                         )}
-                                    </>
-                                ) : (
-                                    <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                                            <span className="material-symbols-outlined text-3xl text-slate-400">lock_open</span>
-                                        </div>
-                                        <h3 className="font-bold text-slate-900">Set Personal</h3>
-                                        <p className="text-slate-500 max-w-sm mx-auto mt-2 text-sm">
-                                            Este set es privado, pero puedes compartirlo enviando el enlace a otros usuarios.
-                                        </p>
-                                    </div>
-                                )}
+                                    </tbody>
+                                </table>
                             </div>
                         )}
                     </div>
