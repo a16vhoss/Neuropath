@@ -123,8 +123,13 @@ const TeacherClassDetail: React.FC = () => {
 
 
     // Attendance state
-    const [attendanceRecords, setAttendanceRecords] = useState<Record<string, 'present' | 'late' | 'absent'>>({});
+    const [attendanceRecords, setAttendanceRecords] = useState<Record<string, 'present' | 'late' | 'absent' | 'excused'>>({});
     const [savingAttendance, setSavingAttendance] = useState(false);
+    const [attendanceSessions, setAttendanceSessions] = useState<{ id: string, session_date: string }[]>([]);
+    const [selectedSession, setSelectedSession] = useState<{ id: string, session_date: string } | null>(null);
+    const [loadingSessions, setLoadingSessions] = useState(false);
+    const [loadingRecords, setLoadingRecords] = useState(false);
+    const [showSessionModal, setShowSessionModal] = useState(false);
 
     // View Assignment Details State
     const [viewingAssignment, setViewingAssignment] = useState<Assignment | null>(null);
@@ -197,6 +202,66 @@ const TeacherClassDetail: React.FC = () => {
     useEffect(() => {
         loadClassData();
     }, [loadClassData]);
+
+    // Load attendance sessions
+    const loadAttendanceSessions = useCallback(async () => {
+        if (!classId) return;
+        setLoadingSessions(true);
+        try {
+            const { data, error } = await supabase
+                .from('attendance_sessions')
+                .select('id, session_date')
+                .eq('class_id', classId)
+                .order('session_date', { ascending: false });
+
+            if (error) throw error;
+            setAttendanceSessions(data || []);
+
+            // Auto-select latest session if none selected
+            if (data && data.length > 0 && !selectedSession) {
+                setSelectedSession(data[0]);
+            }
+        } catch (error) {
+            console.error('Error loading attendance sessions:', error);
+        } finally {
+            setLoadingSessions(false);
+        }
+    }, [classId, selectedSession]);
+
+    // Load records for a selected session
+    const loadAttendanceRecords = useCallback(async (sessionId: string) => {
+        setLoadingRecords(true);
+        try {
+            const { data, error } = await supabase
+                .from('attendance_records')
+                .select('student_id, status')
+                .eq('session_id', sessionId);
+
+            if (error) throw error;
+
+            const records: Record<string, 'present' | 'late' | 'absent' | 'excused'> = {};
+            data?.forEach(r => {
+                records[r.student_id] = r.status as any;
+            });
+            setAttendanceRecords(records);
+        } catch (error) {
+            console.error('Error loading attendance records:', error);
+        } finally {
+            setLoadingRecords(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (activeTab === 'attendance') {
+            loadAttendanceSessions();
+        }
+    }, [activeTab, loadAttendanceSessions]);
+
+    useEffect(() => {
+        if (selectedSession) {
+            loadAttendanceRecords(selectedSession.id);
+        }
+    }, [selectedSession, loadAttendanceRecords]);
 
 
     // Load announcements
@@ -408,8 +473,16 @@ const TeacherClassDetail: React.FC = () => {
     };
 
     // Update attendance handler
-    const handleAttendanceChange = (studentId: string, status: 'present' | 'late' | 'absent') => {
+    const handleAttendanceChange = (studentId: string, status: 'present' | 'late' | 'absent' | 'excused') => {
         setAttendanceRecords(prev => ({ ...prev, [studentId]: status }));
+    };
+
+    const handleMarkAllPresent = () => {
+        const records: Record<string, 'present' | 'late' | 'absent' | 'excused'> = {};
+        students.forEach(s => {
+            records[s.id] = 'present';
+        });
+        setAttendanceRecords(records);
     };
 
     // Save attendance handler
@@ -417,31 +490,41 @@ const TeacherClassDetail: React.FC = () => {
         if (!classId) return;
         setSavingAttendance(true);
         try {
-            // Create attendance session
-            const { data: session, error: sessionError } = await supabase
-                .from('attendance_sessions')
-                .insert({ class_id: classId, session_date: new Date().toISOString().split('T')[0] })
-                .select()
-                .single();
+            let sessionId = selectedSession?.id;
 
-            if (sessionError) throw sessionError;
+            // If no session selected or it's a new one (though usually we select one)
+            if (!sessionId) {
+                const { data: session, error: sessionError } = await supabase
+                    .from('attendance_sessions')
+                    .insert({ class_id: classId, session_date: new Date().toISOString().split('T')[0] })
+                    .select()
+                    .single();
 
-            // Insert records
+                if (sessionError) throw sessionError;
+                sessionId = session.id;
+                setSelectedSession(session);
+                loadAttendanceSessions();
+            }
+
+            // Insert/Upsert records
             const records = Object.entries(attendanceRecords).map(([studentId, status]) => ({
-                session_id: session.id,
+                session_id: sessionId,
                 student_id: studentId,
                 status
             }));
 
             if (records.length > 0) {
-                await supabase.from('attendance_records').insert(records);
+                const { error: upsertError } = await supabase
+                    .from('attendance_records')
+                    .upsert(records, { onConflict: 'session_id, student_id' });
+
+                if (upsertError) throw upsertError;
             }
 
-            setAttendanceRecords({});
             alert('¡Asistencia guardada correctamente!');
         } catch (error) {
             console.error('Error saving attendance:', error);
-            alert('Error al guardar la asistencia. La tabla puede no existir aún.');
+            alert('Error al guardar la asistencia.');
         } finally {
             setSavingAttendance(false);
         }
@@ -1171,69 +1254,124 @@ const TeacherClassDetail: React.FC = () => {
                 {/* Attendance Tab */}
                 {activeTab === 'attendance' && (
                     <div className="space-y-6">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-xl font-bold">Pase de Lista</h2>
-                            <button className="bg-primary text-white font-bold px-4 py-2 rounded-xl hover:bg-blue-700 transition flex items-center gap-2">
-                                <span className="material-symbols-outlined">add</span> Nueva Sesión
-                            </button>
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <h2 className="text-xl font-bold">Asistencia</h2>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={handleMarkAllPresent}
+                                    className="px-4 py-2 rounded-xl border border-slate-200 font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-lg">check_circle</span> Marcar todos presentes
+                                </button>
+                                <button
+                                    onClick={() => setShowSessionModal(true)}
+                                    className="bg-primary text-white font-bold px-4 py-2 rounded-xl hover:bg-blue-700 transition flex items-center gap-2 shadow-sm"
+                                >
+                                    <span className="material-symbols-outlined">calendar_today</span> Nueva Sesión
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Today's attendance */}
+                        {/* Session Selector & Status */}
                         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="font-bold text-slate-900">Hoy - {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
-                                <span className="text-sm text-slate-500">{students.length} estudiantes</span>
+                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Sesión Seleccionada</label>
+                                    <div className="flex items-center gap-3">
+                                        <select
+                                            value={selectedSession?.id || ''}
+                                            onChange={(e) => {
+                                                const session = attendanceSessions.find(s => s.id === e.target.value);
+                                                if (session) setSelectedSession(session);
+                                            }}
+                                            className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-medium text-slate-900 focus:ring-2 focus:ring-primary/20 outline-none"
+                                        >
+                                            {attendanceSessions.length === 0 && <option value="">No hay sesiones</option>}
+                                            {attendanceSessions.map(s => (
+                                                <option key={s.id} value={s.id}>
+                                                    {new Date(s.session_date).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {loadingSessions && <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>}
+                                    </div>
+                                </div>
+                                <div className="flex gap-4">
+                                    <div className="text-center">
+                                        <div className="text-xl font-black text-slate-900">{students.length}</div>
+                                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Estudiantes</div>
+                                    </div>
+                                    <div className="w-px h-8 bg-slate-100 self-center"></div>
+                                    <div className="text-center">
+                                        <div className="text-xl font-black text-emerald-600">
+                                            {Object.values(attendanceRecords).filter(v => v === 'present').length}
+                                        </div>
+                                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Presentes</div>
+                                    </div>
+                                </div>
                             </div>
 
-                            {students.length > 0 ? (
+                            {loadingRecords ? (
+                                <div className="text-center py-12">
+                                    <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                                    <p className="text-slate-500 font-medium">Cargando registros...</p>
+                                </div>
+                            ) : students.length > 0 ? (
                                 <div className="space-y-2">
                                     {students.map((student) => (
-                                        <div key={student.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                                        <div key={student.id} className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl transition-colors">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                                                <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center text-primary font-bold text-sm border border-slate-100">
                                                     {student.name.charAt(0)}
                                                 </div>
-                                                <span className="font-medium text-slate-900">{student.name}</span>
+                                                <div>
+                                                    <span className="font-semibold text-slate-900 block leading-tight">{student.name}</span>
+                                                    <span className="text-[10px] text-slate-400 font-medium">{student.email}</span>
+                                                </div>
                                             </div>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => handleAttendanceChange(student.id, 'present')}
-                                                    className={`px-3 py-1 rounded-lg font-medium text-sm transition ${attendanceRecords[student.id] === 'present' ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}
-                                                >
-                                                    Presente
-                                                </button>
-                                                <button
-                                                    onClick={() => handleAttendanceChange(student.id, 'late')}
-                                                    className={`px-3 py-1 rounded-lg font-medium text-sm transition ${attendanceRecords[student.id] === 'late' ? 'bg-amber-600 text-white' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}
-                                                >
-                                                    Retardo
-                                                </button>
-                                                <button
-                                                    onClick={() => handleAttendanceChange(student.id, 'absent')}
-                                                    className={`px-3 py-1 rounded-lg font-medium text-sm transition ${attendanceRecords[student.id] === 'absent' ? 'bg-rose-600 text-white' : 'bg-rose-100 text-rose-700 hover:bg-rose-200'}`}
-                                                >
-                                                    Falta
-                                                </button>
+                                            <div className="flex gap-1 md:gap-2">
+                                                {[
+                                                    { id: 'present', label: 'P', full: 'Presente', active: 'bg-emerald-600 text-white', inactive: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' },
+                                                    { id: 'late', label: 'R', full: 'Retardo', active: 'bg-amber-500 text-white', inactive: 'bg-amber-50 text-amber-600 hover:bg-amber-100' },
+                                                    { id: 'excused', label: 'J', full: 'Justificada', active: 'bg-blue-600 text-white', inactive: 'bg-blue-50 text-blue-600 hover:bg-blue-100' },
+                                                    { id: 'absent', label: 'F', full: 'Falta', active: 'bg-rose-600 text-white', inactive: 'bg-rose-50 text-rose-600 hover:bg-rose-100' }
+                                                ].map(s => (
+                                                    <button
+                                                        key={s.id}
+                                                        onClick={() => handleAttendanceChange(student.id, s.id as any)}
+                                                        title={s.full}
+                                                        className={`w-8 h-8 md:w-auto md:px-3 md:py-1 rounded-lg font-bold text-xs transition-all ${attendanceRecords[student.id] === s.id ? s.active : s.inactive}`}
+                                                    >
+                                                        <span className="md:hidden">{s.label}</span>
+                                                        <span className="hidden md:inline">{s.full}</span>
+                                                    </button>
+                                                ))}
                                             </div>
                                         </div>
                                     ))}
                                     <button
                                         onClick={handleSaveAttendance}
-                                        disabled={savingAttendance}
-                                        className="w-full mt-4 bg-primary text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition disabled:opacity-50 flex justify-center items-center gap-2"
+                                        disabled={savingAttendance || !selectedSession}
+                                        className="w-full mt-6 bg-primary text-white font-black py-4 rounded-xl hover:bg-blue-700 transition-all disabled:opacity-50 flex justify-center items-center gap-2 shadow-lg shadow-primary/20"
                                     >
                                         {savingAttendance ? (
                                             <>
-                                                <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
-                                                Guardando...
+                                                <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                                                Guardando cambios...
                                             </>
-                                        ) : 'Guardar Asistencia'}
+                                        ) : (
+                                            <>
+                                                <span className="material-symbols-outlined">save</span>
+                                                Guardar Pase de Lista
+                                            </>
+                                        )}
                                     </button>
                                 </div>
                             ) : (
-                                <div className="text-center py-8">
-                                    <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">groups</span>
-                                    <p className="text-slate-500">No hay estudiantes inscritos</p>
+                                <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                    <span className="material-symbols-outlined text-5xl text-slate-300 mb-2">groups</span>
+                                    <h3 className="font-bold text-slate-900">No hay estudiantes</h3>
+                                    <p className="text-slate-500 text-sm">Invita a tus estudiantes a unirse a la clase.</p>
                                 </div>
                             )}
                         </div>
@@ -1423,7 +1561,7 @@ const TeacherClassDetail: React.FC = () => {
             {/* Create Topic Modal */}
             {showTopicModal && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
+                    <div className="bg-white w-full max-md rounded-3xl shadow-2xl overflow-hidden">
                         <div className="p-8">
                             <h2 className="text-2xl font-black text-slate-900 mb-6">
                                 {editingTopic ? 'Editar Módulo' : 'Nuevo Módulo'}
@@ -1465,8 +1603,81 @@ const TeacherClassDetail: React.FC = () => {
                 </div>
             )}
 
-            {/* View Assignment Details Modal - Removed in favor of Full Page View */}
-            {/* Modal removed. Interaction is now via Full Page Item View */}
+            {/* Attendance Session Modal */}
+            {showSessionModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100">
+                        <div className="p-8">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                                    <span className="material-symbols-outlined text-3xl">calendar_add_on</span>
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-black text-slate-900 leading-none">Nueva Sesión</h2>
+                                    <p className="text-sm text-slate-500 font-medium mt-1">Selecciona la fecha de clase</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Fecha</label>
+                                    <input
+                                        type="date"
+                                        defaultValue={new Date().toISOString().split('T')[0]}
+                                        id="session-date-picker"
+                                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none font-bold text-slate-900 transition-all"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 p-6 flex flex-col gap-3">
+                            <button
+                                onClick={async () => {
+                                    const date = (document.getElementById('session-date-picker') as HTMLInputElement).value;
+                                    if (!date || !classId) return;
+
+                                    try {
+                                        // Check if session for this date already exists
+                                        const { data: existing } = await supabase
+                                            .from('attendance_sessions')
+                                            .select('id, session_date')
+                                            .eq('class_id', classId)
+                                            .eq('session_date', date)
+                                            .single();
+
+                                        if (existing) {
+                                            setSelectedSession(existing);
+                                        } else {
+                                            const { data: session, error } = await supabase
+                                                .from('attendance_sessions')
+                                                .insert({ class_id: classId, session_date: date })
+                                                .select()
+                                                .single();
+
+                                            if (error) throw error;
+                                            setSelectedSession(session);
+                                            loadAttendanceSessions();
+                                        }
+                                        setShowSessionModal(false);
+                                    } catch (err) {
+                                        console.error("Error creating session:", err);
+                                        alert("Error al crear la sesión");
+                                    }
+                                }}
+                                className="w-full bg-primary text-white font-black py-4 rounded-2xl hover:bg-blue-700 shadow-lg shadow-primary/30 transition-all active:scale-95"
+                            >
+                                Crear Sesión
+                            </button>
+                            <button
+                                onClick={() => setShowSessionModal(false)}
+                                className="w-full py-3 text-slate-500 font-bold hover:text-slate-800 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
