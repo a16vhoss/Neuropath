@@ -16,7 +16,7 @@ import {
     getClassEnrollments,
     toggleStudySetEditor
 } from '../services/supabaseClient';
-import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary } from '../services/pdfProcessingService';
+import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary, generateInfographicFromMaterials, generatePresentationFromMaterials } from '../services/pdfProcessingService';
 import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL, autoCategorizeFlashcards } from '../services/geminiService';
 import CumulativeReportsCard from '../components/CumulativeReportsCard';
 import VisualProgressionMap from '../components/VisualProgressionMap';
@@ -232,6 +232,8 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
     };
 
     const [generatingGuide, setGeneratingGuide] = useState(false);
+    const [generatingInfographic, setGeneratingInfographic] = useState(false);
+    const [generatingPresentation, setGeneratingPresentation] = useState(false);
 
     const [viewContentModal, setViewContentModal] = useState<{
         isOpen: boolean;
@@ -921,8 +923,8 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                     <td className="py-4 px-4 align-middle">
                                                         {member.quizzes_taken > 0 ? (
                                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${member.quiz_average >= 90 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                                                    member.quiz_average >= 70 ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                                                        'bg-amber-50 text-amber-700 border-amber-200'
+                                                                member.quiz_average >= 70 ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                                                    'bg-amber-50 text-amber-700 border-amber-200'
                                                                 }`}>
                                                                 {Math.round(member.quiz_average)}%
                                                                 <span className="ml-1 text-[10px] opacity-70">({member.quizzes_taken})</span>
@@ -1028,22 +1030,90 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                         Auto-generada con IA
                                     </span>
                                 </h3>
-                                {canEdit && (
-                                    <button
-                                        onClick={() => regenerateStudyGuide()}
-                                        disabled={generatingGuide}
-                                        className={`text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-medium ${generatingGuide
-                                            ? 'bg-indigo-50 text-indigo-400 cursor-not-allowed'
-                                            : 'text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50'
-                                            }`}
-                                        title="Regenerar buscando nuevo contenido en todos los materiales"
-                                    >
-                                        <span className={`material-symbols-outlined text-sm ${generatingGuide ? 'animate-spin' : ''}`}>
-                                            {generatingGuide ? 'sync' : 'refresh'}
-                                        </span>
-                                        {generatingGuide ? 'Generando...' : 'Regenerar Guía'}
-                                    </button>
-                                )}
+                                <div className="flex items-center gap-2">
+                                    {canEdit && (
+                                        <button
+                                            onClick={() => regenerateStudyGuide()}
+                                            disabled={generatingGuide}
+                                            className={`text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-medium ${generatingGuide
+                                                ? 'bg-indigo-50 text-indigo-400 cursor-not-allowed'
+                                                : 'text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50'
+                                                }`}
+                                            title="Regenerar buscando nuevo contenido en todos los materiales"
+                                        >
+                                            <span className={`material-symbols-outlined text-sm ${generatingGuide ? 'animate-spin' : ''}`}>
+                                                {generatingGuide ? 'sync' : 'refresh'}
+                                            </span>
+                                            {generatingGuide ? 'Generando...' : 'Regenerar Guía'}
+                                        </button>
+                                    )}
+                                    {canEdit && (
+                                        <button
+                                            onClick={async () => {
+                                                if (!studySetId) return;
+                                                setGeneratingInfographic(true);
+                                                try {
+                                                    const contents = studySet?.materials.map(m => m.content_text || m.summary || '').filter(t => !!t) || [];
+                                                    const infographic = await generateInfographicFromMaterials(contents, studySet?.name || '');
+                                                    if (infographic) {
+                                                        const { error } = await supabase.from('study_sets').update({ description: infographic }).eq('id', studySetId);
+                                                        if (error) throw error;
+                                                        setStudySet(prev => prev ? { ...prev, description: infographic } : null);
+                                                        setEditDescription(infographic);
+                                                    }
+                                                } catch (err) {
+                                                    console.error("Error generating infographic:", err);
+                                                } finally {
+                                                    setGeneratingInfographic(false);
+                                                }
+                                            }}
+                                            disabled={generatingInfographic}
+                                            className={`text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-medium ${generatingInfographic
+                                                ? 'bg-amber-50 text-amber-400 cursor-not-allowed'
+                                                : 'text-amber-600 hover:text-amber-800 hover:bg-amber-50'
+                                                }`}
+                                            title="Generar una infografía visual basada en los materiales"
+                                        >
+                                            <span className={`material-symbols-outlined text-sm ${generatingInfographic ? 'animate-spin' : ''}`}>
+                                                {generatingInfographic ? 'sync' : 'leaderboard'}
+                                            </span>
+                                            {generatingInfographic ? 'Generando...' : 'Infografía'}
+                                        </button>
+                                    )}
+                                    {canEdit && (
+                                        <button
+                                            onClick={async () => {
+                                                if (!studySetId) return;
+                                                setGeneratingPresentation(true);
+                                                try {
+                                                    const contents = studySet?.materials.map(m => m.content_text || m.summary || '').filter(t => !!t) || [];
+                                                    const presentation = await generatePresentationFromMaterials(contents, studySet?.name || '');
+                                                    if (presentation) {
+                                                        const { error } = await supabase.from('study_sets').update({ description: presentation }).eq('id', studySetId);
+                                                        if (error) throw error;
+                                                        setStudySet(prev => prev ? { ...prev, description: presentation } : null);
+                                                        setEditDescription(presentation);
+                                                    }
+                                                } catch (err) {
+                                                    console.error("Error generating presentation:", err);
+                                                } finally {
+                                                    setGeneratingPresentation(false);
+                                                }
+                                            }}
+                                            disabled={generatingPresentation}
+                                            className={`text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-medium ${generatingPresentation
+                                                ? 'bg-cyan-50 text-cyan-400 cursor-not-allowed'
+                                                : 'text-cyan-600 hover:text-cyan-800 hover:bg-cyan-50'
+                                                }`}
+                                            title="Generar una estructura de presentación/diapositivas"
+                                        >
+                                            <span className={`material-symbols-outlined text-sm ${generatingPresentation ? 'animate-spin' : ''}`}>
+                                                {generatingPresentation ? 'sync' : 'slideshow'}
+                                            </span>
+                                            {generatingPresentation ? 'Generando...' : 'Presentación'}
+                                        </button>
+                                    )}
+                                </div>
                             </div>
 
                             {isEditingName ? (

@@ -30,6 +30,8 @@ const StudyGuideRenderer: React.FC<StudyGuideRendererProps> = ({ content }) => {
                 else if (title.includes('PRÁCTICA') || title.includes('SECCIÓN 5')) type = 'practice';
                 else if (title.includes('AUTOEVALUACIÓN') || title.includes('SECCIÓN 6')) type = 'exam';
                 else if (title.includes('PUNTOS CRÍTICOS') || title.includes('SECCIÓN 7')) type = 'warning';
+                else if (title.includes('INFOGRAFÍA') || title.includes('TÍTULO IMPACTANTE')) type = 'infographic';
+                else if (title.includes('SLIDE') || title.includes('DIAPOSITIVA')) type = 'presentation';
 
                 currentSection = { title, type, level, content: [] };
             } else if (currentSection) {
@@ -58,6 +60,8 @@ const StudyGuideRenderer: React.FC<StudyGuideRendererProps> = ({ content }) => {
             case 'exam': return 'quiz';
             case 'warning': return 'warning';
             case 'intro': return 'auto_awesome';
+            case 'infographic': return 'leaderboard';
+            case 'presentation': return 'slideshow';
             default: return 'label';
         }
     };
@@ -72,6 +76,8 @@ const StudyGuideRenderer: React.FC<StudyGuideRendererProps> = ({ content }) => {
             case 'exam': return 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-100';
             case 'warning': return 'bg-rose-50 text-rose-700 border-rose-100';
             case 'intro': return 'bg-slate-50 text-slate-700 border-slate-100';
+            case 'infographic': return 'bg-amber-50 text-amber-700 border-amber-100';
+            case 'presentation': return 'bg-cyan-50 text-cyan-700 border-cyan-100';
             default: return 'bg-slate-50 text-slate-700 border-slate-100';
         }
     };

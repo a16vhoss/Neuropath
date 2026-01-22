@@ -176,6 +176,90 @@ Genera la guía de estudio más completa, clara y efectiva posible basándote en
     }
 };
 
+export const generateInfographicFromMaterials = async (materialsContent: string[], studySetName: string): Promise<string | null> => {
+    if (materialsContent.length === 0) return null;
+    const genAI = getGeminiSDK();
+    if (!genAI) return null;
+
+    const infographicPrompt = `
+# 🎨 ARQUITECTO DE INFOGRAFÍAS PEDAGÓGICAS
+Eres un experto en comunicación visual y síntesis de información. Tu objetivo es transformar materiales académicos en un "blueprint" de infografía de alto impacto.
+
+## 🎯 ESTRUCTURA REQUERIDA (MANTENER ESTOS ENCABEZADOS):
+### 🚀 TÍTULO IMPACTANTE: [Nombre del Tema]
+### 💡 IDEA CENTRAL: [Resumen en una frase]
+### 📊 DATOS/CONCEPTOS CLAVE:
+- [Concepto 1]: [Explicación breve + Icono sugerido]
+- [Concepto 2]: [Explicación breve + Icono sugerido]
+### 🔄 PROCESO O FLUJO:
+- Paso 1: [Descripción]
+- Paso 2: [Descripción]
+### 📌 CONCLUSIÓN VISUAL:
+- [Punto final clave]
+
+---
+NOMBRE DEL SET DE ESTUDIO: ${studySetName}
+CONTENIDO:
+${materialsContent.map(t => t.slice(0, 10000)).join('\n\n')}
+---
+Genera el contenido para la infografía más clara y visualmente estructurada posible.
+`;
+
+    try {
+        const modelName = await getBestGeminiModel();
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent(infographicPrompt);
+        return result.response.text();
+    } catch (error) {
+        console.error('Error generating infographic:', error);
+        return null;
+    }
+};
+
+export const generatePresentationFromMaterials = async (materialsContent: string[], studySetName: string): Promise<string | null> => {
+    if (materialsContent.length === 0) return null;
+    const genAI = getGeminiSDK();
+    if (!genAI) return null;
+
+    const presentationPrompt = `
+# 📽️ DISEÑADOR DE PRESENTACIONES EJECUTIVAS
+Eres un experto en oratoria y diseño de presentaciones. Crea una estructura de diapositivas (slides) para una exposición de alto nivel.
+
+## 🎯 FORMATO REQUERIDA (MANTENER ESTO):
+### 🎬 SLIDE 1: PORTADA
+- Título: [Nombre]
+- Subtítulo: [Propósito]
+
+### 📝 SLIDE 2: AGENDA
+- Puntos que se tratarán.
+
+### 🖼️ SLIDE [N]: [TÍTULO DE LA DIAPOSITIVA]
+- [Punto clave 1]
+- [Punto clave 2]
+- **Nota del orador:** [Explicación para el presentador]
+
+### 🏁 SLIDE FINAL: CIERRE Y PREGUNTAS
+- Resumen final.
+
+---
+NOMBRE DEL SET DE ESTUDIO: ${studySetName}
+CONTENIDO:
+${materialsContent.map(t => t.slice(0, 10000)).join('\n\n')}
+---
+Genera una presentación de entre 8 y 12 slides.
+`;
+
+    try {
+        const modelName = await getBestGeminiModel();
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent(presentationPrompt);
+        return result.response.text();
+    } catch (error) {
+        console.error('Error generating presentation:', error);
+        return null;
+    }
+};
+
 export const generateMaterialSummary = async (content: string, type: 'pdf' | 'text' | 'url' | 'video'): Promise<string | null> => {
     const genAI = getGeminiSDK();
     if (!genAI || !content) return null;
