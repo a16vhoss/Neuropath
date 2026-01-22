@@ -805,7 +805,7 @@ const StudySession: React.FC = () => {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center justify-center px-4 pb-8">
+      <main className="flex-1 flex flex-col items-center justify-center px-2 md:px-4 pb-8 w-full">
 
         {/* No Cards Due - Caught Up Screen */}
         {noCardsDue && (

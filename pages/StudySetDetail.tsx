@@ -830,7 +830,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
             </header>
 
             {/* Content */}
-            <main className="max-w-5xl mx-auto px-4 py-6">
+            <main className="max-w-5xl mx-auto px-2 md:px-4 py-4 md:py-6">
                 {/* People Tab (Ranking) */}
                 {activeTab === 'people' && (
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 animate-in fade-in slide-in-from-bottom-2 duration-300">

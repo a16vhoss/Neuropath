@@ -268,7 +268,7 @@ const StudentDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex flex-col">
-      <main className="flex-1 p-6 md:p-12 max-w-7xl mx-auto w-full space-y-8 pb-24 md:pb-12">
+      <main className="flex-1 px-3 py-4 md:p-12 max-w-7xl mx-auto w-full space-y-6 md:space-y-8 pb-24 md:pb-12">
         {/* Header */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div>
