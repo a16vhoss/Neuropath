@@ -45,8 +45,8 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 gradient-hero text-white relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col lg:flex-row items-center gap-12 relative z-10">
+      <section className="pt-24 pb-12 lg:pt-32 lg:pb-20 gradient-hero text-white relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 flex flex-col lg:flex-row items-center gap-8 lg:gap-12 relative z-10">
           <div className="lg:w-3/5 text-center lg:text-left">
             <div className="inline-block bg-white/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest mb-6">
               NUEVO: RUTAS GAMIFICADAS V2.0
