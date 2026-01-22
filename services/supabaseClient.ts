@@ -757,11 +757,12 @@ export const getStudySetWithDetails = async (studySetId: string) => {
 
     if (setError) throw setError;
 
-    // Supabase returns nested object or array for joins
+    // Safe extraction of teacher_id from join
     const teacherData = (studySetData as any).teacher_id;
-    const teacherId = Array.isArray(teacherData)
-        ? teacherData[0]?.teacher_id
-        : teacherData?.teacher_id;
+    let teacherId = null;
+    if (teacherData) {
+        teacherId = Array.isArray(teacherData) ? teacherData[0]?.teacher_id : teacherData?.teacher_id;
+    }
 
     const studySet = {
         ...studySetData,
