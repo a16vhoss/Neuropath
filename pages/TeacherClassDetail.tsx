@@ -821,6 +821,7 @@ const TeacherClassDetail: React.FC = () => {
                 setUploadInputValue('');
                 setUploadTitle('');
                 setUploadDescription('');
+                setActiveTopicId('');
             }, 1500);
 
         } catch (error) {
@@ -980,7 +981,10 @@ const TeacherClassDetail: React.FC = () => {
                                 <h3 className="font-bold text-blue-700 mb-2 text-xl">¡Comienza subiendo tu primer material!</h3>
                                 <p className="text-blue-600 mb-6">Sube un PDF y la IA generará flashcards y quizzes automáticamente.</p>
                                 <button
-                                    onClick={() => setShowUploadModal(true)}
+                        onClick={() => {
+                            setActiveTopicId('');
+                            setShowUploadModal(true);
+                        }}
                                     className="bg-primary text-white font-bold px-8 py-3 rounded-xl hover:bg-blue-700 transition-all"
                                 >
                                     Subir Material
