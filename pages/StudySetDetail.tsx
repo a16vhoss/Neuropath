@@ -13,7 +13,8 @@ import {
     addFlashcardsBatch,
     supabase,
     createMaterialWithFlashcards,
-    getClassEnrollments
+    getClassEnrollments,
+    toggleStudySetEditor
 } from '../services/supabaseClient';
 import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary } from '../services/pdfProcessingService';
 import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL, autoCategorizeFlashcards } from '../services/geminiService';
@@ -56,6 +57,8 @@ interface StudySetFull {
     flashcard_count: number;
     material_count: number;
     class_id?: string;
+    student_id: string; // Owner ID
+    editors?: string[];
 }
 
 type TabType = 'overview' | 'flashcards' | 'materials' | 'reports' | 'people';
@@ -126,6 +129,28 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
             console.error("Error loading class members", error);
         } finally {
             setLoadingMembers(false);
+        }
+    };
+
+    const handleToggleEditor = async (memberId: string, memberName: string) => {
+        if (!studySet) return;
+        const isEditor = studySet.editors?.includes(memberId);
+        const action = isEditor ? 'revocar permisos de edición' : 'dar permisos de edición';
+
+        if (!window.confirm(`¿Estás seguro de ${action} a ${memberName}?`)) return;
+
+        try {
+            await toggleStudySetEditor(studySet.id, memberId);
+            // Optimistic update
+            const newEditors = isEditor
+                ? (studySet.editors || []).filter(id => id !== memberId)
+                : [...(studySet.editors || []), memberId];
+
+            setStudySet({ ...studySet, editors: newEditors });
+            alert(isEditor ? 'Permisos revocados' : 'Permisos asignados correctamente');
+        } catch (error) {
+            console.error('Error toggling editor:', error);
+            alert('Error al actualizar permisos');
         }
     };
 
@@ -790,21 +815,50 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {classMembers.map((enrollment: any) => (
-                                                <div key={enrollment.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 transition">
-                                                    <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
-                                                        {enrollment.profiles?.avatar_url ? (
-                                                            <img src={enrollment.profiles.avatar_url} alt="" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <span className="material-symbols-outlined text-slate-400">person</span>
+                                            {classMembers.map((enrollment: any) => {
+                                                const isOwner = studySet.student_id === user?.id;
+                                                const memberId = enrollment.student_id;
+                                                const isMe = memberId === user?.id;
+                                                const isEditor = studySet.editors?.includes(memberId) || memberId === studySet.student_id;
+                                                const isSetOwner = memberId === studySet.student_id;
+
+                                                return (
+                                                    <div key={enrollment.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-100 transition group">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
+                                                                {enrollment.profiles?.avatar_url ? (
+                                                                    <img src={enrollment.profiles.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <span className="material-symbols-outlined text-slate-400">person</span>
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="font-bold text-slate-900 text-sm">{enrollment.profiles?.full_name || 'Estudiante'}</p>
+                                                                    {isSetOwner && (
+                                                                        <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">PROPIETARIO</span>
+                                                                    )}
+                                                                    {!isSetOwner && isEditor && (
+                                                                        <span className="text-[10px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded font-bold">EDITOR</span>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-xs text-slate-500">Estudiante</p>
+                                                            </div>
+                                                        </div>
+
+                                                        {isOwner && !isMe && !isSetOwner && (
+                                                            <button
+                                                                onClick={() => handleToggleEditor(memberId, enrollment.profiles?.full_name)}
+                                                                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition ${isEditor
+                                                                    ? 'bg-rose-50 text-rose-600 hover:bg-rose-100'
+                                                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                                            >
+                                                                {isEditor ? 'Quitar Editor' : 'Hacer Editor'}
+                                                            </button>
                                                         )}
                                                     </div>
-                                                    <div>
-                                                        <p className="font-bold text-slate-900 text-sm">{enrollment.profiles?.full_name || 'Estudiante'}</p>
-                                                        <p className="text-xs text-slate-500">Estudiante</p>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                )
+                                            })}
                                         </div>
                                         {classMembers.length === 0 && (
                                             <p className="text-center text-slate-500 py-8">No hay estudiantes inscritos aún.</p>

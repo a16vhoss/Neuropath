@@ -562,6 +562,15 @@ export const deleteStudySet = async (studySetId: string) => {
     if (error) throw error;
 };
 
+export const toggleStudySetEditor = async (studySetId: string, userId: string) => {
+    const { error } = await supabase.rpc('toggle_study_set_editor', {
+        set_id: studySetId,
+        user_id: userId
+    });
+
+    if (error) throw error;
+};
+
 export const addFlashcardToStudySet = async (studySetId: string, flashcard: {
     question: string;
     answer: string;
