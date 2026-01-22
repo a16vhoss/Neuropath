@@ -267,7 +267,56 @@ const StudentDashboard: React.FC = () => {
   const courseIcons = ['neurology', 'smart_toy', 'science', 'calculate', 'history_edu'];
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] flex flex-col">
+    <div className="min-h-screen bg-[#F9FAFB] flex flex-col md:flex-row">
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex w-64 bg-white border-r border-slate-200 flex-col fixed inset-y-0 z-50">
+        <div className="p-6 flex items-center gap-2 border-b border-slate-100">
+          <span className="material-symbols-outlined text-primary text-3xl font-bold">neurology</span>
+          <span className="font-extrabold text-xl tracking-tighter text-slate-900">MHS</span>
+        </div>
+
+        <nav className="flex-1 p-4 space-y-2">
+          <button
+            onClick={() => setActiveTab('classes')}
+            className={`w-full p-3 rounded-lg flex items-center gap-3 font-bold transition-colors ${activeTab === 'classes' ? 'bg-primary/5 text-primary' : 'text-slate-600 hover:bg-slate-50'}`}
+          >
+            <span className="material-symbols-outlined">home</span> Inicio
+          </button>
+          <button
+            onClick={() => setActiveTab('personal')}
+            className={`w-full p-3 rounded-lg flex items-center gap-3 font-medium transition-colors ${activeTab === 'personal' ? 'bg-primary/5 text-primary' : 'text-slate-600 hover:bg-slate-50'}`}
+          >
+            <span className="material-symbols-outlined">auto_stories</span> Mis Sets
+          </button>
+          <button
+            onClick={() => navigate('/student/battles')}
+            className="w-full p-3 rounded-lg flex items-center gap-3 font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            <span className="material-symbols-outlined">swords</span> Batallas
+          </button>
+          <button
+            onClick={() => navigate('/student/achievements')}
+            className="w-full p-3 rounded-lg flex items-center gap-3 font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            <span className="material-symbols-outlined">emoji_events</span> Logros
+          </button>
+        </nav>
+
+        <div className="p-4 border-t border-slate-100">
+          <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 cursor-pointer" onClick={() => signOut()}>
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <span className="material-symbols-outlined text-primary">person</span>
+            </div>
+            <div className="overflow-hidden">
+              <p className="font-bold text-slate-900 text-sm truncate">{profile?.full_name || 'Estudiante'}</p>
+              <p className="text-xs text-slate-500">Cerrar Sesión</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content Wrapper */}
+      <div className="flex-1 flex flex-col md:ml-64 min-h-screen transition-all duration-300">
       <main className="flex-1 px-3 py-4 md:p-12 max-w-7xl mx-auto w-full space-y-6 md:space-y-8 pb-24 md:pb-12">
         {/* Header */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
@@ -868,7 +917,8 @@ const StudentDashboard: React.FC = () => {
           />
         )
       }
-    </div >
+      </div>
+    </div>
   );
 };
 
