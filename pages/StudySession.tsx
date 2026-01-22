@@ -892,12 +892,12 @@ const StudySession: React.FC = () => {
             >
               <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
                 {/* Front */}
-                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden overflow-y-auto hide-scrollbar">
+                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-5 md:p-8 backface-hidden overflow-y-auto hide-scrollbar">
                   <div className="flex items-center gap-3 mb-4 flex-shrink-0">
                     <span className="bg-indigo-100 text-indigo-600 text-xs font-bold px-3 py-1 rounded-full uppercase">{flashcards[currentIndex]?.category}</span>
                     <span className="bg-amber-100 text-amber-600 text-xs font-bold px-2 py-1 rounded-full">Sesión Diaria</span>
                   </div>
-                  <h2 className="text-xl md:text-3xl font-black text-center text-slate-900 leading-snug overflow-y-auto max-h-full py-2">{flashcards[currentIndex]?.question}</h2>
+                  <h2 className="text-lg md:text-3xl font-black text-center text-slate-900 leading-snug overflow-y-auto max-h-full py-2">{flashcards[currentIndex]?.question}</h2>
                   <p className="text-sm text-slate-400 mt-6 flex items-center gap-1 flex-shrink-0">
                     <span className="material-symbols-outlined text-sm">touch_app</span> Toca para girar
                   </p>
@@ -983,7 +983,7 @@ const StudySession: React.FC = () => {
             >
               <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
                 {/* Front */}
-                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden overflow-y-auto hide-scrollbar">
+                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-5 md:p-8 backface-hidden overflow-y-auto hide-scrollbar">
                   <div className="flex items-center gap-3 mb-4 flex-shrink-0">
                     <span className="bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1 rounded-full uppercase">{flashcards[currentIndex]?.category}</span>
                     {currentMasteryResult && (
@@ -995,7 +995,7 @@ const StudySession: React.FC = () => {
                       />
                     )}
                   </div>
-                  <h2 className="text-xl md:text-3xl font-black text-center text-slate-900 leading-snug overflow-y-auto max-h-full py-2">{flashcards[currentIndex]?.question}</h2>
+                  <h2 className="text-lg md:text-3xl font-black text-center text-slate-900 leading-snug overflow-y-auto max-h-full py-2">{flashcards[currentIndex]?.question}</h2>
                   <p className="text-sm text-slate-400 mt-6 flex items-center gap-1 flex-shrink-0">
                     <span className="material-symbols-outlined text-sm">touch_app</span> Toca para girar
                   </p>
