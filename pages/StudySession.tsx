@@ -805,7 +805,7 @@ const StudySession: React.FC = () => {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center justify-center px-2 md:px-4 pb-8 w-full">
+      <main className="flex-1 flex flex-col items-center justify-center px-2 md:px-4 pb-4 md:pb-8 w-full min-h-0">
 
         {/* No Cards Due - Caught Up Screen */}
         {noCardsDue && (
@@ -888,7 +888,7 @@ const StudySession: React.FC = () => {
             {/* Flashcard */}
             <div
               onClick={() => setIsFlipped(!isFlipped)}
-              className="w-full max-w-lg h-[60vh] md:h-auto md:aspect-[4/3] cursor-pointer perspective-1000"
+              className="w-full max-w-lg flex-1 min-h-0 md:flex-none md:h-auto md:aspect-[4/3] cursor-pointer perspective-1000"
             >
               <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
                 {/* Front */}
@@ -912,7 +912,7 @@ const StudySession: React.FC = () => {
 
             {/* Rating Buttons */}
             {isFlipped && (
-              <div className="mt-8">
+              <div className="mt-4 md:mt-8 w-full max-w-lg">
                 <SRSRatingButtons
                   onRate={(rating) => {
                     handleRate(rating);
@@ -1010,7 +1010,7 @@ const StudySession: React.FC = () => {
 
             {/* Rating Buttons (Adaptive Mode style) */}
             {isFlipped && (
-              <div className="mt-8">
+              <div className="mt-4 md:mt-8 w-full max-w-lg">
                 <SRSRatingButtons
                   onRate={handleRate}
                   disabled={isProcessing}
