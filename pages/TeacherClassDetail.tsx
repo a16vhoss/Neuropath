@@ -13,7 +13,6 @@ import { generateFlashcardsFromYouTubeURL } from '../services/geminiService';
 import StudentProgressModal from '../components/StudentProgressModal';
 import AnnouncementCard from '../components/AnnouncementCard';
 import AssignmentCard from '../components/AssignmentCard';
-import ExamScheduler from '../components/ExamScheduler';
 import GradeBookTable from '../components/GradeBookTable';
 import TopicSection from '../components/TopicSection';
 import {
@@ -25,8 +24,6 @@ import {
     deleteAssignment,
     getAssignmentSubmissions,
     gradeSubmission,
-    getClassExams,
-    scheduleExam,
     getClassTopics,
     createTopic,
     updateTopic,
@@ -35,7 +32,6 @@ import {
     Announcement,
     Assignment,
     AssignmentSubmission,
-    ScheduledExam,
     ClassTopic
 } from '../services/ClassroomService';
 
@@ -65,13 +61,6 @@ interface ClassData {
     topics: string[];
 }
 
-interface Exam {
-    id: string;
-    title: string;
-    type: 'exam' | 'quiz' | 'practice';
-    created_at: string;
-    question_count: number;
-}
 
 const TeacherClassDetail: React.FC = () => {
     const { classId } = useParams();
@@ -79,9 +68,8 @@ const TeacherClassDetail: React.FC = () => {
     const { user } = useAuth();
 
     const [classData, setClassData] = useState<ClassData | null>(null);
-    const [activeTab, setActiveTab] = useState<'home' | 'announcements' | 'modules' | 'assignments' | 'discussions' | 'grades' | 'people' | 'evaluation' | 'attendance'>('home');
+    const [activeTab, setActiveTab] = useState<'home' | 'announcements' | 'modules' | 'assignments' | 'discussions' | 'grades' | 'people' | 'attendance'>('home');
     const [showUploadModal, setShowUploadModal] = useState(false);
-    const [showExamModal, setShowExamModal] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadStatus, setUploadStatus] = useState<'uploading' | 'processing' | 'done' | 'error'>('uploading');
@@ -93,11 +81,6 @@ const TeacherClassDetail: React.FC = () => {
     const [loadingStudents, setLoadingStudents] = useState(true);
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
-    // Exam state
-    const [exams, setExams] = useState<Exam[]>([]);
-    const [loadingExams, setLoadingExams] = useState(true);
-    const [examForm, setExamForm] = useState({ name: '', date: '', type: 'exam' as 'exam' | 'quiz' | 'practice', topics: [] as string[] });
-    const [creatingExam, setCreatingExam] = useState(false);
 
     // Announcements state
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -138,9 +121,6 @@ const TeacherClassDetail: React.FC = () => {
     const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
     const [loadingAssignments, setLoadingAssignments] = useState(true);
 
-    // Scheduled Exams state
-    const [scheduledExams, setScheduledExams] = useState<ScheduledExam[]>([]);
-    const [showExamScheduler, setShowExamScheduler] = useState(false);
 
     // Attendance state
     const [attendanceRecords, setAttendanceRecords] = useState<Record<string, 'present' | 'late' | 'absent'>>({});
@@ -218,43 +198,6 @@ const TeacherClassDetail: React.FC = () => {
         loadClassData();
     }, [loadClassData]);
 
-    // Load exams
-    useEffect(() => {
-        const loadExams = async () => {
-            if (!classId) return;
-            setLoadingExams(true);
-            try {
-                const { data } = await supabase
-                    .from('quizzes')
-                    .select('id, title, material_id, created_at')
-                    .eq('class_id', classId)
-                    .order('created_at', { ascending: false });
-
-                if (data) {
-                    // Get question counts
-                    const examsWithCounts = await Promise.all(data.map(async (exam) => {
-                        const { count } = await supabase
-                            .from('quiz_questions')
-                            .select('*', { count: 'exact', head: true })
-                            .eq('quiz_id', exam.id);
-                        return {
-                            id: exam.id,
-                            title: exam.title,
-                            type: 'exam' as const,
-                            created_at: new Date(exam.created_at).toLocaleDateString(),
-                            question_count: count || 0
-                        };
-                    }));
-                    setExams(examsWithCounts);
-                }
-            } catch (error) {
-                console.error('Error loading exams:', error);
-            } finally {
-                setLoadingExams(false);
-            }
-        };
-        loadExams();
-    }, [classId]);
 
     // Load announcements
     const loadAnnouncements = useCallback(async () => {
@@ -300,54 +243,7 @@ const TeacherClassDetail: React.FC = () => {
         loadAssignmentsData();
     }, [loadAssignmentsData]);
 
-    // Load scheduled exams
-    useEffect(() => {
-        const loadScheduledExams = async () => {
-            if (!classId) return;
-            try {
-                const data = await getClassExams(classId);
-                setScheduledExams(data);
-            } catch (error) {
-                console.error('Error loading scheduled exams:', error);
-            }
-        };
-        loadScheduledExams();
-    }, [classId]);
 
-    // Create exam handler
-    const handleCreateExam = async () => {
-        if (!classId || !examForm.name) return;
-        setCreatingExam(true);
-        try {
-            const { data: newExam, error } = await supabase
-                .from('quizzes')
-                .insert({
-                    class_id: classId,
-                    title: examForm.name,
-                    material_id: null
-                })
-                .select()
-                .single();
-
-            if (error) throw error;
-
-            // Refresh exams list
-            setExams(prev => [{
-                id: newExam.id,
-                title: newExam.title,
-                type: 'exam',
-                created_at: new Date().toLocaleDateString(),
-                question_count: 0
-            }, ...prev]);
-
-            setShowExamModal(false);
-            setExamForm({ name: '', date: '', type: 'exam', topics: [] });
-        } catch (error) {
-            console.error('Error creating exam:', error);
-        } finally {
-            setCreatingExam(false);
-        }
-    };
 
     // Prepare GradeBook Data
     const submissionsMap = useMemo(() => {
@@ -856,7 +752,6 @@ const TeacherClassDetail: React.FC = () => {
 
                         { id: 'grades', icon: 'grade', label: 'Calificaciones', badge: atRiskCount > 0 ? atRiskCount : undefined },
                         { id: 'people', icon: 'groups', label: 'Personas' },
-                        { id: 'evaluation', icon: 'assignment', label: 'Plan de Evaluación' },
                         { id: 'attendance', icon: 'fact_check', label: 'Pase de Lista' }
                     ].map((item) => (
                         <div
@@ -961,10 +856,10 @@ const TeacherClassDetail: React.FC = () => {
                                 <h3 className="font-bold text-blue-700 mb-2 text-xl">¡Comienza subiendo tu primer material!</h3>
                                 <p className="text-blue-600 mb-6">Sube un PDF y la IA generará flashcards y quizzes automáticamente.</p>
                                 <button
-                        onClick={() => {
-                            setActiveTopicId('');
-                            setShowUploadModal(true);
-                        }}
+                                    onClick={() => {
+                                        setActiveTopicId('');
+                                        setShowUploadModal(true);
+                                    }}
                                     className="bg-primary text-white font-bold px-8 py-3 rounded-xl hover:bg-blue-700 transition-all"
                                 >
                                     Subir Material
@@ -1037,11 +932,6 @@ const TeacherClassDetail: React.FC = () => {
                                                 topic_id: topic.id
                                             });
                                             setShowAssignmentModal(true);
-                                        }}
-                                        onAddExam={() => {
-                                            setActiveTopicId(topic.id);
-                                            setShowExamScheduler(true);
-                                            // TODO: Pre-select topic in ExamScheduler if possible
                                         }}
                                         onAddMaterial={() => {
                                             setActiveTopicId(topic.id);
@@ -1203,122 +1093,6 @@ const TeacherClassDetail: React.FC = () => {
                     </div>
                 )}
 
-                {/* Evaluation Tab (Exams) */}
-                {activeTab === 'evaluation' && (
-                    <div className="space-y-8">
-                        {/* Scheduled Exams Section */}
-                        <div>
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-xl font-bold">Exámenes Programados</h2>
-                                <button
-                                    onClick={() => setShowExamScheduler(true)}
-                                    className="bg-primary text-white font-bold px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
-                                >
-                                    <span className="material-symbols-outlined text-lg">event</span> Programar Examen
-                                </button>
-                            </div>
-
-                            {scheduledExams.length > 0 ? (
-                                <div className="grid gap-4">
-                                    {scheduledExams.map((exam) => (
-                                        <div key={exam.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center">
-                                                <span className="material-symbols-outlined text-2xl">event_available</span>
-                                            </div>
-                                            <div className="flex-1">
-                                                <h3 className="font-bold text-slate-900">{exam.title}</h3>
-                                                <div className="flex items-center gap-4 text-sm text-slate-500 mt-1">
-                                                    <span className="flex items-center gap-1">
-                                                        <span className="material-symbols-outlined text-base">calendar_today</span>
-                                                        {new Date(exam.start_time).toLocaleDateString()}
-                                                    </span>
-                                                    <span className="flex items-center gap-1">
-                                                        <span className="material-symbols-outlined text-base">schedule</span>
-                                                        {new Date(exam.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} -
-                                                        {new Date(exam.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className={`text-xs font-bold px-3 py-1 rounded-full ${new Date() < new Date(exam.start_time) ? 'bg-amber-100 text-amber-600' : new Date() > new Date(exam.end_time) ? 'bg-slate-100 text-slate-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                                                    {new Date() < new Date(exam.start_time) ? 'Programado' : new Date() > new Date(exam.end_time) ? 'Finalizado' : 'En curso'}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="bg-slate-50 p-6 rounded-2xl text-center mb-6">
-                                    <p className="text-slate-500">No hay exámenes programados próximamente</p>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Exam Templates Section */}
-                        <div>
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-xl font-bold">Plantillas de Quiz ({exams.length})</h2>
-                                <button
-                                    onClick={() => setShowExamModal(true)}
-                                    className="bg-white border border-slate-200 text-slate-700 font-bold px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-50"
-                                >
-                                    <span className="material-symbols-outlined text-lg">add</span> Crear Plantilla
-                                </button>
-                            </div>
-
-                            {loadingExams ? (
-                                <div className="grid gap-4">
-                                    {[1, 2].map((i) => (
-                                        <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm animate-pulse">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-xl bg-slate-200"></div>
-                                                <div className="flex-1">
-                                                    <div className="h-5 bg-slate-200 rounded w-3/4 mb-2"></div>
-                                                    <div className="h-3 bg-slate-100 rounded w-1/2"></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : exams.length > 0 ? (
-                                <div className="grid gap-4">
-                                    {exams.map((exam) => (
-                                        <div key={exam.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center">
-                                                <span className="material-symbols-outlined text-2xl">description</span>
-                                            </div>
-                                            <div className="flex-1">
-                                                <h3 className="font-bold text-slate-900">{exam.title}</h3>
-                                                <p className="text-sm text-slate-500">Creado: {exam.created_at}</p>
-                                                <p className="text-xs text-violet-600 mt-1">{exam.question_count} preguntas</p>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => setShowExamScheduler(true)} // In future could pre-select this quiz
-                                                    className="p-2 text-primary hover:bg-primary/10 rounded-full"
-                                                    title="Programar este examen"
-                                                >
-                                                    <span className="material-symbols-outlined">event</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="bg-slate-50 p-12 rounded-2xl text-center">
-                                    <span className="material-symbols-outlined text-4xl text-slate-300 mb-4">assignment</span>
-                                    <p className="text-slate-500 mb-4">No hay plantillas de examen creadas</p>
-                                    <button
-                                        onClick={() => setShowExamModal(true)}
-                                        className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700"
-                                    >
-                                        Crear Primera Plantilla
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
 
                 {/* Announcements Tab */}
                 {activeTab === 'announcements' && (
@@ -1467,22 +1241,6 @@ const TeacherClassDetail: React.FC = () => {
                 )}
             </main>
 
-            {/* Exam Scheduler Modal */}
-            {showExamScheduler && classId && (
-                <ExamScheduler
-                    classId={classId}
-                    initialTopicId={activeTopicId}
-                    onClose={() => {
-                        setShowExamScheduler(false);
-                        setActiveTopicId('');
-                    }}
-                    onCreated={(newExam) => {
-                        setScheduledExams(prev => [newExam, ...prev]);
-                        setShowExamScheduler(false);
-                        setActiveTopicId('');
-                    }}
-                />
-            )}
 
             {/* Upload Modal (Magic Import) */}
             {showUploadModal && (
@@ -1502,75 +1260,6 @@ const TeacherClassDetail: React.FC = () => {
                 />
             )}
 
-            {/* Create Exam Modal */}
-            {showExamModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
-                        <div className="p-8">
-                            <h2 className="text-2xl font-black text-slate-900 mb-6">Crear Nuevo Examen</h2>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-2">Nombre del Examen</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Ej: Parcial 2 - Sistema Nervioso"
-                                        value={examForm.name}
-                                        onChange={(e) => setExamForm(prev => ({ ...prev, name: e.target.value }))}
-                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-2">Fecha</label>
-                                    <input
-                                        type="date"
-                                        value={examForm.date}
-                                        onChange={(e) => setExamForm(prev => ({ ...prev, date: e.target.value }))}
-                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-2">Tipo</label>
-                                    <select
-                                        value={examForm.type}
-                                        onChange={(e) => setExamForm(prev => ({ ...prev, type: e.target.value as 'exam' | 'quiz' | 'practice' }))}
-                                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                                    >
-                                        <option value="exam">Examen</option>
-                                        <option value="quiz">Quiz</option>
-                                        <option value="practice">Práctica</option>
-                                    </select>
-                                </div>
-                                {classData?.topics && classData.topics.length > 0 && (
-                                    <div>
-                                        <label className="block text-sm font-bold text-slate-700 mb-2">Temas a Evaluar</label>
-                                        <div className="flex flex-wrap gap-2">
-                                            {classData.topics.map((topic) => (
-                                                <label key={topic} className="flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-lg cursor-pointer hover:bg-slate-200">
-                                                    <input type="checkbox" className="rounded" />
-                                                    <span className="text-sm">{topic}</span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        <div className="bg-slate-50 p-4 flex justify-end gap-3">
-                            <button onClick={() => setShowExamModal(false)} className="px-4 py-2 text-slate-600 font-medium hover:text-slate-800">
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleCreateExam}
-                                disabled={creatingExam || !examForm.name}
-                                className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                            >
-                                {creatingExam && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-                                {creatingExam ? 'Creando...' : 'Crear Examen'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Student Progress Modal */}
             {selectedStudent && classId && (

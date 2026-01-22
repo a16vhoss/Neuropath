@@ -96,13 +96,15 @@ const TopicSection: React.FC<TopicSectionProps> = ({
                                             <span className="material-symbols-outlined text-lg">assignment</span>
                                             Tarea / Actividad
                                         </button>
-                                        <button
-                                            onClick={() => { onAddExam?.(); setShowAddMenu(false); }}
-                                            className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-primary rounded-lg flex items-center gap-2 transition"
-                                        >
-                                            <span className="material-symbols-outlined text-lg">quiz</span>
-                                            Examen
-                                        </button>
+                                        {onAddExam && (
+                                            <button
+                                                onClick={() => { onAddExam?.(); setShowAddMenu(false); }}
+                                                className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-primary rounded-lg flex items-center gap-2 transition"
+                                            >
+                                                <span className="material-symbols-outlined text-lg">quiz</span>
+                                                Examen
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => { onAddMaterial?.(); setShowAddMenu(false); }}
                                             className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-primary rounded-lg flex items-center gap-2 transition"
