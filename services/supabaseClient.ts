@@ -853,6 +853,44 @@ export const createClassStudySet = async (
             .eq('material_id', materialId);
 
         if (updateError) console.error("Error linking flashcards to set:", updateError);
+
+        // 3. Automatically add the source material to study_set_materials
+        try {
+            const { data: material } = await supabase
+                .from('materials')
+                .select('*')
+                .eq('id', materialId)
+                .single();
+
+            if (material) {
+                let studySetType = 'manual';
+                // Map types
+                if (material.type === 'pdf') studySetType = 'pdf';
+                else if (material.type === 'video' || material.type === 'link') studySetType = 'url';
+                else if (material.type === 'doc' || material.type === 'text') studySetType = 'notes';
+
+                // Check if already exists to avoid duplicates (though rare in this flow)
+                const { count } = await supabase
+                    .from('study_set_materials')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('study_set_id', studySet.id)
+                    .eq('name', material.name);
+
+                if (count === 0) {
+                    await supabase.from('study_set_materials').insert({
+                        study_set_id: studySet.id,
+                        name: material.name,
+                        type: studySetType,
+                        file_url: material.url || material.file_url, // Handle both potential field names
+                        content_text: material.content_text,
+                        summary: material.summary,
+                        flashcards_generated: material.flashcard_count || 0
+                    });
+                }
+            }
+        } catch (matError) {
+            console.error("Error auto-linking material to study set:", matError);
+        }
     }
 
     return studySet;
