@@ -92,7 +92,7 @@ const StudentClassDetail: React.FC = () => {
             ]);
 
             setAnnouncements(anns);
-            setAssignments(assig.filter(a => a.published)); // Only published assignments
+            setAssignments(assig.filter(a => a.published || a.type === 'material')); // Show published assignments AND all materials
             setSubmissions(subs);
             setExams(exms.filter(e => e.published)); // Only published exams
             setMaterials(mats.data || []);
@@ -203,7 +203,7 @@ const StudentClassDetail: React.FC = () => {
                                     <h3 className="font-bold text-slate-900">Tareas Pendientes</h3>
                                 </div>
                                 <p className="text-3xl font-black text-slate-900">
-                                    {assignments.filter(a => {
+                                    {assignments.filter(a => a.type !== 'material').filter(a => {
                                         const sub = getMySubmission(a.id);
                                         return !sub || sub.status !== 'turned_in' && sub.status !== 'graded';
                                     }).length}
@@ -331,8 +331,8 @@ const StudentClassDetail: React.FC = () => {
                 {activeTab === 'assignments' && (
                     <div className="max-w-3xl mx-auto space-y-6">
                         <h2 className="text-2xl font-bold text-slate-900 mb-6">Tareas y Actividades</h2>
-                        {assignments.length > 0 ? (
-                            assignments.map(assignment => {
+                        {assignments.filter(a => a.type !== 'material').length > 0 ? (
+                            assignments.filter(a => a.type !== 'material').map(assignment => {
                                 const submission = getMySubmission(assignment.id);
                                 return (
                                     <AssignmentCard
