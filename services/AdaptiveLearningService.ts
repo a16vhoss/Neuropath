@@ -114,13 +114,13 @@ const FSRS_PARAMS = {
         4: 4,   // Easy: 4 days
     },
 
-    // Mastery thresholds
+    // Mastery thresholds (number of successful reps)
     MASTERY_THRESHOLDS: {
-        1: 2,   // 2 successful reviews
-        2: 4,   // 4 successful reviews  
-        3: 7,   // 7 successful reviews
-        4: 12,  // 12 successful reviews
-        5: 20,  // 20 successful reviews
+        1: 1,   // 1st success -> Level 1 (2 stars in modal)
+        2: 2,   // 2nd success -> Level 2
+        3: 3,   // 3rd success -> Level 3 (3 stars in modal)
+        4: 6,   // 6th success -> Level 4 (4 stars in modal)
+        5: 10,  // 10th success -> Level 5
     }
 };
 
