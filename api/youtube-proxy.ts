@@ -15,26 +15,66 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         console.log('Fetching transcript for video:', id);
 
-        // Try to fetch WITHOUT language preference first (let YouTube give the default/auto-generated)
-        // This is usually more reliable than forcing a specific code
-        let transcriptItems;
+        let transcriptItems = null;
+        let errorLog = '';
         
+        // METHOD 1: Fast Library
         try {
             transcriptItems = await YoutubeTranscript.fetchTranscript(id);
-            console.log('Fetched default transcript');
+            console.log('Method 1 (Library) Success');
         } catch (e: any) {
-            console.log('Default fetch failed, trying Spanish variants...');
+            errorLog += `Lib error: ${e.message}. `;
+            
+            // METHOD 2: Manual Scraping Fallback
             try {
-                // Try common Spanish variants if default fails
-                transcriptItems = await YoutubeTranscript.fetchTranscript(id, { lang: 'es' });
-            } catch (e2) {
-                console.log('Spanish failed, trying English...');
-                transcriptItems = await YoutubeTranscript.fetchTranscript(id, { lang: 'en' });
+                console.log('Method 1 failed, trying Method 2 (Manual Scraper)...');
+                const videoUrl = `https://www.youtube.com/watch?v=${id}`;
+                const response = await fetch(videoUrl, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8'
+                    }
+                });
+                const html = await response.text();
+                
+                // Extract caption tracks from YouTube's internal JSON
+                const captionsMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
+                if (captionsMatch) {
+                    const tracks = JSON.parse(captionsMatch[1]);
+                    // Prioritize Spanish, then English, then anything else
+                    const track = tracks.find((t: any) => t.languageCode === 'es') || 
+                                  tracks.find((t: any) => t.languageCode?.startsWith('es')) ||
+                                  tracks.find((t: any) => t.languageCode === 'en') || 
+                                  tracks[0];
+                    
+                    if (track && track.baseUrl) {
+                        const transcriptRes = await fetch(track.baseUrl);
+                        const xml = await transcriptRes.text();
+                        // Simple XML to Text parsing
+                        const textContent = xml
+                            .replace(/<text.*?>/g, '')
+                            .replace(/<\/text>/g, ' ')
+                            .replace(/&amp;/g, '&')
+                            .replace(/&quot;/g, '"')
+                            .replace(/&#39;/g, "'")
+                            .replace(/<[^>]*>?/gm, '');
+                        
+                        if (textContent.trim()) {
+                            return res.status(200).json({ 
+                                success: true, 
+                                transcript: textContent.trim().replace(/\s+/g, ' ') 
+                            });
+                        }
+                    }
+                }
+            } catch (e2: any) {
+                errorLog += `Scraper error: ${e2.message}. `;
             }
         }
 
         if (!transcriptItems || transcriptItems.length === 0) {
-            throw new Error('No se encontraron subtítulos');
+            console.error('All transcript methods failed for ID:', id, errorLog);
+            throw new Error('No se encontraron subtítulos (Incluso tras 3 intentos)');
         }
 
         // Combine all transcript text
