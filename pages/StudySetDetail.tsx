@@ -434,6 +434,54 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
         }
     };
 
+    const handleAutoFlashcards = async () => {
+        if (!studySet || studySet.materials.length === 0) {
+            alert('Sube materiales primero para poder generar flashcards automáticamente.');
+            return;
+        }
+
+        setUploading(true);
+        setUploadProgress('Analizando materiales y generando flashcards...');
+
+        try {
+            // Aggregate all content_text from materials
+            const allContent = studySet.materials
+                .filter(m => m.content_text)
+                .map(m => m.content_text)
+                .join('\n\n---\n\n');
+
+            if (!allContent || allContent.trim().length < 100) {
+                alert('No hay suficiente texto extraído para generar flashcards. Prueba subiendo más materiales.');
+                return;
+            }
+
+            console.log(`Generating auto-flashcards from ${allContent.length} characters...`);
+
+            const newFlashcards = await generateFlashcardsFromText(
+                allContent,
+                studySet.name,
+                targetFlashcardCount
+            );
+
+            if (newFlashcards && newFlashcards.length > 0) {
+                await addFlashcardsBatch(newFlashcards.map(fc => ({
+                    ...fc,
+                    study_set_id: studySet.id
+                })));
+                loadStudySet();
+                setRefreshReports(prev => prev + 1);
+            } else {
+                alert('La IA no pudo generar flashcards. Intenta con materiales más claros.');
+            }
+        } catch (error) {
+            console.error('Error in Auto-Flashcards:', error);
+            alert('Error al generar flashcards automáticamente.');
+        } finally {
+            setUploading(false);
+            setUploadProgress(null);
+        }
+    };
+
     const handleDeleteFlashcard = async (flashcardId: string) => {
         try {
             await deleteFlashcard(flashcardId);
@@ -1364,7 +1412,18 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                     <div>
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-slate-900">Flashcards</h3>
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
+                                {canEdit && (
+                                    <button
+                                        onClick={handleAutoFlashcards}
+                                        disabled={uploading || studySet.materials.length === 0}
+                                        className="flex items-center gap-2 bg-emerald-100 text-emerald-700 font-medium px-4 py-2 rounded-xl hover:bg-emerald-200 transition disabled:opacity-50"
+                                        title="Generar flashcards de todos los materiales"
+                                    >
+                                        <span className="material-symbols-outlined text-lg">psychology</span>
+                                        {uploading ? 'Generando...' : 'Auto-Flashcards'}
+                                    </button>
+                                )}
                                 {canEdit && (
                                     <button
                                         onClick={handleAutoCategorize}
