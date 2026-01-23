@@ -119,21 +119,28 @@ export const generateStudySetFromContext = async (context: string) => {
 export const generateFlashcardsFromYouTubeURL = async (url: string) => {
   try {
     // 1. Get Transcript via Proxy (CORS safe)
-    const fullText = await getYoutubeTranscript(url);
-    if (!fullText) {
-      throw new Error("No se pudo obtener la transcripción del video.");
+    const result = await getYoutubeTranscript(url);
+    if (!result) {
+      throw new Error("No se pudo obtener el contenido del video.");
     }
 
+    const { transcript, title, description, isMetadataFallback } = result as any;
+
     // 2. Generate Flashcards from Transcript
-    const flashcards = await generateStudySetFromContext(fullText);
+    // If it's a fallback, we tell Gemini to focus on metadata
+    const promptContext = isMetadataFallback
+      ? `Título: ${title}\nDescripción: ${description}`
+      : transcript;
 
-    // Simple video title extraction from URL (just a fallback)
-    const videoTitle = "Video de YouTube (" + (new URL(url).searchParams.get('v') || 'ID desconocido') + ")";
+    const flashcards = await generateStudySetFromContext(promptContext);
 
-    // Return both flashcards and the summary text (transcript)
+    // Standardize video title
+    const videoTitle = title || "Video de YouTube (" + (new URL(url).searchParams.get('v') || 'ID desconocido') + ")";
+
+    // Return both flashcards and the summary text
     return {
       flashcards,
-      summary: fullText.slice(0, 1000) + "...",
+      summary: isMetadataFallback ? description.slice(0, 1000) : transcript.slice(0, 1000) + "...",
       videoUrl: url,
       videoTitle,
       channelName: "YouTube"

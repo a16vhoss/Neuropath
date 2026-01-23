@@ -17,7 +17,7 @@ export const getYoutubeTranscript = async (url: string): Promise<string> => {
             const data = await response.json();
 
             if (data.success && data.transcript) {
-                return data.transcript;
+                return data; // Return full object instead of just transcript string
             } else {
                 throw new Error(data.error || 'No se pudo obtener la transcripción');
             }
@@ -118,7 +118,7 @@ function parseTranscriptXml(xml: string): string {
 
 const extractVideoID = (url: string): string | null => {
     if (!url) return null;
-    
+
     // Handle various YouTube URL formats (watch, youtu.be, embed, v, shorts, live)
     const patterns = [
         /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/|youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/,

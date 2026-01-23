@@ -14,6 +14,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log('Iniciando extracción robusta para:', id);
 
         // MÉTODO 1: Intento de Scraping Directo (JSON3 format)
+        let videoTitle = '';
+        let videoDescription = '';
+
         try {
             const videoUrl = `https://www.youtube.com/watch?v=${id}`;
             const response = await fetch(videoUrl, {
@@ -24,30 +27,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
             });
             const html = await response.text();
-            
-            const playerResponseMatch = html.match(/ytInitialPlayerResponse\s*=\s*({.+?});/);
+
+            // Regex más robusta para ytInitialPlayerResponse
+            const playerResponseMatch = html.match(/ytInitialPlayerResponse\s*=\s*({.+?});|var\s+ytInitialPlayerResponse\s*=\s*({.+?});/);
             if (playerResponseMatch) {
-                const playerResponse = JSON.parse(playerResponseMatch[1]);
+                const jsonStr = playerResponseMatch[1] || playerResponseMatch[2];
+                const playerResponse = JSON.parse(jsonStr);
+
+                // Extraer metadata por si acaso
+                videoTitle = playerResponse?.videoDetails?.title || '';
+                videoDescription = playerResponse?.videoDetails?.shortDescription || '';
+
                 const captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
-                
+
                 if (captionTracks.length > 0) {
-                    const track = captionTracks.find((t: any) => t.languageCode?.startsWith('es')) || 
-                                  captionTracks.find((t: any) => t.languageCode?.startsWith('en')) || 
-                                  captionTracks[0];
-                    
+                    const track = captionTracks.find((t: any) => t.languageCode?.startsWith('es')) ||
+                        captionTracks.find((t: any) => t.languageCode?.startsWith('en')) ||
+                        captionTracks[0];
+
                     if (track && track.baseUrl) {
                         const transcriptRes = await fetch(track.baseUrl + '&fmt=json3');
                         const transcriptData = await transcriptRes.json();
-                        
+
                         const transcript = transcriptData.events
                             .filter((e: any) => e.segs)
                             .map((e: any) => e.segs.map((s: any) => s.utf8).join(''))
                             .join(' ')
                             .replace(/\s+/g, ' ')
                             .trim();
-                        
+
                         if (transcript) {
-                            return res.status(200).json({ success: true, transcript });
+                            return res.status(200).json({
+                                success: true,
+                                transcript,
+                                title: videoTitle,
+                                description: videoDescription
+                            });
                         }
                     }
                 }
@@ -64,23 +79,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 .join(' ')
                 .replace(/\s+/g, ' ')
                 .trim();
-            
+
             if (transcript) {
-                return res.status(200).json({ success: true, transcript });
+                return res.status(200).json({
+                    success: true,
+                    transcript,
+                    title: videoTitle,
+                    description: videoDescription
+                });
             }
         } catch (e: any) {
             console.error('Método 2 falló:', e.message);
         }
 
-        throw new Error('No se pudieron extraer subtítulos para este video');
+        // MÉTODO 3: Fallback Final - Metadatos (Título y Descripción) si no hay subtítulos
+        if (videoTitle || videoDescription) {
+            console.log('Usando metadata como fallback final');
+            return res.status(200).json({
+                success: true,
+                isMetadataFallback: true,
+                title: videoTitle,
+                description: videoDescription,
+                transcript: `Título del Video: ${videoTitle}\n\nDescripción:\n${videoDescription}`
+            });
+        }
+
+        throw new Error('No se pudo extraer contenido legible de este video (subtítulos deshabilitados y metadata inaccesible)');
 
     } catch (error: any) {
         console.error('Transcript Error:', error.message);
         let userMessage = error.message || 'No se pudo obtener la transcripción';
-        
+
         if (error.message?.includes('Transcript is disabled')) userMessage = 'Los subtítulos están deshabilitados';
         else if (error.message?.includes('No transcript')) userMessage = 'El video no tiene subtítulos';
-        
+
         res.status(500).json({ success: false, error: userMessage });
     }
 }
