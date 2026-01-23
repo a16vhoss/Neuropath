@@ -9,112 +9,95 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const id = Array.isArray(videoId) ? videoId[0] : videoId;
-    console.log(`[YouTubeProxy] Processing video: ${id}`);
+    console.log(`[YouTubeProxy] Processing: ${id}`);
+
+    let videoTitle = '';
+    let videoDescription = '';
+    let transcript = '';
 
     try {
-        // MÉTODO 1: Scraping Directo
-        let videoTitle = '';
-        let videoDescription = '';
-
+        // Step 1: Attempt to get metadata (Title/Description) - Lightweight
         try {
-            const videoUrl = `https://www.youtube.com/watch?v=${id}`;
-            const response = await fetch(videoUrl, {
+            const metaUrl = `https://www.youtube.com/watch?v=${id}`;
+            const metaRes = await fetch(metaUrl, {
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,webp,image/apng,*/*;q=0.8',
-                    'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
-                    'Cache-Control': 'no-cache'
+                    'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8'
                 }
             });
-            const html = await response.text();
+            const html = await metaRes.text();
 
-            // Backup Title from HTML
+            // Basic regex for title and description
             const titleMatch = html.match(/<title>(.*?)<\/title>/);
             if (titleMatch) videoTitle = titleMatch[1].replace(' - YouTube', '');
 
-            // Robust playerResponse regex
-            const playerResponseMatch = html.match(/(?:var\s+|window\[['"]ytInitialPlayerResponse['"]\]\s*=\s*|ytInitialPlayerResponse\s*=\s*)({.+?});/s);
+            // Try to get description and other details from ytInitialPlayerResponse
+            const playerMatch = html.match(/ytInitialPlayerResponse\s*=\s*({.+?});/);
+            if (playerMatch) {
+                const data = JSON.parse(playerMatch[1]);
+                videoTitle = data?.videoDetails?.title || videoTitle;
+                videoDescription = data?.videoDetails?.shortDescription || '';
 
-            if (playerResponseMatch) {
-                const jsonStr = playerResponseMatch[1];
-                const playerResponse = JSON.parse(jsonStr);
-
-                videoTitle = playerResponse?.videoDetails?.title || videoTitle;
-                videoDescription = playerResponse?.videoDetails?.shortDescription || '';
-
-                const captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
-
+                // If we found the transcript link in the data, we can try to fetch it directly
+                const captionTracks = data.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
                 if (captionTracks.length > 0) {
                     const track = captionTracks.find((t: any) => t.languageCode?.startsWith('es')) ||
                         captionTracks.find((t: any) => t.languageCode?.startsWith('en')) ||
                         captionTracks[0];
-
-                    if (track && track.baseUrl) {
+                    if (track?.baseUrl) {
                         const transcriptRes = await fetch(track.baseUrl + '&fmt=json3');
-                        const transcriptData = await transcriptRes.json();
-
-                        const transcript = transcriptData.events
-                            .filter((e: any) => e.segs)
-                            .map((e: any) => e.segs.map((s: any) => s.utf8).join(''))
-                            .join(' ')
-                            .replace(/\s+/g, ' ')
-                            .trim();
-
-                        if (transcript) {
-                            console.log(`[YouTubeProxy] Success via Method 1 (Transcript)`);
-                            return res.status(200).json({
-                                success: true,
-                                transcript,
-                                title: videoTitle,
-                                description: videoDescription
-                            });
+                        if (transcriptRes.ok) {
+                            const tsData = await transcriptRes.json();
+                            transcript = tsData.events
+                                ?.filter((e: any) => e.segs)
+                                .map((e: any) => e.segs.map((s: any) => s.utf8).join(''))
+                                .join(' ')
+                                .replace(/\s+/g, ' ')
+                                .trim();
                         }
                     }
                 }
             }
-        } catch (e: any) {
-            console.warn('[YouTubeProxy] Method 1 failed:', e.message);
+        } catch (metaErr) {
+            console.warn('[YouTubeProxy] Metadata/Direct Scrape failed:', metaErr);
         }
 
-        // MÉTODO 2: youtube-transcript library
-        try {
-            console.log('[YouTubeProxy] Trying Method 2...');
-            const transcriptItems = await YoutubeTranscript.fetchTranscript(id);
-            const transcript = transcriptItems
-                .map((item: any) => item.text)
-                .join(' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-
-            if (transcript) {
-                console.log(`[YouTubeProxy] Success via Method 2 (Transcript)`);
-                return res.status(200).json({
-                    success: true,
-                    transcript,
-                    title: videoTitle,
-                    description: videoDescription
-                });
+        // Step 2: If transcript is still empty, try the Library (this is what worked "2 days ago")
+        if (!transcript) {
+            try {
+                console.log('[YouTubeProxy] Falling back to youtube-transcript library');
+                const items = await YoutubeTranscript.fetchTranscript(id);
+                transcript = items.map(i => i.text).join(' ').replace(/\s+/g, ' ').trim();
+            } catch (libErr) {
+                console.error('[YouTubeProxy] Library also failed:', libErr);
             }
-        } catch (e: any) {
-            console.error('[YouTubeProxy] Method 2 failed:', e.message);
         }
 
-        // MÉTODO 3: Fallback Final - Metadatos
+        // Step 3: Final response
+        if (transcript) {
+            return res.status(200).json({
+                success: true,
+                transcript,
+                title: videoTitle || 'Video de YouTube',
+                description: videoDescription || 'Contenido de YouTube'
+            });
+        }
+
+        // Step 4: Fallback to metadata-only if no transcript
         if (videoTitle || videoDescription) {
-            console.log('[YouTubeProxy] Fallback to metadata only');
             return res.status(200).json({
                 success: true,
                 isMetadataFallback: true,
                 title: videoTitle || 'Video de YouTube',
-                description: videoDescription || 'Sin descripción',
+                description: videoDescription || 'Sin descripción detallada',
                 transcript: `Título: ${videoTitle}\n\nDescripción: ${videoDescription}`
             });
         }
 
-        throw new Error('Contenido no disponible (subtítulos y metadatos bloqueados)');
+        throw new Error('No se pudo extraer el contenido del video. El video puede ser privado, tener subtítulos desactivados o YouTube ha bloqueado la conexión.');
 
-    } catch (error: any) {
-        console.error('[YouTubeProxy] Error:', error.message);
-        res.status(500).json({ success: false, error: error.message });
+    } catch (err: any) {
+        console.error('[YouTubeProxy] Final Error:', err.message);
+        return res.status(500).json({ success: false, error: err.message });
     }
 }
