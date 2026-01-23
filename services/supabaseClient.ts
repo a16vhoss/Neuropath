@@ -832,6 +832,7 @@ export const createClassStudySet = async (
     description: string,
     flashcards: any[] = []
 ) => {
+    let studySetMaterialId: string | null = null;
     // 1. Create the Study Set
     const { data: studySet, error: createError } = await supabase
         .from('study_sets')
@@ -883,15 +884,16 @@ export const createClassStudySet = async (
                     .eq('name', material.name);
 
                 if (count === 0) {
-                    await supabase.from('study_set_materials').insert({
+                    const { data: matData } = await supabase.from('study_set_materials').insert({
                         study_set_id: studySet.id,
                         name: material.name,
                         type: studySetType,
-                        file_url: material.url || material.file_url, // Handle both potential field names
+                        file_url: material.url || material.file_url,
                         content_text: material.content_text,
                         summary: material.summary,
                         flashcards_generated: material.flashcard_count || 0
-                    });
+                    }).select().single();
+                    studySetMaterialId = matData?.id;
                 }
             }
         } catch (matError) {
@@ -899,5 +901,6 @@ export const createClassStudySet = async (
         }
     }
 
-    return studySet;
+    // 4. Return both
+    return { ...studySet, studySetMaterialId };
 };

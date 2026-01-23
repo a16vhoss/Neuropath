@@ -221,25 +221,22 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess,
 
                 if (!newSet?.id) throw new Error("Error al crear el set de estudio.");
 
-                // Add flashcards in batch
+                // Add flashcards in batch - now with material_id linking
                 setStatus(`Guardando ${cardData.length} flashcards...`);
-                const flashcardsToInsert = cardData.map((card: any) => ({
-                    study_set_id: newSet.id,
-                    question: card.question,
-                    answer: card.answer,
-                    category: card.category || 'General'
-                }));
 
-                await addFlashcardsBatch(flashcardsToInsert);
+                let materialIdForFlashcards = null;
 
-                // 4. Save the source material content INSIDE the Study Set (for Resumen tab)
-                // In Class Mode, this is handled by createClassStudySet automatically.
-                if (!classId) {
-                    setStatus('Finalizando...');
+                if (classId) {
+                    materialIdForFlashcards = (newSet as any).studySetMaterialId;
+                } else {
+                    // PERSONAL MODE: Create material first to get its ID for linking
+                    setStatus('Finalizando material...');
                     try {
                         const youtubeAnalysis = (window as any).__youtubeAnalysis;
+                        let materialResult: any;
+
                         if (activeTab === 'youtube' && youtubeAnalysis) {
-                            await addMaterialToStudySet({
+                            materialResult = await addMaterialToStudySet({
                                 study_set_id: newSet.id,
                                 name: youtubeAnalysis.videoTitle || 'Video de YouTube',
                                 type: 'url',
@@ -248,10 +245,9 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess,
                                 flashcards_generated: cardData.length,
                                 summary: youtubeAnalysis.summary
                             });
-                            // Clean up
                             delete (window as any).__youtubeAnalysis;
                         } else if (processedContent) {
-                            await addMaterialToStudySet({
+                            materialResult = await addMaterialToStudySet({
                                 study_set_id: newSet.id,
                                 name: activeTab === 'pdf' && selectedFile ? selectedFile.name : `Material Original (${activeTab})`,
                                 type: activeTab === 'pdf' ? 'pdf' : 'notes',
@@ -261,10 +257,22 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess,
                                 summary: finalSummary || `Material importado automáticamente desde ${activeTab}`
                             });
                         }
+
+                        materialIdForFlashcards = materialResult?.id;
                     } catch (matError) {
                         console.error('Error saving study set material:', matError);
                     }
                 }
+
+                const flashcardsToInsert = cardData.map((card: any) => ({
+                    study_set_id: newSet.id,
+                    material_id: materialIdForFlashcards,
+                    question: card.question,
+                    answer: card.answer,
+                    category: card.category || 'General'
+                }));
+
+                await addFlashcardsBatch(flashcardsToInsert);
 
                 return newSet;
             };
