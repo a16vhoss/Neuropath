@@ -541,6 +541,8 @@ export const updateStudySet = async (studySetId: string, updates: {
     name?: string;
     description?: string;
     topics?: string[];
+    infographic?: string;
+    presentation?: string;
 }) => {
     const { data, error } = await supabase
         .from('study_sets')

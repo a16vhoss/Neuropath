@@ -61,6 +61,8 @@ interface StudySetFull {
     student_id: string; // Owner ID
     editors?: string[];
     teacher_id?: string;
+    infographic?: string;
+    presentation?: string;
 }
 
 interface RankingMember {
@@ -83,6 +85,41 @@ interface StudySetDetailProps {
     embedded?: boolean;
     readOnly?: boolean;
 }
+
+
+const EmptyAIBox: React.FC<{
+    icon: string;
+    title: string;
+    desc: string;
+    onAction: () => void;
+    loading: boolean;
+    actionText: string;
+    color?: 'indigo' | 'amber' | 'cyan';
+}> = ({ icon, title, desc, onAction, loading, actionText, color = 'indigo' }) => {
+    const colorClasses = {
+        indigo: 'text-indigo-500 bg-indigo-50 border-indigo-100 hover:bg-indigo-100',
+        amber: 'text-amber-500 bg-amber-50 border-amber-100 hover:bg-amber-100',
+        cyan: 'text-cyan-500 bg-cyan-50 border-cyan-100 hover:bg-cyan-100'
+    };
+
+    return (
+        <div className="flex flex-col items-center justify-center py-12 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center">
+            <span className={`material-symbols-outlined text-4xl mb-2 ${color === 'amber' ? 'text-amber-300' : color === 'cyan' ? 'text-cyan-300' : 'text-slate-300'}`}>{icon}</span>
+            <p className="text-slate-500 font-medium">{title}</p>
+            <p className="text-sm text-slate-400 mt-1 max-w-md mb-6">{desc}</p>
+            <button
+                onClick={onAction}
+                disabled={loading}
+                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition shadow-sm ${colorClasses[color]}`}
+            >
+                <span className={`material-symbols-outlined text-lg ${loading ? 'animate-spin' : ''}`}>
+                    {loading ? 'sync' : 'magic_button'}
+                </span>
+                {loading ? 'Generando...' : actionText}
+            </button>
+        </div>
+    );
+};
 
 const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, embedded = false, readOnly = false }) => {
     const { studySetId: paramId } = useParams();
@@ -234,6 +271,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
     const [generatingGuide, setGeneratingGuide] = useState(false);
     const [generatingInfographic, setGeneratingInfographic] = useState(false);
     const [generatingPresentation, setGeneratingPresentation] = useState(false);
+    const [activeGuideTab, setActiveGuideTab] = useState<'guide' | 'infographic' | 'presentation'>('guide');
 
     const [viewContentModal, setViewContentModal] = useState<{
         isOpen: boolean;
@@ -1020,126 +1058,181 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                         )}
 
 
-                        {/* Study Guide (formerly Description) */}
-                        <div className="md:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                            <div className="flex justify-between items-center mb-2">
-                                <h3 className="font-bold text-slate-900 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-indigo-500">auto_stories</span>
-                                    Guía de Estudio
-                                    <span className="text-xs font-normal text-indigo-500 bg-indigo-50 px-2 py-1 rounded-full border border-indigo-100">
-                                        Auto-generada con IA
-                                    </span>
-                                </h3>
-                                <div className="flex items-center gap-2">
-                                    {canEdit && (
-                                        <button
-                                            onClick={() => regenerateStudyGuide()}
-                                            disabled={generatingGuide}
-                                            className={`text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-medium ${generatingGuide
-                                                ? 'bg-indigo-50 text-indigo-400 cursor-not-allowed'
-                                                : 'text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50'
-                                                }`}
-                                            title="Regenerar buscando nuevo contenido en todos los materiales"
-                                        >
-                                            <span className={`material-symbols-outlined text-sm ${generatingGuide ? 'animate-spin' : ''}`}>
-                                                {generatingGuide ? 'sync' : 'refresh'}
-                                            </span>
-                                            {generatingGuide ? 'Generando...' : 'Regenerar Guía'}
-                                        </button>
-                                    )}
-                                    {canEdit && (
-                                        <button
-                                            onClick={async () => {
-                                                if (!studySetId) return;
-                                                setGeneratingInfographic(true);
-                                                try {
-                                                    const contents = studySet?.materials.map(m => m.content_text || m.summary || '').filter(t => !!t) || [];
-                                                    const infographic = await generateInfographicFromMaterials(contents, studySet?.name || '');
-                                                    if (infographic) {
-                                                        const { error } = await supabase.from('study_sets').update({ description: infographic }).eq('id', studySetId);
-                                                        if (error) throw error;
-                                                        setStudySet(prev => prev ? { ...prev, description: infographic } : null);
-                                                        setEditDescription(infographic);
-                                                    }
-                                                } catch (err) {
-                                                    console.error("Error generating infographic:", err);
-                                                } finally {
-                                                    setGeneratingInfographic(false);
-                                                }
-                                            }}
-                                            disabled={generatingInfographic}
-                                            className={`text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-medium ${generatingInfographic
-                                                ? 'bg-amber-50 text-amber-400 cursor-not-allowed'
-                                                : 'text-amber-600 hover:text-amber-800 hover:bg-amber-50'
-                                                }`}
-                                            title="Generar una infografía visual basada en los materiales"
-                                        >
-                                            <span className={`material-symbols-outlined text-sm ${generatingInfographic ? 'animate-spin' : ''}`}>
-                                                {generatingInfographic ? 'sync' : 'leaderboard'}
-                                            </span>
-                                            {generatingInfographic ? 'Generando...' : 'Infografía'}
-                                        </button>
-                                    )}
-                                    {canEdit && (
-                                        <button
-                                            onClick={async () => {
-                                                if (!studySetId) return;
-                                                setGeneratingPresentation(true);
-                                                try {
-                                                    const contents = studySet?.materials.map(m => m.content_text || m.summary || '').filter(t => !!t) || [];
-                                                    const presentation = await generatePresentationFromMaterials(contents, studySet?.name || '');
-                                                    if (presentation) {
-                                                        const { error } = await supabase.from('study_sets').update({ description: presentation }).eq('id', studySetId);
-                                                        if (error) throw error;
-                                                        setStudySet(prev => prev ? { ...prev, description: presentation } : null);
-                                                        setEditDescription(presentation);
-                                                    }
-                                                } catch (err) {
-                                                    console.error("Error generating presentation:", err);
-                                                } finally {
-                                                    setGeneratingPresentation(false);
-                                                }
-                                            }}
-                                            disabled={generatingPresentation}
-                                            className={`text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-medium ${generatingPresentation
-                                                ? 'bg-cyan-50 text-cyan-400 cursor-not-allowed'
-                                                : 'text-cyan-600 hover:text-cyan-800 hover:bg-cyan-50'
-                                                }`}
-                                            title="Generar una estructura de presentación/diapositivas"
-                                        >
-                                            <span className={`material-symbols-outlined text-sm ${generatingPresentation ? 'animate-spin' : ''}`}>
-                                                {generatingPresentation ? 'sync' : 'slideshow'}
-                                            </span>
-                                            {generatingPresentation ? 'Generando...' : 'Presentación'}
-                                        </button>
-                                    )}
-                                </div>
+                        {/* AI Content Section (NotebookLM Style) */}
+                        <div className="md:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                            {/* Tabs Header */}
+                            <div className="flex border-b border-slate-100 bg-slate-50/50">
+                                <button
+                                    onClick={() => setActiveGuideTab('guide')}
+                                    className={`flex-1 px-4 py-3 flex items-center justify-center gap-2 text-sm font-semibold transition-all border-b-2 ${activeGuideTab === 'guide' ? 'text-indigo-600 border-indigo-600 bg-white' : 'text-slate-500 border-transparent hover:bg-slate-50'}`}
+                                >
+                                    <span className="material-symbols-outlined text-lg">auto_stories</span>
+                                    Guía
+                                </button>
+                                <button
+                                    onClick={() => setActiveGuideTab('infographic')}
+                                    className={`flex-1 px-4 py-3 flex items-center justify-center gap-2 text-sm font-semibold transition-all border-b-2 ${activeGuideTab === 'infographic' ? 'text-amber-600 border-amber-600 bg-white' : 'text-slate-500 border-transparent hover:bg-slate-50'}`}
+                                >
+                                    <span className="material-symbols-outlined text-lg">leaderboard</span>
+                                    Infografía
+                                </button>
+                                <button
+                                    onClick={() => setActiveGuideTab('presentation')}
+                                    className={`flex-1 px-4 py-3 flex items-center justify-center gap-2 text-sm font-semibold transition-all border-b-2 ${activeGuideTab === 'presentation' ? 'text-cyan-600 border-cyan-600 bg-white' : 'text-slate-500 border-transparent hover:bg-slate-50'}`}
+                                >
+                                    <span className="material-symbols-outlined text-lg">slideshow</span>
+                                    Presentación
+                                </button>
                             </div>
 
-                            {isEditingName ? (
-                                <textarea
-                                    value={editDescription}
-                                    onChange={(e) => setEditDescription(e.target.value)}
-                                    className="w-full p-4 bg-slate-50 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-slate-700 min-h-[400px] font-mono text-sm leading-relaxed"
-                                    placeholder="La guía de estudio aparecerá aquí automáticamente..."
-                                />
-                            ) : (
-                                <div className="max-w-none">
-                                    {studySet.description ? (
-                                        <div className="bg-white">
-                                            <StudyGuideRenderer content={studySet.description} />
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center py-12 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center">
-                                            <span className="material-symbols-outlined text-4xl text-slate-300 mb-2">magic_button</span>
-                                            <p className="text-slate-500 font-medium">No hay guía de estudio aún</p>
-                                            <p className="text-sm text-slate-400 mt-1 max-w-md">
-                                                Sube materiales (PDF, Notas, Enlaces) y usa el botón "Regenerar" para crear una guía de estudio automática con el nuevo Arquitecto Pedagógico.
-                                            </p>
-                                        </div>
-                                    )}
+                            <div className="p-6">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                                        <span className={`material-symbols-outlined ${activeGuideTab === 'guide' ? 'text-indigo-500' : activeGuideTab === 'infographic' ? 'text-amber-500' : 'text-cyan-500'}`}>
+                                            {activeGuideTab === 'guide' ? 'auto_stories' : activeGuideTab === 'infographic' ? 'leaderboard' : 'slideshow'}
+                                        </span>
+                                        {activeGuideTab === 'guide' ? 'Guía de Estudio' : activeGuideTab === 'infographic' ? 'Infografía del Tema' : 'Estructura de Presentación'}
+                                        <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${activeGuideTab === 'guide' ? 'bg-indigo-50 text-indigo-500 border-indigo-100' : activeGuideTab === 'infographic' ? 'bg-amber-50 text-amber-500 border-amber-100' : 'bg-cyan-50 text-cyan-500 border-cyan-100'}`}>
+                                            IA
+                                        </span>
+                                    </h3>
+
+                                    <div className="flex items-center gap-2">
+                                        {canEdit && activeGuideTab === 'guide' && (
+                                            <button
+                                                onClick={() => regenerateStudyGuide()}
+                                                disabled={generatingGuide}
+                                                className={`text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-medium ${generatingGuide ? 'bg-indigo-50 text-indigo-400' : 'text-indigo-600 hover:bg-indigo-50'}`}
+                                            >
+                                                <span className={`material-symbols-outlined text-sm ${generatingGuide ? 'animate-spin' : ''}`}>refresh</span>
+                                                {generatingGuide ? 'Generando...' : 'Regenerar'}
+                                            </button>
+                                        )}
+                                        {canEdit && activeGuideTab === 'infographic' && (
+                                            <button
+                                                onClick={async () => {
+                                                    setGeneratingInfographic(true);
+                                                    try {
+                                                        const contents = studySet?.materials.map(m => m.content_text || m.summary || '').filter(t => !!t) || [];
+                                                        const infographic = await generateInfographicFromMaterials(contents, studySet?.name || '');
+                                                        if (infographic) {
+                                                            await updateStudySet(studySetId!, { infographic });
+                                                            setStudySet(prev => prev ? { ...prev, infographic } : null);
+                                                        }
+                                                    } finally { setGeneratingInfographic(false); }
+                                                }}
+                                                disabled={generatingInfographic}
+                                                className={`text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-medium ${generatingInfographic ? 'bg-amber-50 text-amber-400' : 'text-amber-600 hover:bg-amber-50'}`}
+                                            >
+                                                <span className={`material-symbols-outlined text-sm ${generatingInfographic ? 'animate-spin' : ''}`}>refresh</span>
+                                                {generatingInfographic ? 'Generando...' : 'Regenerar'}
+                                            </button>
+                                        )}
+                                        {canEdit && activeGuideTab === 'presentation' && (
+                                            <button
+                                                onClick={async () => {
+                                                    setGeneratingPresentation(true);
+                                                    try {
+                                                        const contents = studySet?.materials.map(m => m.content_text || m.summary || '').filter(t => !!t) || [];
+                                                        const presentation = await generatePresentationFromMaterials(contents, studySet?.name || '');
+                                                        if (presentation) {
+                                                            await updateStudySet(studySetId!, { presentation });
+                                                            setStudySet(prev => prev ? { ...prev, presentation } : null);
+                                                        }
+                                                    } finally { setGeneratingPresentation(false); }
+                                                }}
+                                                disabled={generatingPresentation}
+                                                className={`text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-medium ${generatingPresentation ? 'bg-cyan-50 text-cyan-400' : 'text-cyan-600 hover:bg-cyan-50'}`}
+                                            >
+                                                <span className={`material-symbols-outlined text-sm ${generatingPresentation ? 'animate-spin' : ''}`}>refresh</span>
+                                                {generatingPresentation ? 'Generando...' : 'Regenerar'}
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
-                            )}
+
+                                {activeGuideTab === 'guide' && (
+                                    isEditingName ? (
+                                        <textarea
+                                            value={editDescription}
+                                            onChange={(e) => setEditDescription(e.target.value)}
+                                            className="w-full p-4 bg-slate-50 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-slate-700 min-h-[400px] font-mono text-sm leading-relaxed"
+                                            placeholder="La guía de estudio aparecerá aquí automáticamente..."
+                                        />
+                                    ) : (
+                                        <div className="max-w-none">
+                                            {studySet.description ? (
+                                                <StudyGuideRenderer content={studySet.description} />
+                                            ) : (
+                                                <EmptyAIBox
+                                                    icon="magic_button"
+                                                    title="No hay guía de estudio aún"
+                                                    desc="Sube materiales y regenera para crear una guía automática con IA."
+                                                    onAction={() => regenerateStudyGuide()}
+                                                    loading={generatingGuide}
+                                                    actionText="Generar Guía"
+                                                />
+                                            )}
+                                        </div>
+                                    )
+                                )}
+
+                                {activeGuideTab === 'infographic' && (
+                                    <div className="max-w-none">
+                                        {studySet.infographic ? (
+                                            <StudyGuideRenderer content={studySet.infographic} />
+                                        ) : (
+                                            <EmptyAIBox
+                                                icon="leaderboard"
+                                                title="Visualiza tu conocimiento"
+                                                desc="Genera una infografía estructurada basada en tus materiales de estudio."
+                                                onAction={async () => {
+                                                    setGeneratingInfographic(true);
+                                                    try {
+                                                        const contents = studySet?.materials.map(m => m.content_text || m.summary || '').filter(t => !!t) || [];
+                                                        const infographic = await generateInfographicFromMaterials(contents, studySet?.name || '');
+                                                        if (infographic) {
+                                                            await updateStudySet(studySetId!, { infographic });
+                                                            setStudySet(prev => prev ? { ...prev, infographic } : null);
+                                                        }
+                                                    } finally { setGeneratingInfographic(false); }
+                                                }}
+                                                loading={generatingInfographic}
+                                                actionText="Generar Infografía"
+                                                color="amber"
+                                            />
+                                        )}
+                                    </div>
+                                )}
+
+                                {activeGuideTab === 'presentation' && (
+                                    <div className="max-w-none">
+                                        {studySet.presentation ? (
+                                            <StudyGuideRenderer content={studySet.presentation} />
+                                        ) : (
+                                            <EmptyAIBox
+                                                icon="slideshow"
+                                                title="Estructura para exponer"
+                                                desc="Crea un esquema de diapositivas ideal para presentaciones o repasos rápidos."
+                                                onAction={async () => {
+                                                    setGeneratingPresentation(true);
+                                                    try {
+                                                        const contents = studySet?.materials.map(m => m.content_text || m.summary || '').filter(t => !!t) || [];
+                                                        const presentation = await generatePresentationFromMaterials(contents, studySet?.name || '');
+                                                        if (presentation) {
+                                                            await updateStudySet(studySetId!, { presentation });
+                                                            setStudySet(prev => prev ? { ...prev, presentation } : null);
+                                                        }
+                                                    } finally { setGeneratingPresentation(false); }
+                                                }}
+                                                loading={generatingPresentation}
+                                                actionText="Generar Presentación"
+                                                color="cyan"
+                                            />
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
