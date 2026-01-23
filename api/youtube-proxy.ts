@@ -1,6 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { YoutubeTranscript } from 'youtube-transcript';
 
+// In production, set this in Vercel Environment Variables as YOUTUBE_API_KEY
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || 'AIzaSyCHeNTXiq_u9JfwEYVBZbGTks6XHOkVPh4';
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { videoId } = req.query;
 
@@ -17,20 +20,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let isMetadataOnly = false;
 
     try {
-        // LAYER 1: Attempt to get Title via OEmbed (Official, hardest to block)
+        // LAYER 0: YouTube Data API v3 (Official & 100% Reliable for Metadata)
         try {
-            const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`;
-            const oembedRes = await fetch(oembedUrl);
-            if (oembedRes.ok) {
-                const oembedData = await oembedRes.json();
-                videoTitle = oembedData.title || '';
-                console.log('[YouTubeProxy] OEmbed Title found:', videoTitle);
+            console.log('[YouTubeProxy] Attempting YouTube Data API v3...');
+            const apiRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?id=${id}&key=${YOUTUBE_API_KEY}&part=snippet`);
+
+            if (apiRes.ok) {
+                const data = await apiRes.json();
+                if (data.items && data.items.length > 0) {
+                    const snippet = data.items[0].snippet;
+                    videoTitle = snippet.title || '';
+                    videoDescription = snippet.description || '';
+                    console.log('[YouTubeProxy] API v3 Metadata Extracted Success');
+                }
+            } else {
+                console.warn('[YouTubeProxy] API v3 failed with status:', apiRes.status);
             }
-        } catch (e) {
-            console.warn('[YouTubeProxy] OEmbed failed');
+        } catch (apiErr) {
+            console.warn('[YouTubeProxy] API v3 Exception:', apiErr);
         }
 
-        // LAYER 2: Scraping for Description and Transcript link
+        // LAYER 1: OEmbed (Fallback for Title only)
+        if (!videoTitle) {
+            try {
+                const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`;
+                const oembedRes = await fetch(oembedUrl);
+                if (oembedRes.ok) {
+                    const oembedData = await oembedRes.json();
+                    videoTitle = oembedData.title || '';
+                }
+            } catch (e) {
+                console.warn('[YouTubeProxy] OEmbed fallback failed');
+            }
+        }
+
+        // LAYER 2: Scraping for Transcript link (and metadata fallback)
         try {
             const watchUrl = `https://www.youtube.com/watch?v=${id}`;
             const response = await fetch(watchUrl, {
@@ -41,18 +65,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             });
             const html = await response.text();
 
-            if (!videoTitle) {
-                const titleMatch = html.match(/<title>(.*?)<\/title>/);
-                if (titleMatch) videoTitle = titleMatch[1].replace(' - YouTube', '');
-            }
-
+            // Extract player response for transcript links
             const playerResponseMatch = html.match(/(?:var\s+|window\[['"]ytInitialPlayerResponse['"]\]\s*=\s*|ytInitialPlayerResponse\s*=\s*)({.+?});/s);
 
             if (playerResponseMatch) {
                 const playerResponse = JSON.parse(playerResponseMatch[1]);
-                videoTitle = playerResponse?.videoDetails?.title || videoTitle;
-                videoDescription = playerResponse?.videoDetails?.shortDescription || '';
 
+                // Final Metadata fallback
+                if (!videoTitle) videoTitle = playerResponse?.videoDetails?.title || '';
+                if (!videoDescription) videoDescription = playerResponse?.videoDetails?.shortDescription || '';
+
+                // Capture tracks
                 const captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
                 if (captionTracks.length > 0) {
                     const track = captionTracks.find((t: any) => t.languageCode?.startsWith('es')) ||
@@ -87,12 +110,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         }
 
-        // Check if we have enough to proceed
-        if (!transcript && !videoTitle && !videoDescription) {
-            throw new Error('Todo el contenido de YouTube está bloqueado para esta sesión.');
-        }
-
+        // Final result evaluation
         isMetadataOnly = !transcript;
+
+        if (!transcript && !videoTitle) {
+            throw new Error('No se pudo extraer información del video. Youtube ha bloqueado el acceso.');
+        }
 
         return res.status(200).json({
             success: true,
@@ -103,7 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
     } catch (error: any) {
-        console.error('[YouTubeProxy] Fatal Error:', error.message);
-        res.status(500).json({ success: false, error: 'YouTube ha bloqueado el acceso. Prueba con otro video o inténtalo más tarde.' });
+        console.error('[YouTubeProxy] Final Error:', error.message);
+        res.status(500).json({ success: false, error: 'Youtube está bloqueando el acceso. Prueba de nuevo en unos momentos.' });
     }
 }
