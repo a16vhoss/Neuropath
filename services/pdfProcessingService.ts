@@ -73,7 +73,16 @@ export const generateFlashcardsFromText = async (
     const genAI = getGeminiSDK();
     if (!genAI) return null;
 
-    const prompt = `Genera ${count} flashcards sobre "${topic}" basándote en: ${text.slice(0, 10000)}... Formato JSON.`;
+    const prompt = `
+        Genera EXACTAMENTE ${count} flashcards sobre "${topic}" basándote en el siguiente texto.
+        
+        REQUISITOS:
+        1. Debes generar EXACTAMENTE ${count} tarjetas.
+        2. Idioma: Español.
+        3. Formato JSON.
+        
+        Texto: ${text.slice(0, 15000)}...
+    `;
 
     try {
         const modelName = await getBestGeminiModel();

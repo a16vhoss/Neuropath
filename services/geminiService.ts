@@ -62,7 +62,7 @@ export const generateStudyFlashcards = async (topic: string) => {
 /**
  * Generate Study Set (Flashcards) from Context text
  */
-export const generateStudySetFromContext = async (context: string) => {
+export const generateStudySetFromContext = async (context: string, count: number = 10) => {
   if (!context || context.length < 10) return [];
 
   const genAI = getGeminiSDK();
@@ -96,11 +96,12 @@ export const generateStudySetFromContext = async (context: string) => {
     });
 
     const prompt = `
-        Genera un set de flashcards basado en el siguiente texto.
+        Genera EXACTAMENTE ${count} flashcards basadas en el siguiente texto.
         Texto: "${context.slice(0, 15000)}"
         
-        Genera entre 5 y 15 flashcards dependiendo de la longitud y densidad del texto.
-        Idioma: Español.
+        REQUISITOS:
+        1. Genera EXACTAMENTE ${count} flashcards. No más, no menos.
+        2. Idioma: Español.
         `;
 
     const result = await model.generateContent(prompt);
@@ -116,7 +117,7 @@ export const generateStudySetFromContext = async (context: string) => {
 /**
  * Generate Flashcards from YouTube URL
  */
-export const generateFlashcardsFromYouTubeURL = async (url: string) => {
+export const generateFlashcardsFromYouTubeURL = async (url: string, count: number = 10) => {
   try {
     // 1. Get Transcript via Proxy (CORS safe)
     const result = await getYoutubeTranscript(url);
@@ -137,7 +138,7 @@ export const generateFlashcardsFromYouTubeURL = async (url: string) => {
       `.trim();
     }
 
-    const flashcards = await generateStudySetFromContext(promptContext);
+    const flashcards = await generateStudySetFromContext(promptContext, count);
 
     // Standardize video title
     const videoTitle = title || "Video de YouTube (" + (new URL(url).searchParams.get('v') || 'ID desconocido') + ")";
@@ -160,13 +161,13 @@ export const generateFlashcardsFromYouTubeURL = async (url: string) => {
 /**
  * Generate Flashcards from Web URL (Placeholder / Simple Text logic)
  */
-export const generateFlashcardsFromWebURL = async (url: string) => {
+export const generateFlashcardsFromWebURL = async (url: string, count: number = 10) => {
   try {
     const response = await fetch(url);
     const text = await response.text();
     const cleanText = text.replace(/<[^>]*>?/gm, ' ').slice(0, 20000); // Strip HTML tags
 
-    const flashcards = await generateStudySetFromContext(cleanText);
+    const flashcards = await generateStudySetFromContext(cleanText, count);
 
     return {
       flashcards,

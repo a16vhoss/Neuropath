@@ -161,6 +161,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
     // Upload states
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState('');
+    const [targetFlashcardCount, setTargetFlashcardCount] = useState(10);
 
     // Track expanded summaries
     const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
@@ -502,7 +503,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
 
             setUploadProgress('Generando flashcards con IA...');
             console.log('Generating flashcards with AI...');
-            const flashcards = await generateFlashcardsFromText(extractedText, studySet.name);
+            const flashcards = await generateFlashcardsFromText(extractedText, studySet.name, targetFlashcardCount);
 
             setUploadProgress('Generando resumen del material...');
             const summary = await generateMaterialSummary(extractedText, 'pdf');
@@ -567,7 +568,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
             setUploadProgress('Procesando texto...');
             setShowTextModal(false);
 
-            const flashcards = await generateFlashcardsFromText(textContent, studySet.name);
+            const flashcards = await generateFlashcardsFromText(textContent, studySet.name, targetFlashcardCount);
             const summary = await generateMaterialSummary(textContent, 'text');
 
             if (flashcards && flashcards.length > 0) {
@@ -623,7 +624,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                 setUploadProgress('Analizando video con Gemini IA...');
 
                 // Use Gemini to analyze YouTube video and generate flashcards + summary
-                const youtubeResult = await generateFlashcardsFromYouTubeURL(urlInput);
+                const youtubeResult = await generateFlashcardsFromYouTubeURL(urlInput, targetFlashcardCount);
 
                 setUploadProgress('Guardando material...');
 
@@ -649,7 +650,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                 // Website link - analyze with Gemini and generate flashcards
                 setUploadProgress('Analizando página web con IA...');
 
-                const webResult = await generateFlashcardsFromWebURL(urlInput);
+                const webResult = await generateFlashcardsFromWebURL(urlInput, targetFlashcardCount);
 
                 setUploadProgress('Guardando material...');
 
@@ -1012,7 +1013,27 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                         {/* Quick Actions - Only for editors */}
                         {canEdit && (
                             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                                <h3 className="font-bold text-slate-900 mb-4">⚡ Acciones Rápidas</h3>
+                                <h3 className="font-bold text-slate-900 mb-4 flex items-center justify-between">
+                                    <span>⚡ Acciones Rápidas</span>
+                                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase">Flashcards:</span>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                onClick={() => setTargetFlashcardCount(Math.max(5, targetFlashcardCount - 5))}
+                                                className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white text-slate-600 transition"
+                                            >
+                                                <span className="material-symbols-outlined text-xs">remove</span>
+                                            </button>
+                                            <span className="text-sm font-bold text-indigo-600 w-5 text-center">{targetFlashcardCount}</span>
+                                            <button
+                                                onClick={() => setTargetFlashcardCount(Math.min(50, targetFlashcardCount + 5))}
+                                                className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-white text-slate-600 transition"
+                                            >
+                                                <span className="material-symbols-outlined text-xs">add</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </h3>
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                                     <label className={`flex flex-col items-center gap-2 p-4 rounded-xl cursor-pointer transition border border-dashed border-emerald-200 ${uploading ? 'bg-slate-50' : 'bg-emerald-50 hover:bg-emerald-100'}`}>
                                         <span className="material-symbols-outlined text-3xl text-emerald-600">upload_file</span>
@@ -1451,15 +1472,39 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                 {/* Materials Tab */}
                 {activeTab === 'materials' && (
                     <div>
-                        <div className="flex justify-between items-center mb-4">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                             <h3 className="font-bold text-slate-900">Materiales Subidos</h3>
-                            {canEdit && (
-                                <label className={`flex items-center gap-2 font-medium px-4 py-2 rounded-xl cursor-pointer transition ${uploading ? 'bg-slate-200 text-slate-500' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}>
-                                    <span className="material-symbols-outlined">upload</span>
-                                    {uploading ? 'Procesando...' : 'Subir PDF'}
-                                    <input type="file" accept=".pdf" onChange={handleFileUpload} className="hidden" disabled={uploading} />
-                                </label>
-                            )}
+                            <div className="flex items-center gap-3">
+                                {canEdit && (
+                                    <div className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-2 rounded-xl shadow-sm">
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Límite Flashcards</span>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                onClick={() => setTargetFlashcardCount(Math.max(5, targetFlashcardCount - 5))}
+                                                className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-50 text-slate-600 transition"
+                                            >
+                                                <span className="material-symbols-outlined text-base">remove</span>
+                                            </button>
+                                            <div className="w-8 text-center">
+                                                <span className="text-sm font-bold text-indigo-600">{targetFlashcardCount}</span>
+                                            </div>
+                                            <button
+                                                onClick={() => setTargetFlashcardCount(Math.min(50, targetFlashcardCount + 5))}
+                                                className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-50 text-slate-600 transition"
+                                            >
+                                                <span className="material-symbols-outlined text-base">add</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                                {canEdit && (
+                                    <label className={`flex items-center gap-2 font-medium px-5 py-2.5 rounded-xl cursor-pointer transition shadow-sm ${uploading ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700 active:transform active:scale-95'}`}>
+                                        <span className="material-symbols-outlined">upload</span>
+                                        {uploading ? 'Procesando...' : 'Subir PDF'}
+                                        <input type="file" accept=".pdf" onChange={handleFileUpload} className="hidden" disabled={uploading} />
+                                    </label>
+                                )}
+                            </div>
                         </div>
 
                         {uploadProgress && (
@@ -1663,6 +1708,27 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                 className="w-full p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary min-h-[200px]"
                                 placeholder="Pega tu texto aquí..."
                             />
+                            <div className="mt-4 mb-2">
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Cantidad de Flashcards</label>
+                                <div className="flex items-center gap-4 bg-slate-50 border border-slate-200 p-2 rounded-xl">
+                                    <button
+                                        onClick={() => setTargetFlashcardCount(Math.max(5, targetFlashcardCount - 5))}
+                                        className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white border border-transparent hover:border-slate-200 text-slate-600 transition"
+                                    >
+                                        <span className="material-symbols-outlined">remove</span>
+                                    </button>
+                                    <div className="flex-1 text-center">
+                                        <span className="text-xl font-bold text-indigo-600">{targetFlashcardCount}</span>
+                                        <span className="ml-2 text-sm text-slate-500 font-medium">Tarjetas</span>
+                                    </div>
+                                    <button
+                                        onClick={() => setTargetFlashcardCount(Math.min(50, targetFlashcardCount + 5))}
+                                        className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white border border-transparent hover:border-slate-200 text-slate-600 transition"
+                                    >
+                                        <span className="material-symbols-outlined">add</span>
+                                    </button>
+                                </div>
+                            </div>
                             <div className="flex gap-3 mt-6">
                                 <button
                                     onClick={() => setShowTextModal(false)}
@@ -1727,6 +1793,30 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                     </div>
                                 </div>
                             )}
+                            <div className="mt-4 mb-4">
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Cantidad de Flashcards</label>
+                                <div className="flex items-center gap-4 bg-slate-50 border border-slate-200 p-2 rounded-xl">
+                                    <button
+                                        type="button"
+                                        onClick={() => setTargetFlashcardCount(Math.max(5, targetFlashcardCount - 5))}
+                                        className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white border border-transparent hover:border-slate-200 text-slate-600 transition"
+                                    >
+                                        <span className="material-symbols-outlined">remove</span>
+                                    </button>
+                                    <div className="flex-1 text-center">
+                                        <span className="text-xl font-bold text-indigo-600">{targetFlashcardCount}</span>
+                                        <span className="ml-2 text-sm text-slate-500 font-medium">Tarjetas</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setTargetFlashcardCount(Math.min(50, targetFlashcardCount + 5))}
+                                        className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white border border-transparent hover:border-slate-200 text-slate-600 transition"
+                                    >
+                                        <span className="material-symbols-outlined">add</span>
+                                    </button>
+                                </div>
+                            </div>
+
                             <div className="flex gap-3 mt-6">
                                 <button
                                     onClick={() => setShowUrlModal(false)}
