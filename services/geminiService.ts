@@ -96,12 +96,15 @@ export const generateStudySetFromContext = async (context: string, count: number
     });
 
     const prompt = `
-        Genera EXACTAMENTE ${count} flashcards basadas en el siguiente texto.
-        Texto: "${context.slice(0, 15000)}"
+        OBJETIVO: Genera EXACTAMENTE ${count} flashcards de alta calidad basadas en el texto proporcionado.
         
-        REQUISITOS:
-        1. Genera EXACTAMENTE ${count} flashcards. No más, no menos.
-        2. Idioma: Español.
+        INSTRUCCIONES CRÍTICAS:
+        1. COBERTURA TOTAL: Analiza todo el texto, de principio a fin.
+        2. GRANULARIDAD: Si la cantidad solicitada es alta (${count}), extrae detalles, ejemplos puntuales y datos específicos para cumplir con el número exacto sin ser repetitivo.
+        3. CANTIDAD EXACTA: Genera EXACTAMENTE ${count} flashcards. Ni una más, ni una menos.
+        4. IDIOMA: Español.
+        
+        TEXTO: "${context.slice(0, 100000)}"
         `;
 
     const result = await model.generateContent(prompt);

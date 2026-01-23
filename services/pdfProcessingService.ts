@@ -74,14 +74,17 @@ export const generateFlashcardsFromText = async (
     if (!genAI) return null;
 
     const prompt = `
-        Genera EXACTAMENTE ${count} flashcards sobre "${topic}" basándote en el siguiente texto.
+        OBJETIVO: Genera EXACTAMENTE ${count} flashcards de alta calidad sobre el tema "${topic}".
         
-        REQUISITOS:
-        1. Debes generar EXACTAMENTE ${count} tarjetas.
-        2. Idioma: Español.
-        3. Formato JSON.
+        INSTRUCCIONES CRÍTICAS:
+        1. COBERTURA TOTAL: Debes analizar el texto desde el principio hasta el final. No te quedes solo en la introducción.
+        2. GRANULARIDAD: Si se solicita un número alto de tarjetas (${count}), entra en detalles específicos, ejemplos, matices y subtemas. No repitas conceptos generales.
+        3. CANTIDAD EXACTA: Es obligatorio generar EXACTAMENTE ${count} tarjetas.
+        4. IDIOMA: Todo el contenido debe estar en Español.
+        5. FORMATO: Devuelve un array JSON válido.
         
-        Texto: ${text.slice(0, 15000)}...
+        TEXTO DE REFERENCIA:
+        ${text.slice(0, 100000)}
     `;
 
     try {
@@ -167,7 +170,7 @@ Estudiantes universitarios que buscan dominio profundo y preparación para exám
 ---
 NOMBRE DEL SET DE ESTUDIO: ${studySetName}
 CONTENIDO DE LOS MATERIALES:
-${materialsContent.map((t, i) => `[MATERIAL ${i + 1}]:\n${t.slice(0, 15000)}`).join('\n\n')}
+${materialsContent.map((t, i) => `[MATERIAL ${i + 1}]:\n${t.slice(0, 100000)}`).join('\n\n')}
 ---
 Genera la guía de estudio más completa, clara y efectiva posible basándote en los materiales anteriores.
 `;
@@ -273,7 +276,7 @@ export const generateMaterialSummary = async (content: string, type: 'pdf' | 'te
     const genAI = getGeminiSDK();
     if (!genAI || !content) return null;
 
-    const summaryPrompt = `Resume esto (${type}): ${content.slice(0, 5000)}`;
+    const summaryPrompt = `Resume esto (${type}): ${content.slice(0, 50000)}`;
 
     try {
         const modelName = await getBestGeminiModel();
