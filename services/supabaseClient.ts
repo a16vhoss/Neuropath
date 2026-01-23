@@ -793,10 +793,16 @@ export const getStudySetWithDetails = async (studySetId: string) => {
     const safeMatError = matError?.code === '42P01' ? null : matError;
     if (safeMatError) throw safeMatError;
 
+    // 3. Merge Materials with their respective flashcard count
+    const materialsWithCounts = (materials || []).map(mat => ({
+        ...mat,
+        flashcards_generated: (flashcards || []).filter(fc => fc.material_id === mat.id).length
+    }));
+
     return {
         ...studySet,
         flashcards: flashcards || [],
-        materials: materials || [],
+        materials: materialsWithCounts,
         flashcard_count: flashcards?.length || 0,
         material_count: materials?.length || 0
     };
