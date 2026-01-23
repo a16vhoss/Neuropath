@@ -124,13 +124,18 @@ export const generateFlashcardsFromYouTubeURL = async (url: string) => {
       throw new Error("No se pudo obtener el contenido del video.");
     }
 
-    const { transcript, title, description, isMetadataFallback } = result as any;
+    const { transcript, title, description, isMetadataOnly } = result;
 
-    // 2. Generate Flashcards from Transcript
-    // If it's a fallback, we tell Gemini to focus on metadata
-    const promptContext = isMetadataFallback
-      ? `Título: ${title}\nDescripción: ${description}`
-      : transcript;
+    // 2. Prepare Context for Gemini
+    // If we only have metadata, we construct a descriptive context
+    let promptContext = transcript;
+    if (isMetadataOnly || !transcript) {
+      promptContext = `
+        TÍTULO DEL VIDEO: ${title}
+        DESCRIPCIÓN DEL VIDEO: ${description}
+        (Nota: Los subtítulos no están disponibles, genera flashcards basadas en esta descripción).
+      `.trim();
+    }
 
     const flashcards = await generateStudySetFromContext(promptContext);
 
@@ -140,7 +145,7 @@ export const generateFlashcardsFromYouTubeURL = async (url: string) => {
     // Return both flashcards and the summary text
     return {
       flashcards,
-      summary: isMetadataFallback ? description.slice(0, 1000) : transcript.slice(0, 1000) + "...",
+      summary: (isMetadataOnly || !transcript) ? description.slice(0, 1000) : transcript.slice(0, 1000) + "...",
       videoUrl: url,
       videoTitle,
       channelName: "YouTube"

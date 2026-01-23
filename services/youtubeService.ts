@@ -6,30 +6,44 @@
  * Uses serverless API in production for better reliability.
  */
 
-export const getYoutubeTranscript = async (url: string): Promise<string> => {
+export interface YoutubeContent {
+    success: boolean;
+    transcript: string;
+    title: string;
+    description: string;
+    isMetadataOnly?: boolean;
+}
+
+export const getYoutubeTranscript = async (url: string): Promise<YoutubeContent> => {
     const videoId = extractVideoID(url);
     if (!videoId) throw new Error('ID de video inválido');
 
-    // In Production: Use the serverless API which has better success rate
+    // In Production: Use the serverless API
     if (import.meta.env.PROD) {
         try {
             const response = await fetch(`/api/youtube-proxy?videoId=${videoId}`);
             const data = await response.json();
 
-            if (data.success && data.transcript) {
-                return data; // Return full object instead of just transcript string
+            if (data.success) {
+                return data; // Returns { success, transcript, title, description, isMetadataOnly }
             } else {
-                throw new Error(data.error || 'No se pudo obtener la transcripción');
+                throw new Error(data.error || 'No se pudo obtener el contenido del video');
             }
         } catch (error: any) {
             console.error('YouTube API Error:', error);
-            throw new Error(error.message || 'Error al obtener la transcripción del video');
+            throw new Error(error.message || 'Error al conectar con el servidor de YouTube');
         }
     }
 
     // In Development: Use the Vite proxy
     try {
-        return await fetchTranscriptViaDev(videoId);
+        const transcript = await fetchTranscriptViaDev(videoId);
+        return {
+            success: true,
+            transcript,
+            title: 'Video de YouTube (Dev)',
+            description: ''
+        };
     } catch (error: any) {
         console.error('Dev transcript error:', error);
         throw new Error(error.message || 'No se pudo obtener la transcripción');
