@@ -12,6 +12,7 @@
  */
 
 import { supabase } from './supabaseClient';
+import { updateFlashcardMastery } from './supabaseClient';
 
 // ============================================
 // TYPES
@@ -378,6 +379,17 @@ export async function updateCardAfterReview(
             updated_at: now.toISOString(),
         })
         .eq('id', srsData.id);
+
+    // ALSO update legacy mastery level for the star UI
+    try {
+        await updateFlashcardMastery(
+            userId,
+            flashcardId,
+            rating >= 3 // Correct if Good or Easy
+        );
+    } catch (e) {
+        console.error('Error updating legacy mastery:', e);
+    }
 
     if (updateError) {
         console.error('Error updating SRS data:', updateError);

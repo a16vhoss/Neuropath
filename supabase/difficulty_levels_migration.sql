@@ -104,8 +104,8 @@ BEGIN
     -- Determine new level based on mastery and success rate
     v_new_level := v_current_level;
 
-    -- Level UP criteria: ≥80% success rate at current level, ≥5 attempts, mastery thresholds
-    IF v_success_rate >= 0.80 AND v_attempts_at_level >= 5 THEN
+    -- Level UP criteria: ≥80% success rate at current level, ≥3 attempts, mastery thresholds
+    IF v_success_rate >= 0.80 AND v_attempts_at_level >= 3 THEN
         IF v_current_level = 1 AND v_new_mastery >= 30 THEN
             v_new_level := 2;
             v_level_changed := TRUE;
