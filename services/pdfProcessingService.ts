@@ -76,13 +76,14 @@ export const generateFlashcardsFromText = async (
     const prompt = `
         OBJETIVO: Genera EXACTAMENTE ${count} flashcards de alta calidad sobre el tema "${topic}".
         
-        INSTRUCCIONES DE COBERTURA Y GRANULARIDAD (SÍGUELAS RIGUROSAMENTE):
-        1. ESCANEO PROFUNDO: Lee el texto párrafo por párrafo. No saltes ninguna sección.
-        2. EXTRACCIÓN DISTINTA: Debes identificar al menos ${count} datos, conceptos, ejemplos o definiciones independientes y significativos.
-        3. COBERTURA TOTAL: Asegúrate de que las tarjetas cubran TODO el material, desde la primera palabra hasta la última.
-        4. NIVEL DE DETALLE: Si pides muchas tarjetas (${count}), entra en detalles específicos, matices técnicos y ejemplos prácticos mencionados en el texto. Evita generalidades.
-        5. CANTIDAD EXACTA: Es una orden estricta: genera EXACTAMENTE ${count} tarjetas en el array JSON.
-        6. IDIOMA: Todo en Español.
+        INSTRUCCIONES DE COBERTURA Y FUENTES:
+        1. ESCANEO PROFUNDO: Lee el texto párrafo por párrafo.
+        2. EXTRACCIÓN DISTINTA: Identifica conceptos significativos.
+        3. COBERTURA TOTAL: Cubre todo el material.
+        4. NIVEL DE DETALLE: Entra en tecnicismos y ejemplos específicos.
+        5. CANTIDAD EXACTA: Genera EXACTAMENTE ${count} tarjetas.
+        6. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material de donde proviene en el campo "source_name". Si el texto tiene marcadores como "[MATERIAL: Nombre]", usa ese nombre.
+        7. IDIOMA: Español.
         
         TEXTO DE REFERENCIA (ESCANEAR TODO):
         ${text.slice(0, 100000)}
@@ -105,9 +106,10 @@ export const generateFlashcardsFromText = async (
                         properties: {
                             question: { type: SchemaType.STRING },
                             answer: { type: SchemaType.STRING },
-                            category: { type: SchemaType.STRING }
+                            category: { type: SchemaType.STRING },
+                            source_name: { type: SchemaType.STRING }
                         },
-                        required: ["question", "answer", "category"]
+                        required: ["question", "answer", "category", "source_name"]
                     }
                 }
             }

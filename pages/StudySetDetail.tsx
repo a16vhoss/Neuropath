@@ -27,6 +27,7 @@ interface Flashcard {
     question: string;
     answer: string;
     category?: string;
+    source_name?: string;
 }
 
 interface FlashcardProgress {
@@ -444,10 +445,10 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
         setUploadProgress('Analizando materiales y generando flashcards...');
 
         try {
-            // Aggregate all content_text from materials
+            // Aggregate all content_text from materials with source markers
             const allContent = studySet.materials
                 .filter(m => m.content_text)
-                .map(m => m.content_text)
+                .map(m => `[MATERIAL: ${m.name}]\n${m.content_text}`)
                 .join('\n\n---\n\n');
 
             if (!allContent || allContent.trim().length < 100) {
@@ -1473,6 +1474,12 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                                 : 'bg-amber-100 text-amber-700'
                                                             }`}>
                                                             {'⭐'.repeat(flashcardProgress.get(card.id)?.difficulty_level || 1)} Nv.{flashcardProgress.get(card.id)?.difficulty_level || 1}
+                                                        </span>
+                                                    )}
+                                                    {card.source_name && (
+                                                        <span className="bg-slate-50 text-slate-500 text-xs font-medium px-2 py-1 rounded border border-slate-100 flex items-center gap-1">
+                                                            <span className="material-symbols-outlined text-sm">description</span>
+                                                            {card.source_name}
                                                         </span>
                                                     )}
                                                 </div>

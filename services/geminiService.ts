@@ -88,9 +88,10 @@ export const generateStudySetFromContext = async (context: string, count: number
                 properties: {
                   question: { type: SchemaType.STRING },
                   answer: { type: SchemaType.STRING },
-                  category: { type: SchemaType.STRING }
+                  category: { type: SchemaType.STRING },
+                  source_name: { type: SchemaType.STRING }
                 },
-                required: ["question", "answer", "category"]
+                required: ["question", "answer", "category", "source_name"]
               }
             }
           },
@@ -102,12 +103,13 @@ export const generateStudySetFromContext = async (context: string, count: number
     const prompt = `
         OBJETIVO: Genera EXACTAMENTE ${count} flashcards de alta calidad basadas en el texto proporcionado.
         
-        INSTRUCCIONES CRÍTICAS DE COBERTURA:
-        1. ESCANEO DETALLADO: Escanea el texto secuencialmente. No omitas ningún párrafo.
-        2. GRANULARIDAD EXTREMA: Para cumplir con la cantidad de ${count} tarjetas, debes extraer detalles finos, nombres propios, fechas, ejemplos específicos y matices técnicos.
-        3. COBERTURA GLOBAL: Distribuye las preguntas a lo largo de TODO el texto proporcionado.
-        4. CANTIDAD EXACTA: Genera EXACTAMENTE ${count} flashcards. Ni una más, ni una menos.
-        5. IDIOMA: Español.
+        INSTRUCCIONES CRÍTICAS DE COBERTURA Y FUENTES:
+        1. ESCANEO DETALLADO: Escanea el texto secuencialmente.
+        2. GRANULARIDAD EXTREMA: Extrae detalles finos para cumplir con la cuota de ${count}.
+        3. COBERTURA GLOBAL: Distribuye las preguntas en todo el texto.
+        4. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material del que proviene en "source_name". Si el texto tiene marcadores "[MATERIAL: Nombre]", usa ese nombre.
+        5. CANTIDAD EXACTA: Genera EXACTAMENTE ${count} flashcards.
+        6. IDIOMA: Español.
         
         TEXTO: "${context.slice(0, 100000)}"
         `;
