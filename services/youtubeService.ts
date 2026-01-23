@@ -117,19 +117,19 @@ function parseTranscriptXml(xml: string): string {
 }
 
 const extractVideoID = (url: string): string | null => {
-    // Handle various YouTube URL formats
+    if (!url) return null;
+    
+    // Handle various YouTube URL formats (watch, youtu.be, embed, v, shorts, live)
     const patterns = [
-        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/,
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/|youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/,
+        /[?&]v=([a-zA-Z0-9_-]{11})/,
         /^([a-zA-Z0-9_-]{11})$/ // Just the ID
     ];
 
     for (const pattern of patterns) {
         const match = url.match(pattern);
-        if (match) return match[1];
+        if (match && match[1]) return match[1];
     }
 
-    // Fallback regex
-    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[7]?.length === 11) ? match[7] : null;
+    return null;
 };

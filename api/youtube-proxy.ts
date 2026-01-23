@@ -15,20 +15,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         console.log('Fetching transcript for video:', id);
 
-        // Use the youtube-transcript library which handles the complexity
-        const transcriptItems = await YoutubeTranscript.fetchTranscript(id, {
-            lang: 'es', // Try Spanish first
-        }).catch(async () => {
-            // Fallback to English if Spanish not available
-            console.log('Spanish not found, trying English...');
-            return YoutubeTranscript.fetchTranscript(id, {
-                lang: 'en',
-            });
-        }).catch(async () => {
-            // Try without language preference (gets auto-generated)
-            console.log('English not found, trying auto...');
-            return YoutubeTranscript.fetchTranscript(id);
-        });
+        // Try to fetch WITHOUT language preference first (let YouTube give the default/auto-generated)
+        // This is usually more reliable than forcing a specific code
+        let transcriptItems;
+        
+        try {
+            transcriptItems = await YoutubeTranscript.fetchTranscript(id);
+            console.log('Fetched default transcript');
+        } catch (e: any) {
+            console.log('Default fetch failed, trying Spanish variants...');
+            try {
+                // Try common Spanish variants if default fails
+                transcriptItems = await YoutubeTranscript.fetchTranscript(id, { lang: 'es' });
+            } catch (e2) {
+                console.log('Spanish failed, trying English...');
+                transcriptItems = await YoutubeTranscript.fetchTranscript(id, { lang: 'en' });
+            }
+        }
 
         if (!transcriptItems || transcriptItems.length === 0) {
             throw new Error('No se encontraron subtítulos');
