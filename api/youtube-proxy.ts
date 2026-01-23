@@ -9,11 +9,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const id = Array.isArray(videoId) ? videoId[0] : videoId;
+    console.log(`[YouTubeProxy] Processing video: ${id}`);
 
     try {
-        console.log('Iniciando extracción robusta para:', id);
-
-        // MÉTODO 1: Intento de Scraping Directo (JSON3 format)
+        // MÉTODO 1: Scraping Directo
         let videoTitle = '';
         let videoDescription = '';
 
@@ -23,19 +22,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,webp,image/apng,*/*;q=0.8',
-                    'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8'
+                    'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+                    'Cache-Control': 'no-cache'
                 }
             });
             const html = await response.text();
 
-            // Regex más robusta para ytInitialPlayerResponse
-            const playerResponseMatch = html.match(/ytInitialPlayerResponse\s*=\s*({.+?});|var\s+ytInitialPlayerResponse\s*=\s*({.+?});/);
+            // Backup Title from HTML
+            const titleMatch = html.match(/<title>(.*?)<\/title>/);
+            if (titleMatch) videoTitle = titleMatch[1].replace(' - YouTube', '');
+
+            // Robust playerResponse regex
+            const playerResponseMatch = html.match(/(?:var\s+|window\[['"]ytInitialPlayerResponse['"]\]\s*=\s*|ytInitialPlayerResponse\s*=\s*)({.+?});/s);
+
             if (playerResponseMatch) {
-                const jsonStr = playerResponseMatch[1] || playerResponseMatch[2];
+                const jsonStr = playerResponseMatch[1];
                 const playerResponse = JSON.parse(jsonStr);
 
-                // Extraer metadata por si acaso
-                videoTitle = playerResponse?.videoDetails?.title || '';
+                videoTitle = playerResponse?.videoDetails?.title || videoTitle;
                 videoDescription = playerResponse?.videoDetails?.shortDescription || '';
 
                 const captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
@@ -57,6 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             .trim();
 
                         if (transcript) {
+                            console.log(`[YouTubeProxy] Success via Method 1 (Transcript)`);
                             return res.status(200).json({
                                 success: true,
                                 transcript,
@@ -68,11 +73,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
             }
         } catch (e: any) {
-            console.warn('Método 1 falló:', e.message);
+            console.warn('[YouTubeProxy] Method 1 failed:', e.message);
         }
 
-        // MÉTODO 2: Fallback a la librería youtube-transcript
+        // MÉTODO 2: youtube-transcript library
         try {
+            console.log('[YouTubeProxy] Trying Method 2...');
             const transcriptItems = await YoutubeTranscript.fetchTranscript(id);
             const transcript = transcriptItems
                 .map((item: any) => item.text)
@@ -81,6 +87,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 .trim();
 
             if (transcript) {
+                console.log(`[YouTubeProxy] Success via Method 2 (Transcript)`);
                 return res.status(200).json({
                     success: true,
                     transcript,
@@ -89,30 +96,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 });
             }
         } catch (e: any) {
-            console.error('Método 2 falló:', e.message);
+            console.error('[YouTubeProxy] Method 2 failed:', e.message);
         }
 
-        // MÉTODO 3: Fallback Final - Metadatos (Título y Descripción) si no hay subtítulos
+        // MÉTODO 3: Fallback Final - Metadatos
         if (videoTitle || videoDescription) {
-            console.log('Usando metadata como fallback final');
+            console.log('[YouTubeProxy] Fallback to metadata only');
             return res.status(200).json({
                 success: true,
                 isMetadataFallback: true,
-                title: videoTitle,
-                description: videoDescription,
-                transcript: `Título del Video: ${videoTitle}\n\nDescripción:\n${videoDescription}`
+                title: videoTitle || 'Video de YouTube',
+                description: videoDescription || 'Sin descripción',
+                transcript: `Título: ${videoTitle}\n\nDescripción: ${videoDescription}`
             });
         }
 
-        throw new Error('No se pudo extraer contenido legible de este video (subtítulos deshabilitados y metadata inaccesible)');
+        throw new Error('Contenido no disponible (subtítulos y metadatos bloqueados)');
 
     } catch (error: any) {
-        console.error('Transcript Error:', error.message);
-        let userMessage = error.message || 'No se pudo obtener la transcripción';
-
-        if (error.message?.includes('Transcript is disabled')) userMessage = 'Los subtítulos están deshabilitados';
-        else if (error.message?.includes('No transcript')) userMessage = 'El video no tiene subtítulos';
-
-        res.status(500).json({ success: false, error: userMessage });
+        console.error('[YouTubeProxy] Error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
     }
 }
