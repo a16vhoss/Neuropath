@@ -27,7 +27,15 @@ export const getBestGeminiModel = async (): Promise<string> => {
 
         try {
             console.log("🔍 Resolving best Gemini model...");
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`);
+
+            // Add a timeout to the fetch call
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`, {
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 console.error(`Failed to list models: ${response.status} ${response.statusText}`);

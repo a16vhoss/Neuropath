@@ -1111,15 +1111,36 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                         {canEdit && activeGuideTab === 'infographic' && (
                                             <button
                                                 onClick={async () => {
+                                                    console.log('[Generation Flow] Starting infographic generation...');
                                                     setGeneratingInfographic(true);
                                                     try {
-                                                        const contents = studySet?.materials.map(m => m.content_text || m.summary || '').filter(t => !!t) || [];
+                                                        const contents = studySet?.materials
+                                                            .map(m => m.content_text || m.summary || '')
+                                                            .filter(t => (t?.trim().length || 0) > 10) || [];
+
+                                                        console.log(`[Generation Flow] Found ${contents.length} materials with text.`);
+                                                        if (contents.length === 0) {
+                                                            alert('No hay suficiente texto en los materiales para generar la infografía.');
+                                                            return;
+                                                        }
+
                                                         const infographic = await generateInfographicFromMaterials(contents, studySet?.name || '');
+                                                        console.log(`[Generation Flow] AI returned infographic: ${!!infographic}`);
+
                                                         if (infographic) {
+                                                            console.log('[Generation Flow] Updating Supabase...');
                                                             await updateStudySet(studySetId!, { infographic });
                                                             setStudySet(prev => prev ? { ...prev, infographic } : null);
+                                                            console.log('[Generation Flow] Success!');
+                                                        } else {
+                                                            alert('La IA no devolvió contenido para la infografía. Intenta de nuevo.');
                                                         }
-                                                    } finally { setGeneratingInfographic(false); }
+                                                    } catch (err: any) {
+                                                        console.error('[Generation Flow] Error in infographic chain:', err);
+                                                        alert(`Error al generar infografía: ${err.message || 'Error desconocido'}`);
+                                                    } finally {
+                                                        setGeneratingInfographic(false);
+                                                    }
                                                 }}
                                                 disabled={generatingInfographic}
                                                 className={`text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-medium ${generatingInfographic ? 'bg-amber-50 text-amber-400' : 'text-amber-600 hover:bg-amber-50'}`}
@@ -1131,15 +1152,36 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                         {canEdit && activeGuideTab === 'presentation' && (
                                             <button
                                                 onClick={async () => {
+                                                    console.log('[Generation Flow] Starting presentation generation...');
                                                     setGeneratingPresentation(true);
                                                     try {
-                                                        const contents = studySet?.materials.map(m => m.content_text || m.summary || '').filter(t => !!t) || [];
+                                                        const contents = studySet?.materials
+                                                            .map(m => m.content_text || m.summary || '')
+                                                            .filter(t => (t?.trim().length || 0) > 10) || [];
+
+                                                        console.log(`[Generation Flow] Found ${contents.length} materials with text.`);
+                                                        if (contents.length === 0) {
+                                                            alert('No hay suficiente texto en los materiales para generar la presentación.');
+                                                            return;
+                                                        }
+
                                                         const presentation = await generatePresentationFromMaterials(contents, studySet?.name || '');
+                                                        console.log(`[Generation Flow] AI returned presentation: ${!!presentation}`);
+
                                                         if (presentation) {
+                                                            console.log('[Generation Flow] Updating Supabase...');
                                                             await updateStudySet(studySetId!, { presentation });
                                                             setStudySet(prev => prev ? { ...prev, presentation } : null);
+                                                            console.log('[Generation Flow] Success!');
+                                                        } else {
+                                                            alert('La IA no devolvió contenido para la presentación. Intenta de nuevo.');
                                                         }
-                                                    } finally { setGeneratingPresentation(false); }
+                                                    } catch (err: any) {
+                                                        console.error('[Generation Flow] Error in presentation chain:', err);
+                                                        alert(`Error al generar presentación: ${err.message || 'Error desconocido'}`);
+                                                    } finally {
+                                                        setGeneratingPresentation(false);
+                                                    }
                                                 }}
                                                 disabled={generatingPresentation}
                                                 className={`text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1 font-medium ${generatingPresentation ? 'bg-cyan-50 text-cyan-400' : 'text-cyan-600 hover:bg-cyan-50'}`}
@@ -1187,15 +1229,36 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                 title="Visualiza tu conocimiento"
                                                 desc="Genera una infografía estructurada basada en tus materiales de estudio."
                                                 onAction={async () => {
+                                                    console.log('[Generation Flow] Starting infographic generation from empty box...');
                                                     setGeneratingInfographic(true);
                                                     try {
-                                                        const contents = studySet?.materials.map(m => m.content_text || m.summary || '').filter(t => !!t) || [];
+                                                        const contents = studySet?.materials
+                                                            .map(m => m.content_text || m.summary || '')
+                                                            .filter(t => (t?.trim().length || 0) > 10) || [];
+
+                                                        console.log(`[Generation Flow] Found ${contents.length} materials with text.`);
+                                                        if (contents.length === 0) {
+                                                            alert('No hay suficiente texto en los materiales para generar la infografía.');
+                                                            return;
+                                                        }
+
                                                         const infographic = await generateInfographicFromMaterials(contents, studySet?.name || '');
+                                                        console.log(`[Generation Flow] AI returned infographic: ${!!infographic}`);
+
                                                         if (infographic) {
+                                                            console.log('[Generation Flow] Updating Supabase...');
                                                             await updateStudySet(studySetId!, { infographic });
                                                             setStudySet(prev => prev ? { ...prev, infographic } : null);
+                                                            console.log('[Generation Flow] Success!');
+                                                        } else {
+                                                            alert('La IA no devolvió contenido para la infografía.');
                                                         }
-                                                    } finally { setGeneratingInfographic(false); }
+                                                    } catch (err: any) {
+                                                        console.error('[Generation Flow] Error in infographic chain:', err);
+                                                        alert(`Error al generar infografía: ${err.message || 'Error desconocido'}`);
+                                                    } finally {
+                                                        setGeneratingInfographic(false);
+                                                    }
                                                 }}
                                                 loading={generatingInfographic}
                                                 actionText="Generar Infografía"
@@ -1215,15 +1278,36 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                 title="Estructura para exponer"
                                                 desc="Crea un esquema de diapositivas ideal para presentaciones o repasos rápidos."
                                                 onAction={async () => {
+                                                    console.log('[Generation Flow] Starting presentation generation from empty box...');
                                                     setGeneratingPresentation(true);
                                                     try {
-                                                        const contents = studySet?.materials.map(m => m.content_text || m.summary || '').filter(t => !!t) || [];
+                                                        const contents = studySet?.materials
+                                                            .map(m => m.content_text || m.summary || '')
+                                                            .filter(t => (t?.trim().length || 0) > 10) || [];
+
+                                                        console.log(`[Generation Flow] Found ${contents.length} materials with text.`);
+                                                        if (contents.length === 0) {
+                                                            alert('No hay suficiente texto en los materiales para generar la presentación.');
+                                                            return;
+                                                        }
+
                                                         const presentation = await generatePresentationFromMaterials(contents, studySet?.name || '');
+                                                        console.log(`[Generation Flow] AI returned presentation: ${!!presentation}`);
+
                                                         if (presentation) {
+                                                            console.log('[Generation Flow] Updating Supabase...');
                                                             await updateStudySet(studySetId!, { presentation });
                                                             setStudySet(prev => prev ? { ...prev, presentation } : null);
+                                                            console.log('[Generation Flow] Success!');
+                                                        } else {
+                                                            alert('La IA no devolvió contenido para la presentación.');
                                                         }
-                                                    } finally { setGeneratingPresentation(false); }
+                                                    } catch (err: any) {
+                                                        console.error('[Generation Flow] Error in presentation chain:', err);
+                                                        alert(`Error al generar presentación: ${err.message || 'Error desconocido'}`);
+                                                    } finally {
+                                                        setGeneratingPresentation(false);
+                                                    }
                                                 }}
                                                 loading={generatingPresentation}
                                                 actionText="Generar Presentación"
