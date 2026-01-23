@@ -69,10 +69,14 @@ export const generateStudySetFromContext = async (context: string, count: number
   if (!genAI) return [];
 
   try {
-    const modelName = await getBestGeminiModel();
+    const modelName = await getBestGeminiModel('pro');
+    console.log(`Using model ${modelName} for ${count} manual flashcards`);
+
     const model = genAI.getGenerativeModel({
       model: modelName,
       generationConfig: {
+        maxOutputTokens: 8192,
+        temperature: 0.7,
         responseMimeType: "application/json",
         responseSchema: {
           type: SchemaType.OBJECT,
@@ -98,11 +102,12 @@ export const generateStudySetFromContext = async (context: string, count: number
     const prompt = `
         OBJETIVO: Genera EXACTAMENTE ${count} flashcards de alta calidad basadas en el texto proporcionado.
         
-        INSTRUCCIONES CRÍTICAS:
-        1. COBERTURA TOTAL: Analiza todo el texto, de principio a fin.
-        2. GRANULARIDAD: Si la cantidad solicitada es alta (${count}), extrae detalles, ejemplos puntuales y datos específicos para cumplir con el número exacto sin ser repetitivo.
-        3. CANTIDAD EXACTA: Genera EXACTAMENTE ${count} flashcards. Ni una más, ni una menos.
-        4. IDIOMA: Español.
+        INSTRUCCIONES CRÍTICAS DE COBERTURA:
+        1. ESCANEO DETALLADO: Escanea el texto secuencialmente. No omitas ningún párrafo.
+        2. GRANULARIDAD EXTREMA: Para cumplir con la cantidad de ${count} tarjetas, debes extraer detalles finos, nombres propios, fechas, ejemplos específicos y matices técnicos.
+        3. COBERTURA GLOBAL: Distribuye las preguntas a lo largo de TODO el texto proporcionado.
+        4. CANTIDAD EXACTA: Genera EXACTAMENTE ${count} flashcards. Ni una más, ni una menos.
+        5. IDIOMA: Español.
         
         TEXTO: "${context.slice(0, 100000)}"
         `;

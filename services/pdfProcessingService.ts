@@ -76,22 +76,27 @@ export const generateFlashcardsFromText = async (
     const prompt = `
         OBJETIVO: Genera EXACTAMENTE ${count} flashcards de alta calidad sobre el tema "${topic}".
         
-        INSTRUCCIONES CRÍTICAS:
-        1. COBERTURA TOTAL: Debes analizar el texto desde el principio hasta el final. No te quedes solo en la introducción.
-        2. GRANULARIDAD: Si se solicita un número alto de tarjetas (${count}), entra en detalles específicos, ejemplos, matices y subtemas. No repitas conceptos generales.
-        3. CANTIDAD EXACTA: Es obligatorio generar EXACTAMENTE ${count} tarjetas.
-        4. IDIOMA: Todo el contenido debe estar en Español.
-        5. FORMATO: Devuelve un array JSON válido.
+        INSTRUCCIONES DE COBERTURA Y GRANULARIDAD (SÍGUELAS RIGUROSAMENTE):
+        1. ESCANEO PROFUNDO: Lee el texto párrafo por párrafo. No saltes ninguna sección.
+        2. EXTRACCIÓN DISTINTA: Debes identificar al menos ${count} datos, conceptos, ejemplos o definiciones independientes y significativos.
+        3. COBERTURA TOTAL: Asegúrate de que las tarjetas cubran TODO el material, desde la primera palabra hasta la última.
+        4. NIVEL DE DETALLE: Si pides muchas tarjetas (${count}), entra en detalles específicos, matices técnicos y ejemplos prácticos mencionados en el texto. Evita generalidades.
+        5. CANTIDAD EXACTA: Es una orden estricta: genera EXACTAMENTE ${count} tarjetas en el array JSON.
+        6. IDIOMA: Todo en Español.
         
-        TEXTO DE REFERENCIA:
+        TEXTO DE REFERENCIA (ESCANEAR TODO):
         ${text.slice(0, 100000)}
     `;
 
     try {
-        const modelName = await getBestGeminiModel();
+        const modelName = await getBestGeminiModel('pro');
+        console.log(`Using model ${modelName} for ${count} flashcards`);
+
         const model = genAI.getGenerativeModel({
             model: modelName,
             generationConfig: {
+                maxOutputTokens: 8192,
+                temperature: 0.7,
                 responseMimeType: "application/json",
                 responseSchema: {
                     type: SchemaType.ARRAY,

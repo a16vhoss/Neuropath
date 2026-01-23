@@ -11,8 +11,9 @@ const PREFERRED_KEYWORDS = ['flash', 'pro', 'gemini-1.5'];
 /**
  * Dynamically resolves the best available Gemini model.
  * Fetches the list of models from the API and picks the best one.
+ * @param preferredTier Optional preference for 'pro' or 'flash'
  */
-export const getBestGeminiModel = async (): Promise<string> => {
+export const getBestGeminiModel = async (preferredTier?: 'pro' | 'flash'): Promise<string> => {
     // Return cached model if available
     if (cachedModelName) return cachedModelName;
 
@@ -60,7 +61,17 @@ export const getBestGeminiModel = async (): Promise<string> => {
             // SDK usually accepts just the name or models/name. use EXACT name from API.)
 
             // Sort/Find best based on preference
-            let bestModel = contentModels.find((m: any) => m.name.includes("gemini-1.5-flash"));
+            let bestModel;
+
+            if (preferredTier === 'pro') {
+                bestModel = contentModels.find((m: any) => m.name.includes("gemini-1.5-pro"));
+            } else if (preferredTier === 'flash') {
+                bestModel = contentModels.find((m: any) => m.name.includes("gemini-1.5-flash"));
+            }
+
+            if (!bestModel) {
+                bestModel = contentModels.find((m: any) => m.name.includes("gemini-1.5-flash"));
+            }
 
             if (!bestModel) {
                 bestModel = contentModels.find((m: any) => m.name.includes("gemini-1.5-pro"));
