@@ -9,95 +9,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const id = Array.isArray(videoId) ? videoId[0] : videoId;
-    console.log(`[YouTubeProxy] Processing: ${id}`);
-
-    let videoTitle = '';
-    let videoDescription = '';
-    let transcript = '';
 
     try {
-        // Step 1: Attempt to get metadata (Title/Description) - Lightweight
-        try {
-            const metaUrl = `https://www.youtube.com/watch?v=${id}`;
-            const metaRes = await fetch(metaUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                    'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8'
-                }
+        console.log('Fetching transcript for video:', id);
+
+        // This is the stable logic from Jan 18th (Commit 1063118)
+        const transcriptItems = await YoutubeTranscript.fetchTranscript(id, {
+            lang: 'es', // Try Spanish first
+        }).catch(async () => {
+            console.log('Spanish not found, trying English...');
+            return YoutubeTranscript.fetchTranscript(id, {
+                lang: 'en',
             });
-            const html = await metaRes.text();
+        }).catch(async () => {
+            console.log('English not found, trying auto...');
+            return YoutubeTranscript.fetchTranscript(id);
+        });
 
-            // Basic regex for title and description
-            const titleMatch = html.match(/<title>(.*?)<\/title>/);
-            if (titleMatch) videoTitle = titleMatch[1].replace(' - YouTube', '');
-
-            // Try to get description and other details from ytInitialPlayerResponse
-            const playerMatch = html.match(/ytInitialPlayerResponse\s*=\s*({.+?});/);
-            if (playerMatch) {
-                const data = JSON.parse(playerMatch[1]);
-                videoTitle = data?.videoDetails?.title || videoTitle;
-                videoDescription = data?.videoDetails?.shortDescription || '';
-
-                // If we found the transcript link in the data, we can try to fetch it directly
-                const captionTracks = data.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
-                if (captionTracks.length > 0) {
-                    const track = captionTracks.find((t: any) => t.languageCode?.startsWith('es')) ||
-                        captionTracks.find((t: any) => t.languageCode?.startsWith('en')) ||
-                        captionTracks[0];
-                    if (track?.baseUrl) {
-                        const transcriptRes = await fetch(track.baseUrl + '&fmt=json3');
-                        if (transcriptRes.ok) {
-                            const tsData = await transcriptRes.json();
-                            transcript = tsData.events
-                                ?.filter((e: any) => e.segs)
-                                .map((e: any) => e.segs.map((s: any) => s.utf8).join(''))
-                                .join(' ')
-                                .replace(/\s+/g, ' ')
-                                .trim();
-                        }
-                    }
-                }
-            }
-        } catch (metaErr) {
-            console.warn('[YouTubeProxy] Metadata/Direct Scrape failed:', metaErr);
+        if (!transcriptItems || transcriptItems.length === 0) {
+            throw new Error('No se encontraron subtítulos');
         }
 
-        // Step 2: If transcript is still empty, try the Library (this is what worked "2 days ago")
-        if (!transcript) {
-            try {
-                console.log('[YouTubeProxy] Falling back to youtube-transcript library');
-                const items = await YoutubeTranscript.fetchTranscript(id);
-                transcript = items.map(i => i.text).join(' ').replace(/\s+/g, ' ').trim();
-            } catch (libErr) {
-                console.error('[YouTubeProxy] Library also failed:', libErr);
-            }
+        // Combine all transcript text
+        const transcript = transcriptItems
+            .map((item: any) => item.text)
+            .join(' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        console.log('Transcript length:', transcript.length);
+
+        // Return compatibility object for current frontend
+        res.setHeader('Content-Type', 'application/json');
+        res.status(200).json({
+            success: true,
+            transcript,
+            title: 'Video de YouTube',
+            description: 'Contenido extraído'
+        });
+    } catch (error: any) {
+        console.error('Transcript Error:', error.message);
+
+        let userMessage = 'No se pudo obtener la transcripción';
+
+        if (error.message?.includes('Transcript is disabled')) {
+            userMessage = 'Los subtítulos están deshabilitados para este video';
+        } else if (error.message?.includes('No transcript')) {
+            userMessage = 'Este video no tiene subtítulos disponibles';
+        } else if (error.message?.includes('Video unavailable')) {
+            userMessage = 'El video no está disponible o es privado';
         }
 
-        // Step 3: Final response
-        if (transcript) {
-            return res.status(200).json({
-                success: true,
-                transcript,
-                title: videoTitle || 'Video de YouTube',
-                description: videoDescription || 'Contenido de YouTube'
-            });
-        }
-
-        // Step 4: Fallback to metadata-only if no transcript
-        if (videoTitle || videoDescription) {
-            return res.status(200).json({
-                success: true,
-                isMetadataFallback: true,
-                title: videoTitle || 'Video de YouTube',
-                description: videoDescription || 'Sin descripción detallada',
-                transcript: `Título: ${videoTitle}\n\nDescripción: ${videoDescription}`
-            });
-        }
-
-        throw new Error('No se pudo extraer el contenido del video. El video puede ser privado, tener subtítulos desactivados o YouTube ha bloqueado la conexión.');
-
-    } catch (err: any) {
-        console.error('[YouTubeProxy] Final Error:', err.message);
-        return res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({
+            success: false,
+            error: userMessage
+        });
     }
 }
