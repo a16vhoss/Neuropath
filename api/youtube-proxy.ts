@@ -14,25 +14,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let videoTitle = '';
     let videoDescription = '';
     let transcript = '';
+    let isMetadataOnly = false;
 
     try {
-        // Step 1: Extract Metadata & Transcript link from YouTube HTML
+        // LAYER 1: Attempt to get Title via OEmbed (Official, hardest to block)
+        try {
+            const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`;
+            const oembedRes = await fetch(oembedUrl);
+            if (oembedRes.ok) {
+                const oembedData = await oembedRes.json();
+                videoTitle = oembedData.title || '';
+                console.log('[YouTubeProxy] OEmbed Title found:', videoTitle);
+            }
+        } catch (e) {
+            console.warn('[YouTubeProxy] OEmbed failed');
+        }
+
+        // LAYER 2: Scraping for Description and Transcript link
         try {
             const watchUrl = `https://www.youtube.com/watch?v=${id}`;
             const response = await fetch(watchUrl, {
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                    'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
-                    'Cache-Control': 'no-cache'
+                    'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8'
                 }
             });
             const html = await response.text();
 
-            // Extract Title from HTML tag as primary backup
-            const titleMatch = html.match(/<title>(.*?)<\/title>/);
-            if (titleMatch) videoTitle = titleMatch[1].replace(' - YouTube', '');
+            if (!videoTitle) {
+                const titleMatch = html.match(/<title>(.*?)<\/title>/);
+                if (titleMatch) videoTitle = titleMatch[1].replace(' - YouTube', '');
+            }
 
-            // Extract ytInitialPlayerResponse JSON
             const playerResponseMatch = html.match(/(?:var\s+|window\[['"]ytInitialPlayerResponse['"]\]\s*=\s*|ytInitialPlayerResponse\s*=\s*)({.+?});/s);
 
             if (playerResponseMatch) {
@@ -40,7 +53,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 videoTitle = playerResponse?.videoDetails?.title || videoTitle;
                 videoDescription = playerResponse?.videoDetails?.shortDescription || '';
 
-                // Attempt to fetch transcript directly if tracks are visible
                 const captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
                 if (captionTracks.length > 0) {
                     const track = captionTracks.find((t: any) => t.languageCode?.startsWith('es')) ||
@@ -61,36 +73,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     }
                 }
             }
-        } catch (scrapeErr: any) {
-            console.warn('[YouTubeProxy] Scraping failed:', scrapeErr.message);
+        } catch (scrapeErr) {
+            console.warn('[YouTubeProxy] Scrape failed');
         }
 
-        // Step 2: Fallback to Library if transcript is still missing
+        // LAYER 3: Library Fallback for transcript
         if (!transcript) {
             try {
-                console.log('[YouTubeProxy] Falling back to youtube-transcript library');
                 const items = await YoutubeTranscript.fetchTranscript(id);
                 transcript = items.map(i => i.text).join(' ').replace(/\s+/g, ' ').trim();
-            } catch (libErr: any) {
-                console.error('[YouTubeProxy] Library failed:', libErr.message);
+            } catch (libErr) {
+                console.warn('[YouTubeProxy] Library failed');
             }
         }
 
-        // Step 3: Respond with what we have
-        if (transcript || videoTitle || videoDescription) {
-            return res.status(200).json({
-                success: true,
-                transcript: transcript || '',
-                title: videoTitle || 'Video de YouTube',
-                description: videoDescription || '',
-                isMetadataOnly: !transcript && (!!videoTitle || !!videoDescription)
-            });
+        // Check if we have enough to proceed
+        if (!transcript && !videoTitle && !videoDescription) {
+            throw new Error('Todo el contenido de YouTube está bloqueado para esta sesión.');
         }
 
-        throw new Error('No se pudo extraer contenido del video (Privado o bloqueado)');
+        isMetadataOnly = !transcript;
+
+        return res.status(200).json({
+            success: true,
+            transcript: transcript || '',
+            title: videoTitle || 'Video de YouTube',
+            description: videoDescription || '',
+            isMetadataOnly
+        });
 
     } catch (error: any) {
-        console.error('[YouTubeProxy] Logic Error:', error.message);
-        res.status(500).json({ success: false, error: error.message });
+        console.error('[YouTubeProxy] Fatal Error:', error.message);
+        res.status(500).json({ success: false, error: 'YouTube ha bloqueado el acceso. Prueba con otro video o inténtalo más tarde.' });
     }
 }
