@@ -906,3 +906,137 @@ export const createClassStudySet = async (
     // 4. Return both
     return { ...studySet, studySetMaterialId };
 };
+
+// ============================================
+// FOLDER MANAGEMENT
+// ============================================
+
+export interface Folder {
+    id: string;
+    name: string;
+    description?: string;
+    parent_id: string | null;
+    owner_id: string;
+    class_id?: string | null;
+    color?: string;
+    icon?: string;
+    created_at: string;
+}
+
+export const createFolder = async (folderData: {
+    name: string;
+    description?: string;
+    parent_id?: string | null;
+    owner_id: string;
+    class_id?: string | null;
+    color?: string;
+    icon?: string;
+}) => {
+    const { data, error } = await supabase
+        .from('folders')
+        .insert(folderData)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+};
+
+export const getFolders = async (
+    ownerId: string,
+    parentId: string | null = null,
+    classId: string | null = null
+) => {
+    let query = supabase
+        .from('folders')
+        .select('*')
+        .eq('owner_id', ownerId);
+
+    // Filter by parent_id (handling null for root)
+    if (parentId) {
+        query = query.eq('parent_id', parentId);
+    } else {
+        query = query.is('parent_id', null);
+    }
+
+    // Filter by class_id (handling null for personal study)
+    if (classId) {
+        query = query.eq('class_id', classId);
+    } else {
+        query = query.is('class_id', null);
+    }
+
+    const { data, error } = await query.order('name', { ascending: true });
+
+    if (error) throw error;
+    return data;
+};
+
+// Get study sets inside a folder (or root)
+export const getFolderStudySets = async (
+    ownerId: string,
+    folderId: string | null = null,
+    classId: string | null = null // Optional filtering by context
+) => {
+    let query = supabase
+        .from('study_sets')
+        .select('*')
+        .eq('student_id', ownerId);
+
+    if (folderId) {
+        query = query.eq('folder_id', folderId);
+    } else {
+        query = query.is('folder_id', null);
+    }
+
+    // Default default ordering
+    const { data, error } = await query.order('created_at', { ascending: false });
+
+    // For root level, we might get everything if we don't filter carefully, 
+    // but schema says study_sets don't strictly require class_id yet. 
+    // Assuming personal sets for now.
+
+    if (error) throw error;
+    return data;
+};
+
+export const updateFolder = async (folderId: string, updates: Partial<Folder>) => {
+    const { data, error } = await supabase
+        .from('folders')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', folderId)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+};
+
+export const deleteFolder = async (folderId: string) => {
+    // Recursive delete handled by DB CASCADE on parent_id and folder_id
+    const { error } = await supabase
+        .from('folders')
+        .delete()
+        .eq('id', folderId);
+
+    if (error) throw error;
+};
+
+export const moveItem = async (
+    itemId: string,
+    type: 'folder' | 'set',
+    newFolderId: string | null
+) => {
+    const table = type === 'folder' ? 'folders' : 'study_sets';
+    const column = type === 'folder' ? 'parent_id' : 'folder_id';
+
+    const { data, error } = await supabase
+        .from(table)
+        .update({ [column]: newFolderId, updated_at: new Date().toISOString() })
+        .eq('id', itemId)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+};
