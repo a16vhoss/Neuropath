@@ -21,6 +21,7 @@ import {
 import AnnouncementCard from '../components/AnnouncementCard';
 import AssignmentCard from '../components/AssignmentCard';
 import TopicSection from '../components/TopicSection';
+import CalendarView from '../components/CalendarView';
 
 interface ClassData {
     id: string;
@@ -161,6 +162,7 @@ const StudentClassDetail: React.FC = () => {
                         { id: 'announcements', icon: 'campaign', label: 'Anuncios' },
                         { id: 'modules', icon: 'folder_open', label: 'Materiales' },
                         { id: 'assignments', icon: 'assignment', label: 'Tareas' },
+                        { id: 'calendar', icon: 'calendar_month', label: 'Calendario' },
                         { id: 'grades', icon: 'grade', label: 'Calificaciones' },
                     ].map((item) => (
                         <div
@@ -406,6 +408,20 @@ const StudentClassDetail: React.FC = () => {
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                )}
+
+                {/* Calendar Tab */}
+                {activeTab === 'calendar' && (
+                    <div className="max-w-6xl mx-auto space-y-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-2xl font-bold text-slate-900">Agenda de Clase</h2>
+                        </div>
+                        <CalendarView
+                            assignments={assignments}
+                            submissions={submissions}
+                            onAssignmentClick={(id) => navigate(`/student/class/${classId}/item/${id}`)}
+                        />
                     </div>
                 )}
 
