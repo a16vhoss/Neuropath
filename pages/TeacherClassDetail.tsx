@@ -429,12 +429,18 @@ const TeacherClassDetail: React.FC = () => {
                 });
             }
 
+            // Fix timezone issue: Ensure date is treated as end-of-day local time
+            // Otherwise "2023-01-25" -> UTC Midnight -> Previous day 6PM in CST
+            const dueDateISO = newAssignment.due_date
+                ? new Date(newAssignment.due_date + 'T23:59:59').toISOString()
+                : undefined;
+
             const assignment = await createAssignment({
                 class_id: classId,
                 title: newAssignment.title,
                 description: finalDescription,
                 points: newAssignment.points,
-                due_date: newAssignment.due_date,
+                due_date: dueDateISO,
                 topic_id: newAssignment.topic_id || undefined,
                 type: newAssignment.type,
                 published: true, // AUTO PUBLISH
