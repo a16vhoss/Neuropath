@@ -21,6 +21,7 @@ import {
     deleteAnnouncement,
     getClassAssignments,
     createAssignment,
+    updateAssignment, // Added import
     deleteAssignment,
     getAssignmentSubmissions,
     gradeSubmission,
@@ -371,7 +372,8 @@ const TeacherClassDetail: React.FC = () => {
 
     // Create assignment handler
     // Create assignment handler
-    const handleCreateAssignment = async () => {
+    // Save assignment handler (Create or Update)
+    const handleSaveAssignment = async () => {
         if (!classId || !newAssignment.title || (newAssignment.type === 'assignment' && !newAssignment.due_date)) return;
 
         // Show loading state (reuse existing or add local if needed, for now just reuse)
@@ -379,12 +381,11 @@ const TeacherClassDetail: React.FC = () => {
 
         try {
             let finalDescription = newAssignment.description || '';
-            let attachments = [];
+            let attachments = newAssignment.attachments || []; // Preserve existing attachments if update
 
             if (assignmentFile) {
                 // 1. Upload File
-                const fileExt = assignmentFile.name.split('.').pop();
-                const fileName = `${classId} /assignments/${Date.now()}_${assignmentFile.name} `;
+                const fileName = `${classId}/assignments/${Date.now()}_${assignmentFile.name}`;
                 const { data: uploadData, error: uploadError } = await supabase.storage
                     .from('materials')
                     .upload(fileName, assignmentFile);
@@ -403,7 +404,7 @@ const TeacherClassDetail: React.FC = () => {
                                     if (text) {
                                         const summary = await generateStudySummary(text, newAssignment.title || 'General');
                                         if (summary) {
-                                            finalDescription += `\n\n-- - 🤖 Resumen IA-- -\n${summary} `;
+                                            finalDescription += `\n\n--- 🤖 Resumen IA ---\n${summary}`;
                                         }
                                     }
                                 }
@@ -430,12 +431,17 @@ const TeacherClassDetail: React.FC = () => {
             }
 
             // Fix timezone issue: Ensure date is treated as end-of-day local time
-            // Otherwise "2023-01-25" -> UTC Midnight -> Previous day 6PM in CST
-            const dueDateISO = newAssignment.due_date
-                ? new Date(newAssignment.due_date + 'T23:59:59').toISOString()
-                : undefined;
+            // If it's already a full ISO string (from edit without change), we need to extract the date part first
+            // to re-apply the "end of day" logic, OR just trust it if it was already correct?
+            // Safer: Extract YYYY-MM-DD and force T23:59:59 to ensure consistency.
+            let dueDateISO = undefined;
+            if (newAssignment.due_date) {
+                // If it contains T, split it. If not, it's just YYYY-MM-DD
+                const datePart = newAssignment.due_date.split('T')[0];
+                dueDateISO = new Date(datePart + 'T23:59:59').toISOString();
+            }
 
-            const assignment = await createAssignment({
+            const payload: Partial<Assignment> = {
                 class_id: classId,
                 title: newAssignment.title,
                 description: finalDescription,
@@ -443,16 +449,27 @@ const TeacherClassDetail: React.FC = () => {
                 due_date: dueDateISO,
                 topic_id: newAssignment.topic_id || undefined,
                 type: newAssignment.type,
-                published: true, // AUTO PUBLISH
+                published: true,
                 attachments: attachments.length > 0 ? attachments : undefined
-            });
+            };
 
-            setAssignments(prev => [assignment, ...prev]);
+            let savedAssignment: Assignment;
+
+            if (newAssignment.id) {
+                // UPDATE
+                savedAssignment = await updateAssignment(newAssignment.id, payload);
+                setAssignments(prev => prev.map(a => a.id === savedAssignment.id ? savedAssignment : a));
+            } else {
+                // CREATE
+                savedAssignment = await createAssignment(payload);
+                setAssignments(prev => [savedAssignment, ...prev]);
+            }
+
             setShowAssignmentModal(false);
             setNewAssignment({ title: '', description: '', points: 100, due_date: '', type: 'assignment', topic_id: '' });
             setAssignmentFile(null);
         } catch (error) {
-            console.error('Error creating assignment:', error);
+            console.error('Error saving assignment:', error);
         } finally {
             setIsUploading(false);
         }
@@ -999,7 +1016,9 @@ const TeacherClassDetail: React.FC = () => {
                                         isTeacher={true}
                                         onAssignmentClick={(assignment) => navigate(`/teacher/class/${classId}/item/${assignment.id}`)}
                                         onEditAssignment={(assignment) => {
-                                            setNewAssignment(assignment);
+                                            // Format due_date to YYYY-MM-DD for input
+                                            const formattedDate = assignment.due_date ? assignment.due_date.split('T')[0] : '';
+                                            setNewAssignment({ ...assignment, due_date: formattedDate });
                                             setShowAssignmentModal(true);
                                         }}
                                         onEditTopic={() => {
@@ -1555,7 +1574,7 @@ const TeacherClassDetail: React.FC = () => {
                                 Cancelar
                             </button>
                             <button
-                                onClick={handleCreateAssignment}
+                                onClick={handleSaveAssignment}
                                 disabled={!newAssignment.title || (newAssignment.type === 'assignment' && !newAssignment.due_date) || isUploading}
                                 className="bg-primary text-white font-bold px-6 py-2 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
                             >
@@ -1565,7 +1584,7 @@ const TeacherClassDetail: React.FC = () => {
                                         Procesando...
                                     </>
                                 ) : (
-                                    newAssignment.type === 'material' ? 'Publicar Información' : 'Crear Tarea'
+                                    newAssignment.id ? 'Guardar Cambios' : (newAssignment.type === 'material' ? 'Publicar Información' : 'Crear Tarea')
                                 )}
                             </button>
                         </div>
