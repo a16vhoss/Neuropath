@@ -47,17 +47,22 @@ const AssignmentCard: React.FC<AssignmentCardProps> = ({
         if (!dateStr) return null;
         const date = new Date(dateStr);
         const now = new Date();
-        const diff = date.getTime() - now.getTime();
-        const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
 
-        if (days < 0) {
+        // Reset hours to compare just dates for "Today" / "Tomorrow" logic
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+        const diffTime = targetDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) {
             return { text: 'Vencida', urgent: true };
-        } else if (days === 0) {
+        } else if (diffDays === 0) {
             return { text: 'Vence hoy', urgent: true };
-        } else if (days === 1) {
+        } else if (diffDays === 1) {
             return { text: 'Vence mañana', urgent: true };
-        } else if (days <= 7) {
-            return { text: `Vence en ${days} días`, urgent: false };
+        } else if (diffDays <= 7) {
+            return { text: `Vence en ${diffDays} días`, urgent: false };
         } else {
             return { text: date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }), urgent: false };
         }
