@@ -289,12 +289,6 @@ const StudentDashboard: React.FC = () => {
             <span className="material-symbols-outlined">auto_stories</span> Mis Sets
           </button>
           <button
-            onClick={() => navigate('/student/battles')}
-            className="w-full p-3 rounded-lg flex items-center gap-3 font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            <span className="material-symbols-outlined">swords</span> Batallas
-          </button>
-          <button
             onClick={() => navigate('/student/achievements')}
             className="w-full p-3 rounded-lg flex items-center gap-3 font-medium text-slate-600 hover:bg-slate-50 transition-colors"
           >
@@ -317,106 +311,106 @@ const StudentDashboard: React.FC = () => {
 
       {/* Main Content Wrapper */}
       <div className="flex-1 flex flex-col md:ml-64 min-h-screen transition-all duration-300">
-      <main className="flex-1 px-3 py-4 md:p-12 max-w-7xl mx-auto w-full space-y-6 md:space-y-8 pb-24 md:pb-12">
-        {/* Header */}
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-          <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">¡Hola, {displayName}! 👋</h1>
-            <p className="text-slate-500 font-medium">¿Listo para expandir tus rutas neuronales hoy?</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="bg-amber-50 px-4 py-2 rounded-2xl flex items-center gap-2 border border-amber-100">
-              <span className="text-amber-500 material-symbols-outlined fill-1">local_fire_department</span>
-              <span className="text-amber-700 font-black text-xl">{streakDays} Días</span>
+        <main className="flex-1 px-3 py-4 md:p-12 max-w-7xl mx-auto w-full space-y-6 md:space-y-8 pb-24 md:pb-12">
+          {/* Header */}
+          <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+            <div>
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight">¡Hola, {displayName}! 👋</h1>
+              <p className="text-slate-500 font-medium">¿Listo para expandir tus rutas neuronales hoy?</p>
             </div>
-            <div className="bg-violet-50 px-4 py-2 rounded-2xl flex items-center gap-2 border border-violet-100">
-              <span className="text-violet-500 material-symbols-outlined">military_tech</span>
-              <span className="text-violet-700 font-black text-xl">Lvl {level}</span>
+            <div className="flex items-center gap-4">
+              <div className="bg-amber-50 px-4 py-2 rounded-2xl flex items-center gap-2 border border-amber-100">
+                <span className="text-amber-500 material-symbols-outlined fill-1">local_fire_department</span>
+                <span className="text-amber-700 font-black text-xl">{streakDays} Días</span>
+              </div>
+              <div className="bg-violet-50 px-4 py-2 rounded-2xl flex items-center gap-2 border border-violet-100">
+                <span className="text-violet-500 material-symbols-outlined">military_tech</span>
+                <span className="text-violet-700 font-black text-xl">Lvl {level}</span>
+              </div>
             </div>
+          </header>
+
+          {/* Mode Toggle Tabs */}
+          <div className="bg-white rounded-2xl border border-slate-100 p-1.5 inline-flex shadow-sm">
+            <button
+              onClick={() => setActiveTab('classes')}
+              className={`px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'classes'
+                ? 'bg-primary text-white shadow-md'
+                : 'text-slate-500 hover:text-slate-700'
+                }`}
+            >
+              <span className="material-symbols-outlined text-lg">school</span>
+              Mis Clases
+            </button>
+            <button
+              onClick={() => setActiveTab('personal')}
+              className={`px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'personal'
+                ? 'bg-primary text-white shadow-md'
+                : 'text-slate-500 hover:text-slate-700'
+                }`}
+            >
+              <span className="material-symbols-outlined text-lg">auto_stories</span>
+              Estudio Personal
+            </button>
           </div>
-        </header>
 
-        {/* Mode Toggle Tabs */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-1.5 inline-flex shadow-sm">
-          <button
-            onClick={() => setActiveTab('classes')}
-            className={`px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'classes'
-              ? 'bg-primary text-white shadow-md'
-              : 'text-slate-500 hover:text-slate-700'
-              }`}
-          >
-            <span className="material-symbols-outlined text-lg">school</span>
-            Mis Clases
-          </button>
-          <button
-            onClick={() => setActiveTab('personal')}
-            className={`px-6 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${activeTab === 'personal'
-              ? 'bg-primary text-white shadow-md'
-              : 'text-slate-500 hover:text-slate-700'
-              }`}
-          >
-            <span className="material-symbols-outlined text-lg">auto_stories</span>
-            Estudio Personal
-          </button>
-        </div>
+          <div className="grid lg:grid-cols-12 gap-8">
+            {/* Main Content Area */}
+            <div className="lg:col-span-8 space-y-8">
 
-        <div className="grid lg:grid-cols-12 gap-8">
-          {/* Main Content Area */}
-          <div className="lg:col-span-8 space-y-8">
-
-            {/* CLASSES TAB */}
-            {activeTab === 'classes' && (
-              <>
-                {/* Today's Session */}
-                {classes.length > 0 ? (
-                  <div className="relative overflow-hidden rounded-3xl bg-white border border-slate-100 shadow-xl group">
-                    <div className="absolute top-0 right-0 p-8 opacity-5">
-                      <span className="material-symbols-outlined text-[120px]">psychology</span>
-                    </div>
-                    <div className="flex flex-col md:flex-row">
-                      <div className="md:w-2/5 h-48 md:h-auto overflow-hidden">
-                        <img src="https://picsum.photos/seed/bio/600/600" className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="Study" />
+              {/* CLASSES TAB */}
+              {activeTab === 'classes' && (
+                <>
+                  {/* Today's Session */}
+                  {classes.length > 0 ? (
+                    <div className="relative overflow-hidden rounded-3xl bg-white border border-slate-100 shadow-xl group">
+                      <div className="absolute top-0 right-0 p-8 opacity-5">
+                        <span className="material-symbols-outlined text-[120px]">psychology</span>
                       </div>
-                      <div className="p-8 flex-1">
-                        <span className="bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4 inline-block">Recomendado</span>
-                        <h2 className="text-2xl font-black text-slate-900 mb-2">Tu sesión de hoy</h2>
-                        <p className="text-slate-500 mb-6 leading-relaxed">
-                          Continúa estudiando <strong>{classes[0]?.name}</strong>. ¡Llevas {classes[0]?.progress || 0}% de progreso!
-                        </p>
+                      <div className="flex flex-col md:flex-row">
+                        <div className="md:w-2/5 h-48 md:h-auto overflow-hidden">
+                          <img src="https://picsum.photos/seed/bio/600/600" className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="Study" />
+                        </div>
+                        <div className="p-8 flex-1">
+                          <span className="bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4 inline-block">Recomendado</span>
+                          <h2 className="text-2xl font-black text-slate-900 mb-2">Tu sesión de hoy</h2>
+                          <p className="text-slate-500 mb-6 leading-relaxed">
+                            Continúa estudiando <strong>{classes[0]?.name}</strong>. ¡Llevas {classes[0]?.progress || 0}% de progreso!
+                          </p>
+                          <button
+                            onClick={() => navigate(`/student/study/${classes[0]?.id}`)}
+                            className="w-full md:w-auto bg-primary text-white font-bold px-8 py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                          >
+                            Comenzar Ahora <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative overflow-hidden rounded-3xl bg-white border border-slate-100 shadow-xl p-12 text-center">
+                      <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                        <span className="material-symbols-outlined text-4xl text-primary">school</span>
+                      </div>
+                      <h2 className="text-2xl font-black text-slate-900 mb-2">¡Bienvenido a MHS!</h2>
+                      <p className="text-slate-500 mb-6 max-w-md mx-auto">
+                        Únete a tu primera clase con el código de tu profesor, o crea tu propio set de estudio personal.
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-4 justify-center">
                         <button
-                          onClick={() => navigate(`/student/study/${classes[0]?.id}`)}
-                          className="w-full md:w-auto bg-primary text-white font-bold px-8 py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                          onClick={() => setShowJoinModal(true)}
+                          className="bg-primary text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
                         >
-                          Comenzar Ahora <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                          <span className="material-symbols-outlined">add</span> Unirse a Clase
+                        </button>
+                        <button
+                          onClick={() => { setActiveTab('personal'); setShowCreateSetModal(true); }}
+                          className="bg-violet-600 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:bg-violet-700 transition-all flex items-center justify-center gap-2"
+                        >
+                          <span className="material-symbols-outlined">auto_stories</span> Crear Set Personal
                         </button>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="relative overflow-hidden rounded-3xl bg-white border border-slate-100 shadow-xl p-12 text-center">
-                    <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                      <span className="material-symbols-outlined text-4xl text-primary">school</span>
-                    </div>
-                    <h2 className="text-2xl font-black text-slate-900 mb-2">¡Bienvenido a MHS!</h2>
-                    <p className="text-slate-500 mb-6 max-w-md mx-auto">
-                      Únete a tu primera clase con el código de tu profesor, o crea tu propio set de estudio personal.
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                      <button
-                        onClick={() => setShowJoinModal(true)}
-                        className="bg-primary text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
-                      >
-                        <span className="material-symbols-outlined">add</span> Unirse a Clase
-                      </button>
-                      <button
-                        onClick={() => { setActiveTab('personal'); setShowCreateSetModal(true); }}
-                        className="bg-violet-600 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:bg-violet-700 transition-all flex items-center justify-center gap-2"
-                      >
-                        <span className="material-symbols-outlined">auto_stories</span> Crear Set Personal
-                      </button>
-                    </div>
-                  </div>
-                )}
+                  )}
 
                   {/* Classes Grid */}
                   <section>
@@ -482,42 +476,42 @@ const StudentDashboard: React.FC = () => {
                         })}
                       </div>
                     ) : (
-                    <div className="bg-white p-8 rounded-2xl border border-slate-100 text-center">
-                      <span className="material-symbols-outlined text-4xl text-slate-300 mb-4">folder_open</span>
-                      <p className="text-slate-500">No estás inscrito en ninguna clase aún</p>
-                    </div>
-                  )}
-                </section>
-              </>
-            )}
+                      <div className="bg-white p-8 rounded-2xl border border-slate-100 text-center">
+                        <span className="material-symbols-outlined text-4xl text-slate-300 mb-4">folder_open</span>
+                        <p className="text-slate-500">No estás inscrito en ninguna clase aún</p>
+                      </div>
+                    )}
+                  </section>
+                </>
+              )}
 
-            {/* PERSONAL STUDY TAB */}
-            {activeTab === 'personal' && (
-              <>
-                {/* Create Set CTA */}
-                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-violet-600 to-purple-600 p-8 text-white shadow-xl">
-                  <div className="absolute top-0 right-0 p-8 opacity-10">
-                    <span className="material-symbols-outlined text-[120px]">auto_stories</span>
+              {/* PERSONAL STUDY TAB */}
+              {activeTab === 'personal' && (
+                <>
+                  {/* Create Set CTA */}
+                  <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-violet-600 to-purple-600 p-8 text-white shadow-xl">
+                    <div className="absolute top-0 right-0 p-8 opacity-10">
+                      <span className="material-symbols-outlined text-[120px]">auto_stories</span>
+                    </div>
+                    <div className="relative z-10">
+                      <h2 className="text-2xl font-black mb-2">📚 Estudio Personal</h2>
+                      <p className="text-violet-100 mb-6 max-w-lg">
+                        Crea tus propios sets de estudio. Sube un PDF y la IA generará flashcards automáticamente para ti.
+                      </p>
+                      <button
+                        onClick={() => setShowCreateSetModal(true)}
+                        className="bg-white text-violet-600 font-bold px-6 py-3 rounded-xl shadow-lg hover:bg-violet-50 transition-all flex items-center gap-2"
+                      >
+                        <span className="material-symbols-outlined">add</span> Crear Nuevo Set
+                      </button>
+                      <button
+                        onClick={() => setShowMagicModal(true)}
+                        className="mt-3 bg-white/20 backdrop-blur-md border border-white/40 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:bg-white/30 transition-all flex items-center gap-2 text-sm"
+                      >
+                        <span className="material-symbols-outlined">auto_awesome</span> Importar Mágico (IA)
+                      </button>
+                    </div>
                   </div>
-                  <div className="relative z-10">
-                    <h2 className="text-2xl font-black mb-2">📚 Estudio Personal</h2>
-                    <p className="text-violet-100 mb-6 max-w-lg">
-                      Crea tus propios sets de estudio. Sube un PDF y la IA generará flashcards automáticamente para ti.
-                    </p>
-                    <button
-                      onClick={() => setShowCreateSetModal(true)}
-                      className="bg-white text-violet-600 font-bold px-6 py-3 rounded-xl shadow-lg hover:bg-violet-50 transition-all flex items-center gap-2"
-                    >
-                      <span className="material-symbols-outlined">add</span> Crear Nuevo Set
-                    </button>
-                    <button
-                      onClick={() => setShowMagicModal(true)}
-                      className="mt-3 bg-white/20 backdrop-blur-md border border-white/40 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:bg-white/30 transition-all flex items-center gap-2 text-sm"
-                    >
-                      <span className="material-symbols-outlined">auto_awesome</span> Importar Mágico (IA)
-                    </button>
-                  </div>
-                </div>
 
                   {/* Study Sets Grid */}
                   <section>
@@ -564,7 +558,7 @@ const StudentDashboard: React.FC = () => {
                                   <p className="text-xs text-slate-500">{set.flashcard_count || 0} flashcards</p>
                                 </div>
                               </div>
-                              
+
                               <div className="flex items-center flex-shrink-0">
                                 <button
                                   onClick={(e) => {
@@ -578,14 +572,14 @@ const StudentDashboard: React.FC = () => {
                                 </button>
                               </div>
                             </div>
-                            
+
                             <div className="flex items-center justify-between mt-auto pt-2">
                               <div className="flex flex-wrap gap-1.5">
                                 {set.topics && set.topics.length > 0 && set.topics.slice(0, 2).map((topic, i) => (
                                   <span key={i} className="bg-slate-100 text-slate-600 text-[10px] sm:text-xs px-2 py-0.5 rounded-full truncate max-w-[80px]">{topic}</span>
                                 ))}
                                 {set.topics && set.topics.length > 2 && (
-                                   <span className="text-[10px] text-slate-400">+{set.topics.length - 2}</span>
+                                  <span className="text-[10px] text-slate-400">+{set.topics.length - 2}</span>
                                 )}
                               </div>
                               <span className="material-symbols-outlined text-slate-300 group-hover:text-primary transition-colors text-lg sm:text-xl">arrow_forward</span>
@@ -594,329 +588,322 @@ const StudentDashboard: React.FC = () => {
                         ))}
                       </div>
                     ) : (
-                    <div className="bg-white p-12 rounded-2xl border border-slate-100 text-center">
-                      <div className="w-16 h-16 bg-violet-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                        <span className="material-symbols-outlined text-3xl text-violet-600">library_books</span>
+                      <div className="bg-white p-12 rounded-2xl border border-slate-100 text-center">
+                        <div className="w-16 h-16 bg-violet-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                          <span className="material-symbols-outlined text-3xl text-violet-600">library_books</span>
+                        </div>
+                        <h3 className="font-bold text-lg text-slate-900 mb-2">No tienes sets de estudio aún</h3>
+                        <p className="text-slate-500 mb-6">Crea tu primer set y comienza a estudiar por tu cuenta</p>
+                        <button
+                          onClick={() => setShowCreateSetModal(true)}
+                          className="bg-violet-600 text-white font-bold px-6 py-2 rounded-xl hover:bg-violet-700"
+                        >
+                          Crear Primer Set
+                        </button>
                       </div>
-                      <h3 className="font-bold text-lg text-slate-900 mb-2">No tienes sets de estudio aún</h3>
-                      <p className="text-slate-500 mb-6">Crea tu primer set y comienza a estudiar por tu cuenta</p>
+                    )}
+                  </section>
+                </>
+              )}
+            </div>
+
+            {/* Sidebar */}
+            <div className="lg:col-span-4 space-y-6">
+              {/* XP Widget */}
+              <div className="bg-gradient-to-br from-violet-600 to-primary p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
+                <div className="relative z-10 flex flex-col items-center text-center">
+                  <div className="w-20 h-20 rounded-full border-4 border-white/20 flex items-center justify-center bg-white/10 backdrop-blur-sm mb-4">
+                    <span className="material-symbols-outlined text-4xl fill-1">rocket_launch</span>
+                  </div>
+                  <h3 className="font-bold text-xl mb-1">Nivel {level}</h3>
+                  <p className="text-blue-100 text-sm mb-6">Faltan {xpRemaining} XP para el nivel {level + 1}</p>
+                  <div className="w-full bg-white/20 rounded-full h-2 mb-2">
+                    <div className="bg-white h-full rounded-full transition-all" style={{ width: `${xpProgress}%` }}></div>
+                  </div>
+                  <div className="flex justify-between w-full text-[10px] font-bold uppercase tracking-wider text-blue-100">
+                    <span>{xp.toLocaleString()} XP</span>
+                    <span>{xpForNextLevel.toLocaleString()} XP</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Adaptive Study Widget */}
+              <AdaptiveProgressCard
+                onStartSession={(mode) => navigate(`/student/adaptive-study?mode=${mode}`)}
+              />
+
+
+
+            </div>
+          </div>
+        </main>
+
+        {/* Join Class Modal */}
+        {
+          showJoinModal && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
+                <div className="p-8">
+                  {joinSuccess ? (
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="material-symbols-outlined text-3xl text-emerald-600">check_circle</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-900">¡Te has unido exitosamente!</h3>
+                    </div>
+                  ) : (
+                    <>
+                      <h2 className="text-2xl font-black text-slate-900 mb-2">Unirse a una Clase</h2>
+                      <p className="text-slate-500 mb-6">Ingresa el código de 6 dígitos proporcionado por tu profesor</p>
+                      <input
+                        type="text"
+                        value={joinCode}
+                        onChange={(e) => setJoinCode(e.target.value.toUpperCase().slice(0, 6))}
+                        placeholder="CÓDIGO"
+                        className="w-full text-center text-3xl font-mono font-bold tracking-[0.5em] py-4 border-2 border-slate-200 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none uppercase"
+                        maxLength={6}
+                      />
+                      {joinError && (
+                        <p className="text-rose-500 text-sm mt-3 text-center">{joinError}</p>
+                      )}
                       <button
-                        onClick={() => setShowCreateSetModal(true)}
-                        className="bg-violet-600 text-white font-bold px-6 py-2 rounded-xl hover:bg-violet-700"
+                        onClick={handleJoinClass}
+                        disabled={joinCode.length !== 6 || joiningClass}
+                        className="w-full mt-6 bg-primary text-white font-bold py-4 rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                       >
-                        Crear Primer Set
+                        {joiningClass ? (
+                          <>
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Uniéndose...
+                          </>
+                        ) : (
+                          'Unirse a la Clase'
+                        )}
+                      </button>
+                    </>
+                  )}
+                </div>
+                {!joinSuccess && (
+                  <div className="bg-slate-50 p-4 flex justify-end">
+                    <button onClick={() => { setShowJoinModal(false); setJoinCode(''); setJoinError(''); }} className="text-slate-600 font-medium hover:text-slate-800">
+                      Cancelar
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        }
+
+        {/* Create Study Set Modal */}
+        {
+          showCreateSetModal && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+                <div className="p-8">
+                  {/* Step indicator */}
+                  <div className="flex items-center gap-2 mb-6">
+                    {[1, 2, 3].map((step) => (
+                      <div key={step} className={`flex-1 h-1 rounded-full ${createStep >= step ? 'bg-violet-500' : 'bg-slate-200'}`}></div>
+                    ))}
+                  </div>
+
+                  {createStep === 1 && (
+                    <>
+                      <h2 className="text-2xl font-black text-slate-900 mb-2">Crear Set de Estudio</h2>
+                      <p className="text-slate-500 mb-6">Dale un nombre y describe lo que vas a estudiar</p>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-2">Nombre del Set *</label>
+                          <input
+                            type="text"
+                            value={newSetName}
+                            onChange={(e) => setNewSetName(e.target.value)}
+                            placeholder="Ej: Anatomía - Sistema Nervioso"
+                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-2">Descripción</label>
+                          <textarea
+                            value={newSetDescription}
+                            onChange={(e) => setNewSetDescription(e.target.value)}
+                            placeholder="¿De qué trata este set de estudio?"
+                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none resize-none h-20"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-2">Temas (separados por comas)</label>
+                          <input
+                            type="text"
+                            value={newSetTopics}
+                            onChange={(e) => setNewSetTopics(e.target.value)}
+                            placeholder="Ej: Neurociencia, Cerebro, Sinapsis"
+                            className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={handleCreateStudySet}
+                        disabled={!newSetName.trim() || creatingSet}
+                        className="w-full mt-6 bg-violet-600 text-white font-bold py-4 rounded-2xl hover:bg-violet-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {creatingSet ? (
+                          <>
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Creando...
+                          </>
+                        ) : (
+                          <>
+                            Continuar <span className="material-symbols-outlined">arrow_forward</span>
+                          </>
+                        )}
+                      </button>
+                    </>
+                  )}
+
+                  {createStep === 2 && (
+                    <>
+                      <h2 className="text-2xl font-black text-slate-900 mb-2">Agregar Contenido</h2>
+                      <p className="text-slate-500 mb-6">Sube un PDF para generar flashcards automáticamente con IA</p>
+
+                      {!uploadingPdf ? (
+                        <>
+                          <label className="block border-2 border-dashed border-violet-200 rounded-2xl p-12 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50 transition-all">
+                            <span className="material-symbols-outlined text-4xl text-violet-400 mb-4">cloud_upload</span>
+                            <p className="font-bold text-slate-700">Arrastra un PDF o haz clic</p>
+                            <p className="text-sm text-slate-500 mt-2">La IA generará flashcards automáticamente</p>
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept=".pdf"
+                              onChange={(e) => handleStudySetPdfUpload(e.target.files)}
+                            />
+                          </label>
+
+                          <div className="text-center mt-6">
+                            <button
+                              onClick={() => setCreateStep(3)}
+                              className="text-violet-600 font-medium hover:underline"
+                            >
+                              Omitir y crear set vacío
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-center py-8">
+                          <div className="w-16 h-16 mx-auto mb-4">
+                            <div className="w-full h-full border-4 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+                          </div>
+                          <p className="font-bold text-slate-900 mb-2">🤖 IA procesando PDF...</p>
+                          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
+                            <div className="bg-violet-500 h-full rounded-full transition-all" style={{ width: `${pdfProgress}%` }}></div>
+                          </div>
+                          <p className="text-sm text-slate-500">Generando flashcards automáticamente</p>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {createStep === 3 && (
+                    <div className="text-center py-8">
+                      <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="material-symbols-outlined text-4xl text-emerald-600">check_circle</span>
+                      </div>
+                      <h3 className="text-2xl font-bold text-slate-900 mb-2">¡Set Creado!</h3>
+                      <p className="text-slate-500 mb-6">Tu set de estudio "{newSetName}" está listo</p>
+                      <button
+                        onClick={() => {
+                          closeCreateModal();
+                          if (createdSetId) navigate(`/student/study-set/${createdSetId}`);
+                        }}
+                        className="bg-violet-600 text-white font-bold px-8 py-3 rounded-xl hover:bg-violet-700"
+                      >
+                        Comenzar a Estudiar
                       </button>
                     </div>
                   )}
-                </section>
-              </>
-            )}
-          </div>
+                </div>
 
-          {/* Sidebar */}
-          <div className="lg:col-span-4 space-y-6">
-            {/* XP Widget */}
-            <div className="bg-gradient-to-br from-violet-600 to-primary p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
-              <div className="relative z-10 flex flex-col items-center text-center">
-                <div className="w-20 h-20 rounded-full border-4 border-white/20 flex items-center justify-center bg-white/10 backdrop-blur-sm mb-4">
-                  <span className="material-symbols-outlined text-4xl fill-1">rocket_launch</span>
-                </div>
-                <h3 className="font-bold text-xl mb-1">Nivel {level}</h3>
-                <p className="text-blue-100 text-sm mb-6">Faltan {xpRemaining} XP para el nivel {level + 1}</p>
-                <div className="w-full bg-white/20 rounded-full h-2 mb-2">
-                  <div className="bg-white h-full rounded-full transition-all" style={{ width: `${xpProgress}%` }}></div>
-                </div>
-                <div className="flex justify-between w-full text-[10px] font-bold uppercase tracking-wider text-blue-100">
-                  <span>{xp.toLocaleString()} XP</span>
-                  <span>{xpForNextLevel.toLocaleString()} XP</span>
-                </div>
+                {createStep < 3 && (
+                  <div className="bg-slate-50 p-4 flex justify-between">
+                    <button onClick={() => createStep > 1 ? setCreateStep(createStep - 1) : closeCreateModal()} className="text-slate-600 font-medium hover:text-slate-800">
+                      {createStep > 1 ? 'Atrás' : 'Cancelar'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
+          )
+        }
 
-            {/* Adaptive Study Widget */}
-            <AdaptiveProgressCard
-              onStartSession={(mode) => navigate(`/student/adaptive-study?mode=${mode}`)}
+        {
+          editingStudySet && (
+            <StudySetManager
+              studySet={editingStudySet}
+              onClose={() => setEditingStudySet(null)}
+              onUpdate={() => {
+                loadStudySets();
+                setEditingStudySet(null);
+              }}
             />
+          )
+        }
 
-
-
-          </div>
-        </div>
-      </main>
-
-      {/* Join Class Modal */}
-      {
-        showJoinModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
-              <div className="p-8">
-                {joinSuccess ? (
-                  <div className="text-center py-8">
-                    <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <span className="material-symbols-outlined text-3xl text-emerald-600">check_circle</span>
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-900">¡Te has unido exitosamente!</h3>
-                  </div>
-                ) : (
-                  <>
-                    <h2 className="text-2xl font-black text-slate-900 mb-2">Unirse a una Clase</h2>
-                    <p className="text-slate-500 mb-6">Ingresa el código de 6 dígitos proporcionado por tu profesor</p>
-                    <input
-                      type="text"
-                      value={joinCode}
-                      onChange={(e) => setJoinCode(e.target.value.toUpperCase().slice(0, 6))}
-                      placeholder="CÓDIGO"
-                      className="w-full text-center text-3xl font-mono font-bold tracking-[0.5em] py-4 border-2 border-slate-200 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none uppercase"
-                      maxLength={6}
-                    />
-                    {joinError && (
-                      <p className="text-rose-500 text-sm mt-3 text-center">{joinError}</p>
-                    )}
-                    <button
-                      onClick={handleJoinClass}
-                      disabled={joinCode.length !== 6 || joiningClass}
-                      className="w-full mt-6 bg-primary text-white font-bold py-4 rounded-2xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {joiningClass ? (
-                        <>
-                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Uniéndose...
-                        </>
-                      ) : (
-                        'Unirse a la Clase'
-                      )}
-                    </button>
-                  </>
-                )}
-              </div>
-              {!joinSuccess && (
-                <div className="bg-slate-50 p-4 flex justify-end">
-                  <button onClick={() => { setShowJoinModal(false); setJoinCode(''); setJoinError(''); }} className="text-slate-600 font-medium hover:text-slate-800">
-                    Cancelar
-                  </button>
-                </div>
-              )}
+        {/* Bottom Navigation Bar */}
+        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50 pb-[env(safe-area-inset-bottom)] md:hidden">
+          <div className="max-w-lg mx-auto px-4">
+            <div className="flex justify-around items-center py-2">
+              <button
+                onClick={() => setActiveTab('classes')}
+                className={`flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-colors ${activeTab === 'classes' ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-primary'}`}
+              >
+                <span className="material-symbols-outlined text-2xl">home</span>
+                <span className="text-[10px] font-medium">Inicio</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('personal')}
+                className={`flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-colors ${activeTab === 'personal' ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-primary'}`}
+              >
+                <span className="material-symbols-outlined text-2xl">auto_stories</span>
+                <span className="text-[10px] font-medium">Mis Sets</span>
+              </button>
+              <button
+                onClick={() => navigate('/student/achievements')}
+                className="flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-colors text-slate-500 hover:text-primary"
+              >
+                <span className="material-symbols-outlined text-2xl">emoji_events</span>
+                <span className="text-[10px] font-medium">Logros</span>
+              </button>
+              <button
+                onClick={() => signOut()}
+                className="flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-colors text-slate-500 hover:text-rose-500"
+              >
+                <span className="material-symbols-outlined text-2xl">logout</span>
+                <span className="text-[10px] font-medium">Salir</span>
+              </button>
             </div>
           </div>
-        )
-      }
+        </nav>
 
-      {/* Create Study Set Modal */}
-      {
-        showCreateSetModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
-              <div className="p-8">
-                {/* Step indicator */}
-                <div className="flex items-center gap-2 mb-6">
-                  {[1, 2, 3].map((step) => (
-                    <div key={step} className={`flex-1 h-1 rounded-full ${createStep >= step ? 'bg-violet-500' : 'bg-slate-200'}`}></div>
-                  ))}
-                </div>
-
-                {createStep === 1 && (
-                  <>
-                    <h2 className="text-2xl font-black text-slate-900 mb-2">Crear Set de Estudio</h2>
-                    <p className="text-slate-500 mb-6">Dale un nombre y describe lo que vas a estudiar</p>
-
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-2">Nombre del Set *</label>
-                        <input
-                          type="text"
-                          value={newSetName}
-                          onChange={(e) => setNewSetName(e.target.value)}
-                          placeholder="Ej: Anatomía - Sistema Nervioso"
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-2">Descripción</label>
-                        <textarea
-                          value={newSetDescription}
-                          onChange={(e) => setNewSetDescription(e.target.value)}
-                          placeholder="¿De qué trata este set de estudio?"
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none resize-none h-20"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-2">Temas (separados por comas)</label>
-                        <input
-                          type="text"
-                          value={newSetTopics}
-                          onChange={(e) => setNewSetTopics(e.target.value)}
-                          placeholder="Ej: Neurociencia, Cerebro, Sinapsis"
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-200 focus:border-violet-500 outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={handleCreateStudySet}
-                      disabled={!newSetName.trim() || creatingSet}
-                      className="w-full mt-6 bg-violet-600 text-white font-bold py-4 rounded-2xl hover:bg-violet-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      {creatingSet ? (
-                        <>
-                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Creando...
-                        </>
-                      ) : (
-                        <>
-                          Continuar <span className="material-symbols-outlined">arrow_forward</span>
-                        </>
-                      )}
-                    </button>
-                  </>
-                )}
-
-                {createStep === 2 && (
-                  <>
-                    <h2 className="text-2xl font-black text-slate-900 mb-2">Agregar Contenido</h2>
-                    <p className="text-slate-500 mb-6">Sube un PDF para generar flashcards automáticamente con IA</p>
-
-                    {!uploadingPdf ? (
-                      <>
-                        <label className="block border-2 border-dashed border-violet-200 rounded-2xl p-12 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50 transition-all">
-                          <span className="material-symbols-outlined text-4xl text-violet-400 mb-4">cloud_upload</span>
-                          <p className="font-bold text-slate-700">Arrastra un PDF o haz clic</p>
-                          <p className="text-sm text-slate-500 mt-2">La IA generará flashcards automáticamente</p>
-                          <input
-                            type="file"
-                            className="hidden"
-                            accept=".pdf"
-                            onChange={(e) => handleStudySetPdfUpload(e.target.files)}
-                          />
-                        </label>
-
-                        <div className="text-center mt-6">
-                          <button
-                            onClick={() => setCreateStep(3)}
-                            className="text-violet-600 font-medium hover:underline"
-                          >
-                            Omitir y crear set vacío
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-center py-8">
-                        <div className="w-16 h-16 mx-auto mb-4">
-                          <div className="w-full h-full border-4 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
-                        </div>
-                        <p className="font-bold text-slate-900 mb-2">🤖 IA procesando PDF...</p>
-                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-2">
-                          <div className="bg-violet-500 h-full rounded-full transition-all" style={{ width: `${pdfProgress}%` }}></div>
-                        </div>
-                        <p className="text-sm text-slate-500">Generando flashcards automáticamente</p>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {createStep === 3 && (
-                  <div className="text-center py-8">
-                    <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <span className="material-symbols-outlined text-4xl text-emerald-600">check_circle</span>
-                    </div>
-                    <h3 className="text-2xl font-bold text-slate-900 mb-2">¡Set Creado!</h3>
-                    <p className="text-slate-500 mb-6">Tu set de estudio "{newSetName}" está listo</p>
-                    <button
-                      onClick={() => {
-                        closeCreateModal();
-                        if (createdSetId) navigate(`/student/study-set/${createdSetId}`);
-                      }}
-                      className="bg-violet-600 text-white font-bold px-8 py-3 rounded-xl hover:bg-violet-700"
-                    >
-                      Comenzar a Estudiar
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {createStep < 3 && (
-                <div className="bg-slate-50 p-4 flex justify-between">
-                  <button onClick={() => createStep > 1 ? setCreateStep(createStep - 1) : closeCreateModal()} className="text-slate-600 font-medium hover:text-slate-800">
-                    {createStep > 1 ? 'Atrás' : 'Cancelar'}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )
-      }
-
-      {
-        editingStudySet && (
-          <StudySetManager
-            studySet={editingStudySet}
-            onClose={() => setEditingStudySet(null)}
-            onUpdate={() => {
-              loadStudySets();
-              setEditingStudySet(null);
-            }}
-          />
-        )
-      }
-
-      {/* Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50 pb-[env(safe-area-inset-bottom)] md:hidden">
-        <div className="max-w-lg mx-auto px-4">
-          <div className="flex justify-around items-center py-2">
-            <button
-              onClick={() => setActiveTab('classes')}
-              className={`flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-colors ${activeTab === 'classes' ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-primary'}`}
-            >
-              <span className="material-symbols-outlined text-2xl">home</span>
-              <span className="text-[10px] font-medium">Inicio</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('personal')}
-              className={`flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-colors ${activeTab === 'personal' ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-primary'}`}
-            >
-              <span className="material-symbols-outlined text-2xl">auto_stories</span>
-              <span className="text-[10px] font-medium">Mis Sets</span>
-            </button>
-            <button
-              onClick={() => navigate('/student/battles')}
-              className="flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-colors text-slate-500 hover:text-primary"
-            >
-              <span className="material-symbols-outlined text-2xl">swords</span>
-              <span className="text-[10px] font-medium">Batallas</span>
-            </button>
-            <button
-              onClick={() => navigate('/student/achievements')}
-              className="flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-colors text-slate-500 hover:text-primary"
-            >
-              <span className="material-symbols-outlined text-2xl">emoji_events</span>
-              <span className="text-[10px] font-medium">Logros</span>
-            </button>
-            <button
-              onClick={() => signOut()}
-              className="flex flex-col items-center gap-1 px-2 py-2 rounded-xl transition-colors text-slate-500 hover:text-rose-500"
-            >
-              <span className="material-symbols-outlined text-2xl">logout</span>
-              <span className="text-[10px] font-medium">Salir</span>
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      {/* Bottom padding to account for navbar */}
-      <div className="h-20"></div>
-      {/* Magic Import Modal */}
-      {
-        showMagicModal && (
-          <MagicImportModal
-            onClose={() => setShowMagicModal(false)}
-            onSuccess={(newSet) => {
-              setShowMagicModal(false);
-              loadStudySets(); // Refresh list
-              // Optionally navigate to the new set
-              // navigate(`/student/study-set/${newSet.id}`);
-            }}
-          />
-        )
-      }
+        {/* Bottom padding to account for navbar */}
+        <div className="h-20"></div>
+        {/* Magic Import Modal */}
+        {
+          showMagicModal && (
+            <MagicImportModal
+              onClose={() => setShowMagicModal(false)}
+              onSuccess={(newSet) => {
+                setShowMagicModal(false);
+                loadStudySets(); // Refresh list
+                // Optionally navigate to the new set
+                // navigate(`/student/study-set/${newSet.id}`);
+              }}
+            />
+          )
+        }
       </div>
     </div>
   );
