@@ -453,6 +453,12 @@ const TeacherClassDetail: React.FC = () => {
                 attachments: attachments.length > 0 ? attachments : undefined
             };
 
+            // DEBUG LOGGING
+            console.warn("==== SAVING ASSIGNMENT ====");
+            console.warn("Original Date Input:", newAssignment.due_date);
+            console.warn("Processed ISO (End of Day):", dueDateISO);
+            console.warn("Full Payload:", payload);
+
             let savedAssignment: Assignment;
 
             if (newAssignment.id) {
