@@ -249,9 +249,17 @@ export const prepareNotebookSave = async (
   }
 
   // 2. Calcular contenido nuevo
+  const isFirstSave = !notebook.last_saved_content || notebook.last_saved_content.trim() === '';
   const newContentDiff = calculateNewContent(currentContent, notebook.last_saved_content);
 
-  if (!newContentDiff || newContentDiff.trim().length < 20) {
+  // Debug log
+  console.log('[Notebook] First save:', isFirstSave);
+  console.log('[Notebook] New content length:', newContentDiff?.length);
+  console.log('[Notebook] New content preview:', newContentDiff?.slice(0, 100));
+
+  // Si es primera vez, el minimo es 5 caracteres; si no, 10
+  const minChars = isFirstSave ? 5 : 10;
+  if (!newContentDiff || newContentDiff.trim().length < minChars) {
     // No hay suficiente contenido nuevo para generar flashcards
     return {
       hasNewContent: false,
