@@ -191,7 +191,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
         }]);
 
         try {
-            const results = await searchInternet(finalQuery);
+            const results = await searchInternet(finalQuery, contextText || '', studySetName);
             setResearchResults(results);
             setResearchMode('results');
 

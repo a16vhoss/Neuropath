@@ -62,7 +62,7 @@ export const generateStudyFlashcards = async (topic: string) => {
 /**
  * AI Research: Search internet for high-quality resources
  */
-export const searchInternet = async (topic: string): Promise<{ title: string; url: string; snippet: string; type: 'web' | 'youtube' }[]> => {
+export const searchInternet = async (topic: string, setContext: string, setName: string): Promise<any[]> => {
   const genAI = getGeminiSDK();
   if (!genAI) return [];
 
@@ -91,17 +91,22 @@ export const searchInternet = async (topic: string): Promise<{ title: string; ur
     });
 
     const prompt = `
-      OBJETIVO: Identifica los 4 mejores recursos académicos y educativos disponibles en internet sobre el tema: "${topic}".
+      Eres ZpBot, un experto investigador académico. El usuario quiere buscar recursos educativos sobre: "${topic}".
+      
+      CONTEXTO DEL SET DE ESTUDIO ("${setName}"):
+      ${setContext.slice(0, 1500)}
+      
+      OBJETIVO:
+      Identifica los 4 mejores recursos (artículos y videos) que ayuden específicamente a entender "${topic}" dentro del contexto de "${setName}". 
+      Si "${topic}" es breve (ej: "fórmulas"), usa el contexto para saber de QUÉ fórmulas se trata (ej: fórmulas de probabilidad).
       
       REQUISITOS DE LOS RESULTADOS:
-      1. CALIDAD: Selecciona solo sitios web de alta autoridad (.edu, .org, sitios oficiales de tecnología/ciencia) o videos de YouTube educativos (canales verificados).
+      1. CALIDAD: Selecciona solo sitios web de alta autoridad (.edu, .org, Khan Academy, Coursera, Wikipedia) o videos de YouTube de canales educativos reconocidos.
       2. VARIEDAD: Incluye al menos 2 videos de YouTube y 2 artículos web.
-      3. ACTUALIDAD: Prefiere recursos actualizados si el tema es tecnológico o científico.
-      4. ESTRUCTURA JSON: Devuelve un array de objetos con "title", "url", "snippet" (resumen breve del recurso) y "type" ("web" o "youtube").
+      3. RELEVANCIA: El snippet debe explicar brevemente por qué este recurso es útil para el tema específico del usuario.
       
-      IMPORTANTE: Devuelve únicamente el JSON. Si no conoces URLs exactas con absoluta certeza, genera una descripción que permita al usuario buscarlas o usa dominios confiables como Wikipedia, Khan Academy, Coursera o YouTube.
-      
-      IDIOMA: Español.
+      Estructura JSON: un array de objetos con "title", "url", "snippet" y "type" ("web" o "youtube").
+      Idioma: Español.
     `;
 
     const result = await model.generateContent(prompt);
