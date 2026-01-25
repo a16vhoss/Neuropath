@@ -381,8 +381,8 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
         <div className="max-w-5xl mx-auto my-0 bg-transparent min-h-screen relative flex flex-col">
 
           {/* Toolbar - Docked Sub-header (Fixed Visibility) */
-            /* Reverted to top-0 because it's inside a flex-col scroll container, so top-0 docks it to the container top (below header). */}
-          <div className={`sticky top-0 z-40 transition-all duration-300 -mx-4 md:-mx-12 mb-6 border-b border-slate-200/50 bg-white shadow-sm`}>
+            /* Adjusted top-26 md:top-28 to clear the App Header + Tabs so it docks correctly below them on scroll. */}
+          <div className={`sticky top-24 md:top-32 z-30 transition-all duration-300 -mx-4 md:-mx-12 mb-6 border-b border-slate-100 bg-white/95 backdrop-blur-md shadow-sm`}>
             <div className="max-w-3xl mx-auto flex items-center justify-center gap-1 p-2 overflow-x-auto no-scrollbar">
 
               <ToolbarButton
