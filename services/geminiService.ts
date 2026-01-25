@@ -290,13 +290,29 @@ export const getZpBotResponse = async (
   message: string,
   contextMatches: string, // Retrieved snippets from materials
   chatHistory: { role: string; content: string }[],
-): Promise<string> => {
+): Promise<{ text: string; suggestions: string[] }> => {
   const genAI = getGeminiSDK();
-  if (!genAI) return "Lo siento, ZpBot está desconectado.";
+  if (!genAI) return { text: "Lo siento, ZpBot está desconectado.", suggestions: [] };
 
   try {
     const modelName = await getBestGeminiModel();
-    const model = genAI.getGenerativeModel({ model: modelName });
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: SchemaType.OBJECT,
+          properties: {
+            text: { type: SchemaType.STRING },
+            suggestions: {
+              type: SchemaType.ARRAY,
+              items: { type: SchemaType.STRING }
+            }
+          },
+          required: ["text", "suggestions"]
+        }
+      }
+    });
 
     const systemPrompt = `
       Eres ZpBot, un asistente de estudio inteligente y amigable.
@@ -310,22 +326,18 @@ export const getZpBotResponse = async (
       2. USAR SEGUNDO: Tu conocimiento general. Si el contexto no tiene la respuesta, USA TU PROPIO CONOCIMIENTO para ayudar. NO digas "no tengo información", simplemente responde lo mejor que sepas, pero aclara sutilmente si estás saliendo del material del curso (ej: "Aunque esto no está en tus notas, generalmente...").
       
       PERSONALIDAD:
-      - Nombre: ZpBot.
       - Tono: COMO SI LE EXPLICARAS A UN NIÑO DE 5 AÑOS. Simple, directo, específico, pero muy fácil de entender.
+      - LONGITUD: RESPUESTAS CORTAS (Máximo 3-4 frases). No hagas testamentos. Ve al grano.
       - Evita tecnicismos innecesarios. Si usas uno, explícalo con una analogía divertida.
       - Usa emojis para hacerlo amigable 🤖✨.
-      - Memoria: Usa el historial de chat para mantener el hilo.
+      
+      SUGERENCIAS (suggestions):
+      - Genera 3 preguntas cortas de seguimiento que el estudiante podría querer hacer a continuación. 
+      - Deben ser relevantes al contexto y curiosas.
       
       CONTEXTO DE MATERIALES:
       ${contextMatches ? contextMatches.slice(0, 25000) : "No hay materiales específicos cargados para esta consulta."}
     `;
-
-    // Construct chat history for the model
-    // Note: Gemini API `generateContent` accepts a simpler format or Multi-turn `startChat`. 
-    // For specific content generation with system prompt embedded, we'll maintain history in the prompt 
-    // or use `startChat` if we were stateless, but here we rebuild context each time.
-    // Let's use `startChat` for better multi-turn handling if possible, or just append history strings.
-    // For simplicity and prompt control, we'll append history.
 
     const historyText = chatHistory.slice(-10).map(msg => `${msg.role === 'user' ? 'Estudiante' : 'ZpBot'}: ${msg.content}`).join('\n');
 
@@ -338,16 +350,21 @@ export const getZpBotResponse = async (
       ESTUDIANTE AHORA:
       ${message}
 
-      RESPUESTA DE ZPBOT:
+      RESPUESTA (JSON):
     `;
 
     const result = await model.generateContent(fullPrompt);
-    return result.response.text();
+    const parsed = JSON.parse(result.response.text());
+    return {
+      text: parsed.text || "Lo siento, no pude generar una respuesta.",
+      suggestions: parsed.suggestions?.slice(0, 3) || []
+    };
 
   } catch (error) {
     console.error("Error getting ZpBot response:", error);
-    return "Lo siento, mis circuitos están un poco cruzados. Intenta de nuevo.";
+    return { text: "Lo siento, mis circuitos están un poco cruzados. Intenta de nuevo.", suggestions: [] };
   }
+
 };
 
 /**

@@ -14,6 +14,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, contextText }) => {
     const [loading, setLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [hasLoadedHistory, setHasLoadedHistory] = useState(false);
+    const [suggestions, setSuggestions] = useState<string[]>([]);
 
     // Initial load of history
     useEffect(() => {
@@ -39,6 +40,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, contextText }) => {
                     user_id: 'system'
                 };
                 setMessages([initialMsg]);
+                setSuggestions(["¿De qué trata este Study Set?", "¿Puedes hacerme un resumen?", "¿Qué es lo más importante?"]);
                 // Usually we don't save the initial greeting to DB unless user interacts, 
                 // but let's leave it ephemeral until first message.
             }
@@ -53,13 +55,14 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, contextText }) => {
     // Auto-scroll
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isOpen]);
+    }, [messages, isOpen, suggestions]);
 
-    const handleSend = async () => {
-        if (!input.trim() || loading) return;
+    const handleSend = async (text?: string) => {
+        const userText = text || input;
+        if (!userText.trim() || loading) return;
 
-        const userText = input;
         setInput('');
+        setSuggestions([]); // Clear previous suggestions
         setLoading(true);
 
         // Optimizistic UI update
@@ -81,26 +84,28 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, contextText }) => {
             // Simplify history for the prompt to just role/content
             const historyForAI = messages.map(m => ({ role: m.role, content: m.content }));
 
-            const aiResponseText = await getZpBotResponse(
+            // Note: Updated signature returns object { text, suggestions }
+            const aiResponse = await getZpBotResponse(
                 userText,
                 contextText || '',
                 historyForAI
             );
 
-            // 3. Save AI Message to DB
-            const savedAiMsg = await saveChatMessage(studySetId, 'assistant', aiResponseText);
+            // 3. Save AI Message to DB (Only text is saved)
+            const savedAiMsg = await saveChatMessage(studySetId, 'assistant', aiResponse.text);
 
             // 4. Update UI with real saved message (or fallback)
             const aiMsgDisplay: ChatMessage = savedAiMsg || {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
-                content: aiResponseText,
+                content: aiResponse.text,
                 created_at: new Date().toISOString(),
                 study_set_id: studySetId,
                 user_id: 'system'
             };
 
             setMessages(prev => [...prev, aiMsgDisplay]);
+            setSuggestions(aiResponse.suggestions || []);
 
         } catch (error) {
             console.error('Error in chat loop', error);
@@ -136,7 +141,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, contextText }) => {
 
             {/* Chat Window */}
             {isOpen && (
-                <div className="fixed bottom-24 right-6 w-96 h-[500px] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50 animate-in slide-in-from-bottom-10 fade-in duration-300">
+                <div className="fixed bottom-24 right-6 w-96 h-[600px] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50 animate-in slide-in-from-bottom-10 fade-in duration-300">
                     {/* Header */}
                     <div className="bg-slate-800 p-4 border-b border-slate-700 flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -187,6 +192,23 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, contextText }) => {
                                 </div>
                             </div>
                         )}
+
+                        {/* Suggestions */}
+                        {!loading && suggestions.length > 0 && (
+                            <div className="flex flex-col gap-2 mt-2 items-start">
+                                <p className="text-xs text-slate-500 ml-1">Sugerencias:</p>
+                                {suggestions.map((s, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => handleSend(s)}
+                                        className="text-left text-xs bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-xl px-3 py-2 transition-colors"
+                                    >
+                                        {s}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
                         <div ref={messagesEndRef} />
                     </div>
 
@@ -203,7 +225,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, contextText }) => {
                                 className="w-full bg-slate-900 text-white placeholder-slate-500 border border-slate-700 rounded-xl px-4 py-3 pl-4 pr-12 focus:outline-none focus:border-cyan-500 transition-colors"
                             />
                             <button
-                                onClick={handleSend}
+                                onClick={() => handleSend()}
                                 disabled={!input.trim() || loading}
                                 className="absolute right-2 p-1.5 bg-cyan-600 text-white rounded-lg hover:bg-cyan-500 disabled:opacity-50 disabled:hover:bg-cyan-600 transition-colors"
                             >
