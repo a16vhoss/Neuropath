@@ -577,6 +577,7 @@ export const addFlashcardToStudySet = async (studySetId: string, flashcard: {
     question: string;
     answer: string;
     category?: string;
+    is_ai_generated?: boolean;
 }) => {
     const { data, error } = await supabase
         .from('flashcards')
