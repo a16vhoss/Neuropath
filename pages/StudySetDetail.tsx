@@ -2141,6 +2141,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
             {studySet && (
                 <ZpBotChat
                     studySetId={studySet.id}
+                    studySetName={studySet.name}
                     contextText={studySet.materials
                         ?.map(m => `--- MATERIAL: ${m.name} ---\n${m.content_text || ''}`)
                         .join('\n\n')}

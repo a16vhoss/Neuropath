@@ -14,10 +14,11 @@ import {
 
 interface ZpBotChatProps {
     studySetId: string;
+    studySetName: string;
     contextText?: string; // All material text combined
 }
 
-const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, contextText }) => {
+const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, contextText }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -70,7 +71,11 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, contextText }) => {
     const handleNewChat = () => {
         setCurrentSessionId(null); // Reset to "New Chat" state
         setMessages([]);
-        setSuggestions(["¿De qué trata este Study Set?", "¿Puedes hacerme un resumen?", "¿Qué es lo más importante?"]);
+        setSuggestions([
+            `¿De qué trata "${studySetName}"?`,
+            "¿Puedes hacerme un resumen?",
+            "¿Qué es lo más importante?"
+        ]);
         setIsSidebarOpen(false); // Close sidebar on mobile/small view if needed
     };
 
@@ -116,7 +121,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, contextText }) => {
         setMessages(prev => [...prev, {
             id: Date.now().toString(),
             role: 'assistant',
-            content: '🤖 ¡Claro! Crearemos flashcards potenciadas con IA. ¿Sobre qué tema específico te gustaría? (Ej: "Ciclo de Krebs", "Todo el material", "Personajes importantes")',
+            content: `🤖 ¡Claro! Crearemos flashcards para **${studySetName}** usando IA. ¿Sobre qué tema específico te gustaría? (Ej: "Todo el contenido", "Conceptos claves", "Resumen")`,
             created_at: new Date().toISOString(),
             study_set_id: studySetId,
             user_id: 'system'
@@ -155,7 +160,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, contextText }) => {
                 await saveChatMessage(studySetId, 'user', topic, currentSessionId);
             }
 
-            const cards = await generatePromptedFlashcards(topic, contextText || '', 5);
+            const cards = await generatePromptedFlashcards(topic, contextText || '', studySetName, 5);
             setGeneratedCards(cards);
             setFcMode('preview');
 
