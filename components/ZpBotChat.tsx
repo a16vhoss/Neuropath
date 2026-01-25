@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getZpBotResponse } from '../services/geminiService';
+import { getZpBotResponse, generatePromptedFlashcards } from '../services/geminiService';
+import { addFlashcardsBatch } from '../services/supabaseClient';
 import {
     saveChatMessage,
     ChatMessage,
@@ -100,14 +101,133 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, contextText }) => {
         }
     };
 
+    // Flashcard Wizard State
+    const [fcMode, setFcMode] = useState<'idle' | 'asking_topic' | 'generating' | 'preview'>('idle');
+    const [fcTopic, setFcTopic] = useState('');
+    const [generatedCards, setGeneratedCards] = useState<any[]>([]);
+
     // Auto-scroll
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isOpen, suggestions]);
+    }, [messages, isOpen, suggestions, fcMode, generatedCards]);
+
+    const startFlashcardFlow = () => {
+        setFcMode('asking_topic');
+        setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            role: 'assistant',
+            content: '🤖 ¡Claro! Crearemos flashcards potenciadas con IA. ¿Sobre qué tema específico te gustaría? (Ej: "Ciclo de Krebs", "Todo el material", "Personajes importantes")',
+            created_at: new Date().toISOString(),
+            study_set_id: studySetId,
+            user_id: 'system'
+        }]);
+    };
+
+    const handleGenerateFlashcards = async (topic: string) => {
+        setFcMode('generating');
+        const loadingMsgId = Date.now().toString();
+
+        // Add optimistic user message for the topic
+        const userMsg: ChatMessage = {
+            id: Date.now().toString(),
+            role: 'user',
+            content: topic,
+            created_at: new Date().toISOString(),
+            study_set_id: studySetId,
+            user_id: 'me',
+            session_id: currentSessionId || 'temp'
+        };
+        setMessages(prev => [...prev, userMsg]);
+
+        // Add loading indicator
+        setMessages(prev => [...prev, {
+            id: loadingMsgId,
+            role: 'assistant',
+            content: '⚙️ Analizando tus materiales y profundizando en el tema... Dame unos segundos.',
+            created_at: new Date().toISOString(),
+            study_set_id: studySetId,
+            user_id: 'system'
+        }]);
+
+        try {
+            // Save user message to DB if session exists
+            if (currentSessionId) {
+                await saveChatMessage(studySetId, 'user', topic, currentSessionId);
+            }
+
+            const cards = await generatePromptedFlashcards(topic, contextText || '', 5);
+            setGeneratedCards(cards);
+            setFcMode('preview');
+
+            // Replace loading message with success
+            setMessages(prev => prev.filter(m => m.id !== loadingMsgId).concat({
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: `✅ He generado ${cards.length} flashcards sobre "${topic}". Revísalas abajo y dime si te gustan.`,
+                created_at: new Date().toISOString(),
+                study_set_id: studySetId,
+                user_id: 'system'
+            }));
+
+        } catch (err) {
+            console.error(err);
+            setMessages(prev => prev.filter(m => m.id !== loadingMsgId).concat({
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: '❌ Hubo un error al generar las tarjetas. Intenta de nuevo.',
+                created_at: new Date().toISOString(),
+                study_set_id: studySetId,
+                user_id: 'system'
+            }));
+            setFcMode('idle');
+        }
+    };
+
+    const saveGeneratedFlashcards = async () => {
+        setLoading(true);
+        try {
+            const formatted = generatedCards.map(c => ({
+                question: c.question,
+                answer: c.answer,
+                category: c.category || 'AI Generated',
+                study_set_id: studySetId,
+                is_ai_generated: true
+            }));
+
+            await addFlashcardsBatch(formatted);
+
+            setMessages(prev => [...prev, {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: '🎉 ¡Flashcards guardadas con éxito! Las verás en tu lista con el icono de robot (🤖).',
+                created_at: new Date().toISOString(),
+                study_set_id: studySetId,
+                user_id: 'system'
+            }]);
+
+            setGeneratedCards([]);
+            setFcMode('idle');
+            // Refresh web app state? ideally study set details should listen or re-fetch
+            window.location.reload(); // Hard refresh to show new cards for now (easiest way without prop callbacks)
+
+        } catch (error) {
+            console.error(error);
+            alert('Error al guardar');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleSend = async (text?: string) => {
         const userText = text || input;
         if (!userText.trim() || loading) return;
+
+        // If in wizard mode, intercept input
+        if (fcMode === 'asking_topic') {
+            setInput('');
+            handleGenerateFlashcards(userText);
+            return;
+        }
 
         setInput('');
         setSuggestions([]);
@@ -254,6 +374,14 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, contextText }) => {
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
+                                    onClick={startFlashcardFlow}
+                                    className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-emerald-400 transition-colors"
+                                    title="Crear Flashcards con IA"
+                                    disabled={loading || fcMode !== 'idle'}
+                                >
+                                    <span className="material-symbols-outlined">style</span>
+                                </button>
+                                <button
                                     onClick={handleNewChat}
                                     className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-cyan-400 transition-colors"
                                     title="Nuevo Chat"
@@ -305,6 +433,41 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, contextText }) => {
                                             <span className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce delay-100"></span>
                                             <span className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce delay-200"></span>
                                         </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Generated Cards Preview */}
+                            {fcMode === 'preview' && generatedCards.length > 0 && (
+                                <div className="space-y-3 pl-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="bg-slate-800 border border-emerald-500/30 rounded-2xl p-4 shadow-lg shadow-emerald-900/10">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h5 className="text-emerald-400 font-bold text-sm flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-lg">smart_toy</span>
+                                                Vista Previa ({generatedCards.length})
+                                            </h5>
+                                            <button
+                                                onClick={() => { setFcMode('idle'); setGeneratedCards([]); }}
+                                                className="text-slate-400 hover:text-white"
+                                            >
+                                                <span className="material-symbols-outlined text-sm">close</span>
+                                            </button>
+                                        </div>
+                                        <div className="space-y-2 max-h-60 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-600 mb-3">
+                                            {generatedCards.map((c, i) => (
+                                                <div key={i} className="bg-slate-900/50 p-2 rounded-lg border border-slate-700/50 text-xs">
+                                                    <p className="font-bold text-slate-200 mb-1">P: {c.question}</p>
+                                                    <p className="text-slate-400">R: {c.answer}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <button
+                                            onClick={saveGeneratedFlashcards}
+                                            className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm transition shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">save</span>
+                                            Guardar Flashcards
+                                        </button>
                                     </div>
                                 </div>
                             )}

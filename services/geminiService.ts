@@ -60,6 +60,58 @@ export const generateStudyFlashcards = async (topic: string) => {
 };
 
 /**
+ * Generate Flashcards from a Specific Prompt (ZpBot)
+ */
+export const generatePromptedFlashcards = async (userPrompt: string, materialContext: string, count: number = 5) => {
+  const genAI = getGeminiSDK();
+  if (!genAI) return [];
+
+  try {
+    const modelName = await getBestGeminiModel('pro');
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              question: { type: SchemaType.STRING },
+              answer: { type: SchemaType.STRING },
+              category: { type: SchemaType.STRING }
+            },
+            required: ["question", "answer"]
+          }
+        }
+      }
+    });
+
+    const systemInfo = `
+            Eres un experto creador de material de estudio.
+            Tu tarea es crear ${count} Flashcards de alta calidad basadas en el tema: "${userPrompt}".
+            
+            FUENTE: Usa el siguiente contexto del material del estudiante como base principal:
+            ${materialContext ? materialContext.slice(0, 30000) : "Usa tu conocimiento general."}
+
+            REGLAS:
+            - Preguntas claras y directas.
+            - Respuestas concisas pero completas.
+            - Categoriza cada tarjeta (ej: Definición, Concepto, Relación, Importante).
+            - Idioma: Español.
+        `;
+
+    const result = await model.generateContent(systemInfo);
+    const response = await result.response;
+    return JSON.parse(response.text());
+
+  } catch (error) {
+    console.error("Error generating prompted flashcards:", error);
+    return [];
+  }
+};
+
+/**
  * Generate Study Set (Flashcards) from Context text
  */
 export const generateStudySetFromContext = async (context: string, count: number = 10) => {

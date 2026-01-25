@@ -29,6 +29,7 @@ interface Flashcard {
     answer: string;
     category?: string;
     source_name?: string;
+    is_ai_generated?: boolean;
 }
 
 interface FlashcardProgress {
@@ -1475,6 +1476,12 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                                 : 'bg-amber-100 text-amber-700'
                                                             }`}>
                                                             {'⭐'.repeat(flashcardProgress.get(card.id)?.difficulty_level || 1)} Nv.{flashcardProgress.get(card.id)?.difficulty_level || 1}
+                                                        </span>
+                                                    )}
+                                                    {card.is_ai_generated && (
+                                                        <span className="bg-cyan-50 text-cyan-600 text-xs font-bold px-2 py-1 rounded border border-cyan-100 flex items-center gap-1" title="Generada por IA">
+                                                            <span className="material-symbols-outlined text-sm">smart_toy</span>
+                                                            IA
                                                         </span>
                                                     )}
                                                     {card.source_name && (
