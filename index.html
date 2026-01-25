@@ -94,6 +94,20 @@
       scrollbar-width: none;
       /* Firefox */
     }
+
+    /* Tiptap Placeholder */
+    .ProseMirror p.is-editor-empty:first-child::before {
+      color: #94a3b8;
+      content: attr(data-placeholder);
+      float: left;
+      height: 0;
+      pointer-events: none;
+    }
+
+    /* Active Editor Focus */
+    .ProseMirror:focus {
+      outline: none;
+    }
   </style>
 
   <link rel="stylesheet" href="/index.css">
