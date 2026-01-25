@@ -285,6 +285,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
     useEffect(() => {
         if (studySetId) {
             loadStudySet();
+            fetchNotebooks(); // Load notebooks for bot context
         }
     }, [studySetId]);
 
@@ -2241,9 +2242,12 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                 <ZpBotChat
                     studySetId={studySet.id}
                     studySetName={studySet.name}
-                    contextText={studySet.materials
-                        ?.map(m => `--- MATERIAL: ${m.name} ---\n${m.content_text || ''}`)
-                        .join('\n\n')}
+                    contextText={[
+                        // Include materials
+                        ...(studySet.materials?.map(m => `--- MATERIAL: ${m.name} ---\n${m.content_text || ''}`) || []),
+                        // Include notebooks
+                        ...(notebooks?.filter(n => n.content?.trim()).map(n => `--- CUADERNO: ${n.title} ---\n${n.content}`) || [])
+                    ].join('\n\n')}
                 />
             )}
         </div>
