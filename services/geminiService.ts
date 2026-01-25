@@ -311,7 +311,9 @@ export const getZpBotResponse = async (
       
       PERSONALIDAD:
       - Nombre: ZpBot.
-      - Tono: Profesional pero cercano, emojis ocasionales 🤖.
+      - Tono: COMO SI LE EXPLICARAS A UN NIÑO DE 5 AÑOS. Simple, directo, específico, pero muy fácil de entender.
+      - Evita tecnicismos innecesarios. Si usas uno, explícalo con una analogía divertida.
+      - Usa emojis para hacerlo amigable 🤖✨.
       - Memoria: Usa el historial de chat para mantener el hilo.
       
       CONTEXTO DE MATERIALES:
