@@ -886,713 +886,715 @@ const StudySession: React.FC = () => {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center justify-center px-2 md:px-4 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:pb-8 w-full min-h-0">
+      <main className="flex-1 w-full min-h-0 overflow-y-auto relative z-0 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+        <div className="flex flex-col items-center justify-center min-h-full w-full px-2 md:px-4 py-6 md:py-10">
 
-        {/* No Cards Due - Caught Up Screen */}
-        {noCardsDue && (
-          <div className="w-full max-w-md text-center animate-fade-in-up">
-            <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/50">
-              <div className="w-24 h-24 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-200">
-                <span className="material-symbols-outlined text-5xl text-white">check_circle</span>
-              </div>
-              <h2 className="text-3xl font-black text-slate-800 mb-3">¡Todo al día!</h2>
-              <p className="text-slate-600 mb-8 leading-relaxed">
-                Has repasado todas tus tarjetas pendientes. El sistema SR (Repetición Espaciada) te avisará cuando sea el momento óptimo para repasar de nuevo.
-              </p>
+          {/* No Cards Due - Caught Up Screen */}
+          {noCardsDue && (
+            <div className="w-full max-w-md text-center animate-fade-in-up">
+              <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/50">
+                <div className="w-24 h-24 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-200">
+                  <span className="material-symbols-outlined text-5xl text-white">check_circle</span>
+                </div>
+                <h2 className="text-3xl font-black text-slate-800 mb-3">¡Todo al día!</h2>
+                <p className="text-slate-600 mb-8 leading-relaxed">
+                  Has repasado todas tus tarjetas pendientes. El sistema SR (Repetición Espaciada) te avisará cuando sea el momento óptimo para repasar de nuevo.
+                </p>
 
-              {/* Mode Navigation */}
-              <div className="grid grid-cols-3 gap-3 mb-6">
-                <button
-                  onClick={() => { setNoCardsDue(false); setMode('flashcards'); }}
-                  className="bg-indigo-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-indigo-700 transition flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-lg">style</span>
-                  Flashcards
-                </button>
-                <button
-                  onClick={() => { setNoCardsDue(false); setMode('quiz'); }}
-                  className="bg-purple-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-purple-700 transition flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-lg">quiz</span>
-                  Quiz
-                </button>
-                <button
-                  onClick={() => { setNoCardsDue(false); setMode('cramming'); }}
-                  className="bg-teal-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-teal-700 transition flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-lg">speed</span>
-                  Cramming
-                </button>
-              </div>
+                {/* Mode Navigation */}
+                <div className="grid grid-cols-3 gap-3 mb-6">
+                  <button
+                    onClick={() => { setNoCardsDue(false); setMode('flashcards'); }}
+                    className="bg-indigo-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-indigo-700 transition flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-lg">style</span>
+                    Flashcards
+                  </button>
+                  <button
+                    onClick={() => { setNoCardsDue(false); setMode('quiz'); }}
+                    className="bg-purple-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-purple-700 transition flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-lg">quiz</span>
+                    Quiz
+                  </button>
+                  <button
+                    onClick={() => { setNoCardsDue(false); setMode('cramming'); }}
+                    className="bg-teal-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-teal-700 transition flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined text-lg">speed</span>
+                    Cramming
+                  </button>
+                </div>
 
-              <div className="space-y-4">
-                <button
-                  onClick={() => navigate('/classes')}
-                  className="w-full bg-slate-100 text-slate-700 font-bold py-4 rounded-xl hover:bg-slate-200 transition flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-outlined">arrow_back</span>
-                  Volver al inicio
-                </button>
+                <div className="space-y-4">
+                  <button
+                    onClick={() => navigate('/classes')}
+                    className="w-full bg-slate-100 text-slate-700 font-bold py-4 rounded-xl hover:bg-slate-200 transition flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined">arrow_back</span>
+                    Volver al inicio
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Daily Session Mode */}
-        {mode === 'daily' && !dailySessionComplete && (
-          <>
-            {/* Timer and Progress Header */}
-            <div className="w-full max-w-lg mb-6">
-              <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-4 shadow-lg border border-white/50">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-indigo-500">timer</span>
-                    <span className="text-2xl font-black text-slate-900">
-                      {Math.floor(dailySessionTime / 60)}:{(dailySessionTime % 60).toString().padStart(2, '0')}
-                    </span>
+          {/* Daily Session Mode */}
+          {mode === 'daily' && !dailySessionComplete && (
+            <>
+              {/* Timer and Progress Header */}
+              <div className="w-full max-w-lg mb-6">
+                <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-4 shadow-lg border border-white/50">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-indigo-500">timer</span>
+                      <span className="text-2xl font-black text-slate-900">
+                        {Math.floor(dailySessionTime / 60)}:{(dailySessionTime % 60).toString().padStart(2, '0')}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-slate-500">Pregunta</div>
+                      <div className="text-lg font-bold text-slate-900">{currentIndex + 1} / {Math.min(flashcards.length, DAILY_SESSION_QUESTIONS)}</div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xs text-slate-500">Pregunta</div>
-                    <div className="text-lg font-bold text-slate-900">{currentIndex + 1} / {Math.min(flashcards.length, DAILY_SESSION_QUESTIONS)}</div>
+                  {/* Progress bar */}
+                  <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-300"
+                      style={{ width: `${(dailySessionTime / (15 * 60)) * 100}%` }}
+                    />
                   </div>
                 </div>
-                {/* Progress bar */}
-                <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-300"
-                    style={{ width: `${(dailySessionTime / (15 * 60)) * 100}%` }}
+              </div>
+
+              {/* Flashcard */}
+              <div
+                onClick={() => setIsFlipped(!isFlipped)}
+                className="w-full max-w-lg flex-1 min-h-0 md:flex-none md:h-auto md:aspect-[4/3] cursor-pointer perspective-1000"
+              >
+                <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+                  {/* Front */}
+                  <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-5 md:p-8 backface-hidden overflow-y-auto hide-scrollbar">
+                    <div className="flex items-center gap-3 mb-4 flex-shrink-0">
+                      <span className="bg-indigo-100 text-indigo-600 text-xs font-bold px-3 py-1 rounded-full uppercase">{flashcards[currentIndex]?.category}</span>
+                      <span className="bg-amber-100 text-amber-600 text-xs font-bold px-2 py-1 rounded-full">Sesión Diaria</span>
+                    </div>
+                    <h2 className="text-lg md:text-3xl font-black text-center text-slate-900 leading-snug overflow-y-auto max-h-full py-2">{flashcards[currentIndex]?.question}</h2>
+                    <p className="text-sm text-slate-400 mt-6 flex items-center gap-1 flex-shrink-0">
+                      <span className="material-symbols-outlined text-sm">touch_app</span> Toca para girar
+                    </p>
+                  </div>
+                  {/* Back */}
+                  <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden rotate-y-180 overflow-y-auto hide-scrollbar">
+                    <span className="bg-emerald-100 text-emerald-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4 flex-shrink-0">Respuesta</span>
+                    <p className="text-lg md:text-xl text-center text-slate-700 leading-relaxed overflow-y-auto max-h-full py-2">{flashcards[currentIndex]?.answer}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rating Buttons */}
+              {isFlipped && (
+                <div className="mt-2 md:mt-8 w-full max-w-lg shrink-0">
+                  <SRSRatingButtons
+                    onRate={(rating) => {
+                      handleRate(rating);
+                      setDailyQuestionsAnswered(prev => prev + 1);
+                      // Check if we've reached the target questions or end of cards
+                      if (currentIndex + 1 >= Math.min(flashcards.length, DAILY_SESSION_QUESTIONS)) {
+                        setDailySessionComplete(true);
+                        setShowConfetti(true);
+                      }
+                    }}
+                    disabled={isProcessing}
+                    cardState="new"
                   />
                 </div>
-              </div>
-            </div>
-
-            {/* Flashcard */}
-            <div
-              onClick={() => setIsFlipped(!isFlipped)}
-              className="w-full max-w-lg flex-1 min-h-0 md:flex-none md:h-auto md:aspect-[4/3] cursor-pointer perspective-1000"
-            >
-              <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
-                {/* Front */}
-                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-5 md:p-8 backface-hidden overflow-y-auto hide-scrollbar">
-                  <div className="flex items-center gap-3 mb-4 flex-shrink-0">
-                    <span className="bg-indigo-100 text-indigo-600 text-xs font-bold px-3 py-1 rounded-full uppercase">{flashcards[currentIndex]?.category}</span>
-                    <span className="bg-amber-100 text-amber-600 text-xs font-bold px-2 py-1 rounded-full">Sesión Diaria</span>
-                  </div>
-                  <h2 className="text-lg md:text-3xl font-black text-center text-slate-900 leading-snug overflow-y-auto max-h-full py-2">{flashcards[currentIndex]?.question}</h2>
-                  <p className="text-sm text-slate-400 mt-6 flex items-center gap-1 flex-shrink-0">
-                    <span className="material-symbols-outlined text-sm">touch_app</span> Toca para girar
-                  </p>
-                </div>
-                {/* Back */}
-                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden rotate-y-180 overflow-y-auto hide-scrollbar">
-                  <span className="bg-emerald-100 text-emerald-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4 flex-shrink-0">Respuesta</span>
-                  <p className="text-lg md:text-xl text-center text-slate-700 leading-relaxed overflow-y-auto max-h-full py-2">{flashcards[currentIndex]?.answer}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Rating Buttons */}
-            {isFlipped && (
-              <div className="mt-2 md:mt-8 w-full max-w-lg shrink-0">
-                <SRSRatingButtons
-                  onRate={(rating) => {
-                    handleRate(rating);
-                    setDailyQuestionsAnswered(prev => prev + 1);
-                    // Check if we've reached the target questions or end of cards
-                    if (currentIndex + 1 >= Math.min(flashcards.length, DAILY_SESSION_QUESTIONS)) {
-                      setDailySessionComplete(true);
-                      setShowConfetti(true);
-                    }
-                  }}
-                  disabled={isProcessing}
-                  cardState="new"
-                />
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Daily Session Complete */}
-        {mode === 'daily' && dailySessionComplete && (
-          <div className="w-full max-w-md animate-fade-in-up">
-            <div className="bg-white rounded-3xl shadow-2xl p-8 text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="material-symbols-outlined text-4xl text-white">event_available</span>
-              </div>
-              <h2 className="text-3xl font-black text-slate-900 mb-2">¡Sesión Diaria Completada!</h2>
-              <p className="text-slate-500 mb-6">15 minutos de estudio efectivo</p>
-
-              <div className="grid grid-cols-3 gap-3 mb-8">
-                <div className="bg-indigo-50 rounded-xl p-4">
-                  <div className="text-2xl font-black text-indigo-600">{dailyQuestionsAnswered}</div>
-                  <div className="text-xs text-indigo-500 font-bold">PREGUNTAS</div>
-                </div>
-                <div className="bg-emerald-50 rounded-xl p-4">
-                  <div className="text-2xl font-black text-emerald-600">{correctFlashcards}</div>
-                  <div className="text-xs text-emerald-500 font-bold">CORRECTAS</div>
-                </div>
-                <div className="bg-amber-50 rounded-xl p-4">
-                  <div className="text-2xl font-black text-amber-600">+{xpEarned}</div>
-                  <div className="text-xs text-amber-500 font-bold">XP</div>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-r from-indigo-100 to-purple-100 rounded-xl p-4 mb-6">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <span className="material-symbols-outlined text-indigo-500">calendar_today</span>
-                  <span className="text-lg font-bold text-indigo-600">Racha mantenida</span>
-                </div>
-                <p className="text-sm text-indigo-500">Vuelve mañana para otra sesión diaria</p>
-              </div>
-
-              <button
-                onClick={handleEndSession}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition shadow-lg"
-              >
-                Finalizar
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Flashcards Mode */}
-        {mode === 'flashcards' && !flashcardsComplete && !noCardsDue && (
-          <>
-            <div
-              onClick={() => setIsFlipped(!isFlipped)}
-              className="w-full max-w-lg aspect-[3/4] md:aspect-[4/3] cursor-pointer perspective-1000"
-            >
-              <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
-                {/* Front */}
-                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-5 md:p-8 backface-hidden overflow-y-auto hide-scrollbar">
-                  <div className="flex items-center gap-3 mb-4 flex-shrink-0">
-                    <span className="bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1 rounded-full uppercase">{flashcards[currentIndex]?.category}</span>
-                    {currentMasteryResult && (
-                      <DifficultyLevelIndicator
-                        level={currentMasteryResult.new_level}
-                        masteryPercent={currentMasteryResult.mastery_percent}
-                        size="sm"
-                        showLabel={false}
-                      />
-                    )}
-                  </div>
-                  <h2 className="text-lg md:text-3xl font-black text-center text-slate-900 leading-snug overflow-y-auto max-h-full py-2">{flashcards[currentIndex]?.question}</h2>
-                  <p className="text-sm text-slate-400 mt-6 flex items-center gap-1 flex-shrink-0">
-                    <span className="material-symbols-outlined text-sm">touch_app</span> Toca para girar
-                  </p>
-                </div>
-                {/* Back */}
-                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden rotate-y-180 overflow-y-auto hide-scrollbar">
-                  <span className="bg-emerald-100 text-emerald-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4 flex-shrink-0">Respuesta</span>
-                  <p className="text-lg md:text-xl text-center text-slate-700 leading-relaxed overflow-y-auto max-h-full py-2">{flashcards[currentIndex]?.answer}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Rating Buttons (Adaptive Mode style) */}
-            {isFlipped && (
-              <div className="mt-2 md:mt-8 w-full max-w-lg shrink-0">
-                <SRSRatingButtons
-                  onRate={handleRate}
-                  disabled={isProcessing}
-                  cardState="new"
-                />
-              </div>
-            )}
-
-          </>
-        )}
-
-        {/* Flashcards Complete Screen */}
-        {mode === 'flashcards' && flashcardsComplete && (
-          <div className="w-full max-w-md">
-            <div className="bg-white rounded-3xl shadow-2xl p-8 text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="material-symbols-outlined text-4xl text-white">celebration</span>
-              </div>
-              <h2 className="text-3xl font-black text-slate-900 mb-2">¡Sesión Completada!</h2>
-              <p className="text-slate-500 mb-6">Has terminado todas las flashcards</p>
-
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="bg-violet-50 rounded-xl p-4">
-                  <div className="text-3xl font-black text-violet-600">+{xpEarned}</div>
-                  <div className="text-xs text-violet-500 font-bold">XP GANADOS</div>
-                </div>
-                <div className="bg-amber-50 rounded-xl p-4">
-                  <div className="text-3xl font-black text-amber-600">{correctFlashcards}/{flashcards.length}</div>
-                  <div className="text-xs text-amber-500 font-bold">CORRECTAS</div>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-r from-orange-100 to-red-100 rounded-xl p-4 mb-6">
-                <div className="flex items-center justify-center gap-2">
-                  <span className="material-symbols-outlined text-orange-500">local_fire_department</span>
-                  <span className="text-lg font-bold text-orange-600">Racha activada</span>
-                </div>
-              </div>
-
-              {/* Dynamic Content Generation Notification */}
-              {generatingNewContent && (
-                <div className="bg-gradient-to-r from-indigo-100 to-purple-100 rounded-xl p-4 mb-6 animate-pulse">
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="material-symbols-outlined text-indigo-500 animate-spin">autorenew</span>
-                    <span className="text-lg font-bold text-indigo-600">Generando nuevas preguntas...</span>
-                  </div>
-                </div>
               )}
+            </>
+          )}
 
-              {newContentMessage && (
-                <div className="bg-gradient-to-r from-emerald-100 to-teal-100 rounded-xl p-4 mb-6">
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="material-symbols-outlined text-emerald-500">auto_awesome</span>
-                    <span className="text-sm font-bold text-emerald-700">{newContentMessage}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Regression Notification - when user is struggling */}
-              {regressionMessage && (
-                <div className="bg-gradient-to-r from-amber-100 to-orange-100 rounded-xl p-4 mb-6">
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="material-symbols-outlined text-amber-600">psychology_alt</span>
-                    <span className="text-sm font-bold text-amber-700">{regressionMessage}</span>
-                  </div>
-                </div>
-              )}
-
-              <button
-                onClick={handleEndSession}
-                className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition"
-              >
-                Finalizar y Guardar Progreso
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Quiz Mode */}
-        {mode === 'quiz' && !quizComplete && (
-          <div className="w-full max-w-2xl">
-            {quizLoading ? (
+          {/* Daily Session Complete */}
+          {mode === 'daily' && dailySessionComplete && (
+            <div className="w-full max-w-md animate-fade-in-up">
               <div className="bg-white rounded-3xl shadow-2xl p-8 text-center">
-                <div className="animate-pulse">
-                  <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="material-symbols-outlined text-3xl text-violet-600 animate-spin">sync</span>
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">Generando Quiz...</h3>
-                  <p className="text-slate-500">Creando preguntas basadas en el contenido del set</p>
+                <div className="w-20 h-20 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="material-symbols-outlined text-4xl text-white">event_available</span>
                 </div>
-              </div>
-            ) : quizQuestions.length === 0 ? (
-              <div className="bg-white rounded-3xl shadow-2xl p-8 text-center animate-fade-in-up">
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="material-symbols-outlined text-3xl text-red-600">error</span>
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">No pudimos generar el quiz</h3>
-                <p className="text-slate-500 mb-6">Hubo un problema al crear las preguntas con IA. Por favor, intenta de nuevo.</p>
-                <button
-                  onClick={() => setQuizGenerated(false)}
-                  className="px-6 py-3 bg-violet-600 text-white font-bold rounded-xl hover:bg-violet-700 transition-colors shadow-lg hover:shadow-xl"
-                >
-                  Intentar Nuevamente
-                </button>
-              </div>
-            ) : (
-              <div className="bg-white rounded-3xl shadow-2xl p-8">
-                {/* Question header with type badge */}
-                <div className="mb-6 flex items-center gap-2">
-                  <span className="bg-violet-100 text-violet-600 text-xs font-bold px-3 py-1 rounded-full">
-                    Pregunta {currentQuizIndex + 1}/{quizQuestions.length}
-                  </span>
-                  <span className={`text-xs font-bold px-3 py-1 rounded-full ${quizQuestions[currentQuizIndex]?.type === 'true_false' ? 'bg-emerald-100 text-emerald-600' :
-                    quizQuestions[currentQuizIndex]?.type === 'analysis' ? 'bg-amber-100 text-amber-600' :
-                      (quizQuestions[currentQuizIndex]?.type === 'design' || quizQuestions[currentQuizIndex]?.options?.[0]?.includes('solución')) ? 'bg-purple-100 text-purple-600' :
-                        quizQuestions[currentQuizIndex]?.type === 'practical' ? 'bg-cyan-100 text-cyan-600' :
-                          'bg-blue-100 text-blue-600'
-                    }`}>
-                    {quizQuestions[currentQuizIndex]?.type === 'true_false' ? '✓✗ V/F' :
-                      quizQuestions[currentQuizIndex]?.type === 'analysis' ? '🔍 Análisis' :
-                        (quizQuestions[currentQuizIndex]?.type === 'design' || quizQuestions[currentQuizIndex]?.options?.[0]?.includes('solución')) ? '✏️ Diseño' :
-                          quizQuestions[currentQuizIndex]?.type === 'practical' ? '🚀 Aplicación' : '📝 Opción Múltiple'}
-                  </span>
-                </div>
+                <h2 className="text-3xl font-black text-slate-900 mb-2">¡Sesión Diaria Completada!</h2>
+                <p className="text-slate-500 mb-6">15 minutos de estudio efectivo</p>
 
-                {/* Scenario for analysis questions */}
-                {quizQuestions[currentQuizIndex]?.type === 'analysis' && quizQuestions[currentQuizIndex]?.scenario && (
-                  <div className="mb-6 p-4 bg-amber-50 border-l-4 border-amber-400 rounded-r-xl">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="material-symbols-outlined text-amber-600">cases</span>
-                      <span className="font-bold text-amber-700">Escenario</span>
-                    </div>
-                    <p className="text-slate-700 text-sm leading-relaxed">{quizQuestions[currentQuizIndex].scenario}</p>
+                <div className="grid grid-cols-3 gap-3 mb-8">
+                  <div className="bg-indigo-50 rounded-xl p-4">
+                    <div className="text-2xl font-black text-indigo-600">{dailyQuestionsAnswered}</div>
+                    <div className="text-xs text-indigo-500 font-bold">PREGUNTAS</div>
                   </div>
-                )}
-
-                {/* Real-world example for practical questions */}
-                {quizQuestions[currentQuizIndex]?.type === 'practical' && quizQuestions[currentQuizIndex]?.realWorldExample && (
-                  <div className="mb-6 p-4 bg-cyan-50 border-l-4 border-cyan-400 rounded-r-xl">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="material-symbols-outlined text-cyan-600">public</span>
-                      <span className="font-bold text-cyan-700">Ejemplo del Mundo Real</span>
-                    </div>
-                    <p className="text-slate-700 text-sm leading-relaxed">{quizQuestions[currentQuizIndex].realWorldExample}</p>
+                  <div className="bg-emerald-50 rounded-xl p-4">
+                    <div className="text-2xl font-black text-emerald-600">{correctFlashcards}</div>
+                    <div className="text-xs text-emerald-500 font-bold">CORRECTAS</div>
                   </div>
-                )}
-
-                <h2 className="text-2xl font-black text-slate-900 mb-8">{quizQuestions[currentQuizIndex]?.question}</h2>
-
-                {/* TRUE/FALSE TYPE - Large V/F buttons */}
-                {quizQuestions[currentQuizIndex]?.type === 'true_false' ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    {['Verdadero', 'Falso'].map((option, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleQuizAnswer(i)}
-                        disabled={showResult}
-                        className={`p-8 rounded-2xl font-bold text-xl transition-all flex flex-col items-center justify-center gap-3 ${showResult
-                          ? i === quizQuestions[currentQuizIndex].correctIndex
-                            ? 'bg-emerald-100 text-emerald-700 border-4 border-emerald-500 scale-105'
-                            : selectedAnswer === i
-                              ? 'bg-rose-100 text-rose-700 border-4 border-rose-500'
-                              : 'bg-slate-100 text-slate-400'
-                          : selectedAnswer === i
-                            ? i === 0 ? 'bg-emerald-500 text-white scale-105' : 'bg-rose-500 text-white scale-105'
-                            : i === 0 ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-2 border-emerald-200'
-                              : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border-2 border-rose-200'
-                          }`}
-                      >
-                        <span className="material-symbols-outlined text-4xl">
-                          {i === 0 ? 'check_circle' : 'cancel'}
-                        </span>
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                ) : (quizQuestions[currentQuizIndex]?.type === 'design' || quizQuestions[currentQuizIndex]?.options?.[0]?.includes('solución')) ? (
-                  /* DESIGN TYPE - Text area for open response */
-                  <div className="space-y-4">
-                    {quizQuestions[currentQuizIndex]?.designPrompt && (
-                      <div className="p-4 bg-purple-50 border-l-4 border-purple-400 rounded-r-xl mb-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="material-symbols-outlined text-purple-600">design_services</span>
-                          <span className="font-bold text-purple-700">Tu Reto</span>
-                        </div>
-                        <p className="text-slate-700 text-sm">{quizQuestions[currentQuizIndex].designPrompt}</p>
-                      </div>
-                    )}
-
-                    {quizQuestions[currentQuizIndex]?.evaluationCriteria && (
-                      <div className="text-xs text-slate-500 mb-2">
-                        <span className="font-semibold">Se evaluará:</span> {quizQuestions[currentQuizIndex].evaluationCriteria?.join(' • ')}
-                      </div>
-                    )}
-
-                    <textarea
-                      value={designAnswer}
-                      onChange={(e) => setDesignAnswer(e.target.value)}
-                      disabled={showResult}
-                      placeholder="Escribe tu solución aquí..."
-                      className="w-full h-40 p-4 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all resize-none text-slate-700"
-                    />
-
-                    {!showResult && (
-                      <button
-                        onClick={() => handleQuizAnswer(0, designAnswer)}
-                        disabled={!designAnswer.trim()}
-                        className={`w-full py-4 font-bold rounded-xl transition-all ${designAnswer.trim()
-                          ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-md transform hover:-translate-y-1'
-                          : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                          }`}
-                      >
-                        Enviar mi Solución
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  /* MULTIPLE CHOICE / ANALYSIS - Standard options */
-                  <div className="space-y-3">
-                    {quizQuestions[currentQuizIndex]?.options.map((option, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleQuizAnswer(i)}
-                        disabled={showResult}
-                        className={`w-full p-4 rounded-xl text-left font-medium transition-all flex items-center gap-3 ${showResult
-                          ? i === quizQuestions[currentQuizIndex].correctIndex
-                            ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500'
-                            : selectedAnswer === i
-                              ? 'bg-rose-100 text-rose-700 border-2 border-rose-500'
-                              : 'bg-slate-100 text-slate-500'
-                          : selectedAnswer === i
-                            ? 'bg-primary text-white'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                          }`}
-                      >
-                        <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${showResult && i === quizQuestions[currentQuizIndex].correctIndex ? 'bg-emerald-500 text-white' :
-                          showResult && selectedAnswer === i ? 'bg-rose-500 text-white' :
-                            selectedAnswer === i ? 'bg-white/20 text-white' : 'bg-white text-slate-600'
-                          }`}>
-                          {String.fromCharCode(65 + i)}
-                        </span>
-                        {option}
-                        {showResult && i === quizQuestions[currentQuizIndex].correctIndex && (
-                          <span className="material-symbols-outlined ml-auto text-emerald-600">check_circle</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {showResult && (
-                  <div className="mt-6 p-4 bg-blue-50 rounded-xl text-sm text-blue-700">
-                    <strong>Explicación:</strong> {quizQuestions[currentQuizIndex].explanation}
-                  </div>
-                )}
-
-                {showResult && (
-                  <button
-                    onClick={() => { nextQuizQuestion(); setDesignAnswer(''); }}
-                    className="w-full mt-6 bg-primary text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-all"
-                  >
-                    {currentQuizIndex < quizQuestions.length - 1 ? 'Siguiente Pregunta' : 'Ver Resultados'}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Quiz Complete - Detailed Report */}
-        {mode === 'quiz' && quizComplete && (
-          <div className="w-full max-w-2xl">
-            <div className="bg-white rounded-3xl shadow-2xl p-8">
-              {/* Header */}
-              <div className="text-center mb-8">
-                <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${score >= (quizQuestions.length * 0.6)
-                  ? 'bg-gradient-to-br from-emerald-400 to-emerald-600'
-                  : 'bg-gradient-to-br from-amber-400 to-amber-600'
-                  }`}>
-                  <span className="material-symbols-outlined text-4xl text-white">
-                    {score >= (quizQuestions.length * 0.6) ? 'school' : 'psychology'}
-                  </span>
-                </div>
-                <h2 className="text-3xl font-black text-slate-900 mb-2">Reporte del Quiz</h2>
-                <p className="text-slate-500">
-                  {score >= (quizQuestions.length * 0.6) ? '¡Excelente trabajo!' : 'Sigue practicando los temas difíciles'}
-                </p>
-              </div>
-
-              {/* Stats Grid */}
-              <div className="grid grid-cols-3 gap-4 mb-8">
-                <div className="bg-violet-50 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-black text-violet-600">+{xpEarned}</div>
-                  <div className="text-xs text-violet-500 font-bold">XP GANADOS</div>
-                </div>
-                <div className={`rounded-xl p-4 text-center ${score >= (quizQuestions.length * 0.6) ? 'bg-emerald-50' : 'bg-rose-50'}`}>
-                  <div className={`text-3xl font-black ${score >= (quizQuestions.length * 0.6) ? 'text-emerald-600' : 'text-rose-600'}`}>
-                    {Math.round((score / quizQuestions.length) * 100)}%
-                  </div>
-                  <div className={`text-xs font-bold ${score >= (quizQuestions.length * 0.6) ? 'text-emerald-500' : 'text-rose-500'}`}>PRECISIÓN</div>
-                </div>
-                <div className="bg-blue-50 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-black text-blue-600">{score}/{quizQuestions.length}</div>
-                  <div className="text-xs text-blue-500 font-bold">CORRECTAS</div>
-                </div>
-              </div>
-
-              {/* Topic Breakdown */}
-              {quizReport && quizReport.topicBreakdown.length > 0 && (
-                <div className="mb-8">
-                  <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-lg">analytics</span>
-                    Rendimiento por Tema
-                  </h3>
-                  <div className="space-y-2">
-                    {quizReport.topicBreakdown.map((topic, i) => (
-                      <div key={i} className="flex items-center gap-3">
-                        <div className="flex-1">
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="font-medium text-slate-700">{topic.topic}</span>
-                            <span className={`font-bold ${topic.percentage >= 60 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                              {topic.correct}/{topic.total} ({topic.percentage}%)
-                            </span>
-                          </div>
-                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all ${topic.percentage >= 60 ? 'bg-emerald-500' : 'bg-rose-500'}`}
-                              style={{ width: `${topic.percentage}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="bg-amber-50 rounded-xl p-4">
+                    <div className="text-2xl font-black text-amber-600">+{xpEarned}</div>
+                    <div className="text-xs text-amber-500 font-bold">XP</div>
                   </div>
                 </div>
-              )}
 
-              {/* Questions Review */}
-              <div className="mb-8">
-                <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-lg">fact_check</span>
-                  Revisión de Preguntas
-                </h3>
-                <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {quizResults.map((result, i) => (
-                    <div
-                      key={i}
-                      className={`p-3 rounded-xl border-2 ${result.isCorrect ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <span className={`material-symbols-outlined ${result.isCorrect ? 'text-emerald-500' : 'text-rose-500'}`}>
-                          {result.isCorrect ? 'check_circle' : 'cancel'}
-                        </span>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-slate-800 line-clamp-2">{result.question}</p>
-                          {!result.isCorrect && (
-                            <p className="text-xs text-rose-600 mt-1">
-                              Tu respuesta: {quizQuestions[result.questionIndex]?.options[result.userAnswerIndex]}
-                            </p>
-                          )}
-                          <p className={`text-xs mt-1 ${result.isCorrect ? 'text-emerald-600' : 'text-slate-600'}`}>
-                            Respuesta correcta: {quizQuestions[result.questionIndex]?.options[result.correctAnswerIndex]}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Weak Topics Alert */}
-              {quizReport && quizReport.incorrectQuestions.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-                  <div className="flex items-center gap-2 text-amber-700">
-                    <span className="material-symbols-outlined">lightbulb</span>
-                    <span className="font-bold">El próximo quiz enfatizará:</span>
+                <div className="bg-gradient-to-r from-indigo-100 to-purple-100 rounded-xl p-4 mb-6">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <span className="material-symbols-outlined text-indigo-500">calendar_today</span>
+                    <span className="text-lg font-bold text-indigo-600">Racha mantenida</span>
                   </div>
-                  <p className="text-sm text-amber-600 mt-1">
-                    Las preguntas que fallaste se repetirán y las que acertaste serán reemplazadas por contenido nuevo o más avanzado.
-                  </p>
+                  <p className="text-sm text-indigo-500">Vuelve mañana para otra sesión diaria</p>
                 </div>
-              )}
 
-              {/* Action Buttons */}
-              <div className="flex gap-4">
-                <button
-                  onClick={async () => {
-                    // Generate new adaptive quiz
-                    setQuizComplete(false);
-                    setQuizGenerated(false);
-                    setCurrentQuizIndex(0);
-                    setScore(0);
-                    setXpEarned(0);
-                    setQuizResults([]);
-                    setQuizReport(null);
-                    setSelectedAnswer(null);
-                    setShowResult(false);
-                  }}
-                  className="flex-1 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-outlined">autorenew</span>
-                  Siguiente Quiz
-                </button>
                 <button
                   onClick={handleEndSession}
-                  className="flex-1 bg-slate-100 text-slate-700 font-bold py-4 rounded-xl hover:bg-slate-200 transition"
+                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition shadow-lg"
                 >
                   Finalizar
                 </button>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Cramming Mode */}
-        {mode === 'cramming' && !crammingComplete && (
-          <>
-            <div className="text-center text-white mb-8">
-              <span className="material-symbols-outlined text-6xl mb-4 animate-pulse">bolt</span>
-              <h2 className="text-3xl font-black">🔥 Modo Cramming</h2>
-              <p className="text-white/80 mt-2">Repaso intensivo antes del examen</p>
-            </div>
-
-            <div
-              onClick={() => setIsFlipped(!isFlipped)}
-              className="w-full max-w-lg aspect-[4/3] cursor-pointer perspective-1000"
-            >
-              <div className={`relative w-full h-full transition-transform duration-300 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
-                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden border-4 border-amber-400">
-                  <span className="bg-rose-100 text-rose-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4">⚡ Cramming</span>
-                  <h2 className="text-2xl md:text-3xl font-black text-center text-slate-900 leading-snug">{flashcards[currentIndex]?.question}</h2>
-                </div>
-                <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden rotate-y-180 border-4 border-emerald-400">
-                  <span className="bg-emerald-100 text-emerald-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4">Respuesta</span>
-                  <p className="text-lg md:text-xl text-center text-slate-700 leading-relaxed">{flashcards[currentIndex]?.answer}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-4 mt-8">
-              <button
-                onClick={handleDontKnow}
-                className="bg-white/20 text-white font-bold px-6 py-4 rounded-xl hover:bg-white/30 transition-all"
+          {/* Flashcards Mode */}
+          {mode === 'flashcards' && !flashcardsComplete && !noCardsDue && (
+            <>
+              <div
+                onClick={() => setIsFlipped(!isFlipped)}
+                className="w-full max-w-lg aspect-[3/4] md:aspect-[4/3] cursor-pointer perspective-1000"
               >
-                Repasar más tarde
-              </button>
-              <button
-                onClick={handleKnow}
-                className="bg-white text-rose-600 font-bold px-6 py-4 rounded-xl shadow-lg hover:scale-105 transition-all"
-              >
-                ¡Lo domino! 🔥
-              </button>
+                <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+                  {/* Front */}
+                  <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-5 md:p-8 backface-hidden overflow-y-auto hide-scrollbar">
+                    <div className="flex items-center gap-3 mb-4 flex-shrink-0">
+                      <span className="bg-blue-100 text-blue-600 text-xs font-bold px-3 py-1 rounded-full uppercase">{flashcards[currentIndex]?.category}</span>
+                      {currentMasteryResult && (
+                        <DifficultyLevelIndicator
+                          level={currentMasteryResult.new_level}
+                          masteryPercent={currentMasteryResult.mastery_percent}
+                          size="sm"
+                          showLabel={false}
+                        />
+                      )}
+                    </div>
+                    <h2 className="text-lg md:text-3xl font-black text-center text-slate-900 leading-snug overflow-y-auto max-h-full py-2">{flashcards[currentIndex]?.question}</h2>
+                    <p className="text-sm text-slate-400 mt-6 flex items-center gap-1 flex-shrink-0">
+                      <span className="material-symbols-outlined text-sm">touch_app</span> Toca para girar
+                    </p>
+                  </div>
+                  {/* Back */}
+                  <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden rotate-y-180 overflow-y-auto hide-scrollbar">
+                    <span className="bg-emerald-100 text-emerald-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4 flex-shrink-0">Respuesta</span>
+                    <p className="text-lg md:text-xl text-center text-slate-700 leading-relaxed overflow-y-auto max-h-full py-2">{flashcards[currentIndex]?.answer}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rating Buttons (Adaptive Mode style) */}
+              {isFlipped && (
+                <div className="mt-2 md:mt-8 w-full max-w-lg shrink-0">
+                  <SRSRatingButtons
+                    onRate={handleRate}
+                    disabled={isProcessing}
+                    cardState="new"
+                  />
+                </div>
+              )}
+
+            </>
+          )}
+
+          {/* Flashcards Complete Screen */}
+          {mode === 'flashcards' && flashcardsComplete && (
+            <div className="w-full max-w-md">
+              <div className="bg-white rounded-3xl shadow-2xl p-8 text-center">
+                <div className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="material-symbols-outlined text-4xl text-white">celebration</span>
+                </div>
+                <h2 className="text-3xl font-black text-slate-900 mb-2">¡Sesión Completada!</h2>
+                <p className="text-slate-500 mb-6">Has terminado todas las flashcards</p>
+
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                  <div className="bg-violet-50 rounded-xl p-4">
+                    <div className="text-3xl font-black text-violet-600">+{xpEarned}</div>
+                    <div className="text-xs text-violet-500 font-bold">XP GANADOS</div>
+                  </div>
+                  <div className="bg-amber-50 rounded-xl p-4">
+                    <div className="text-3xl font-black text-amber-600">{correctFlashcards}/{flashcards.length}</div>
+                    <div className="text-xs text-amber-500 font-bold">CORRECTAS</div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-orange-100 to-red-100 rounded-xl p-4 mb-6">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="material-symbols-outlined text-orange-500">local_fire_department</span>
+                    <span className="text-lg font-bold text-orange-600">Racha activada</span>
+                  </div>
+                </div>
+
+                {/* Dynamic Content Generation Notification */}
+                {generatingNewContent && (
+                  <div className="bg-gradient-to-r from-indigo-100 to-purple-100 rounded-xl p-4 mb-6 animate-pulse">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="material-symbols-outlined text-indigo-500 animate-spin">autorenew</span>
+                      <span className="text-lg font-bold text-indigo-600">Generando nuevas preguntas...</span>
+                    </div>
+                  </div>
+                )}
+
+                {newContentMessage && (
+                  <div className="bg-gradient-to-r from-emerald-100 to-teal-100 rounded-xl p-4 mb-6">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="material-symbols-outlined text-emerald-500">auto_awesome</span>
+                      <span className="text-sm font-bold text-emerald-700">{newContentMessage}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Regression Notification - when user is struggling */}
+                {regressionMessage && (
+                  <div className="bg-gradient-to-r from-amber-100 to-orange-100 rounded-xl p-4 mb-6">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="material-symbols-outlined text-amber-600">psychology_alt</span>
+                      <span className="text-sm font-bold text-amber-700">{regressionMessage}</span>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleEndSession}
+                  className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition"
+                >
+                  Finalizar y Guardar Progreso
+                </button>
+              </div>
             </div>
-          </>
-        )}
+          )}
 
-        {/* Cramming Complete Screen */}
-        {mode === 'cramming' && crammingComplete && (
-          <div className="w-full max-w-md">
-            <div className="bg-white rounded-3xl shadow-2xl p-8 text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-rose-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="material-symbols-outlined text-4xl text-white">bolt</span>
-              </div>
-              <h2 className="text-3xl font-black text-slate-900 mb-2">🔥 ¡Cramming Completado!</h2>
-              <p className="text-slate-500 mb-6">Repaso intensivo terminado</p>
-
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-violet-50 rounded-xl p-4">
-                  <div className="text-3xl font-black text-violet-600">+{xpEarned}</div>
-                  <div className="text-xs text-violet-500 font-bold">XP GANADOS</div>
+          {/* Quiz Mode */}
+          {mode === 'quiz' && !quizComplete && (
+            <div className="w-full max-w-2xl">
+              {quizLoading ? (
+                <div className="bg-white rounded-3xl shadow-2xl p-8 text-center">
+                  <div className="animate-pulse">
+                    <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <span className="material-symbols-outlined text-3xl text-violet-600 animate-spin">sync</span>
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-900 mb-2">Generando Quiz...</h3>
+                    <p className="text-slate-500">Creando preguntas basadas en el contenido del set</p>
+                  </div>
                 </div>
-                <div className="bg-amber-50 rounded-xl p-4">
-                  <div className="text-3xl font-black text-amber-600">{correctFlashcards}/{flashcards.length}</div>
-                  <div className="text-xs text-amber-500 font-bold">DOMINADAS</div>
+              ) : quizQuestions.length === 0 ? (
+                <div className="bg-white rounded-3xl shadow-2xl p-8 text-center animate-fade-in-up">
+                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="material-symbols-outlined text-3xl text-red-600">error</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">No pudimos generar el quiz</h3>
+                  <p className="text-slate-500 mb-6">Hubo un problema al crear las preguntas con IA. Por favor, intenta de nuevo.</p>
+                  <button
+                    onClick={() => setQuizGenerated(false)}
+                    className="px-6 py-3 bg-violet-600 text-white font-bold rounded-xl hover:bg-violet-700 transition-colors shadow-lg hover:shadow-xl"
+                  >
+                    Intentar Nuevamente
+                  </button>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-white rounded-3xl shadow-2xl p-8">
+                  {/* Question header with type badge */}
+                  <div className="mb-6 flex items-center gap-2">
+                    <span className="bg-violet-100 text-violet-600 text-xs font-bold px-3 py-1 rounded-full">
+                      Pregunta {currentQuizIndex + 1}/{quizQuestions.length}
+                    </span>
+                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${quizQuestions[currentQuizIndex]?.type === 'true_false' ? 'bg-emerald-100 text-emerald-600' :
+                      quizQuestions[currentQuizIndex]?.type === 'analysis' ? 'bg-amber-100 text-amber-600' :
+                        (quizQuestions[currentQuizIndex]?.type === 'design' || quizQuestions[currentQuizIndex]?.options?.[0]?.includes('solución')) ? 'bg-purple-100 text-purple-600' :
+                          quizQuestions[currentQuizIndex]?.type === 'practical' ? 'bg-cyan-100 text-cyan-600' :
+                            'bg-blue-100 text-blue-600'
+                      }`}>
+                      {quizQuestions[currentQuizIndex]?.type === 'true_false' ? '✓✗ V/F' :
+                        quizQuestions[currentQuizIndex]?.type === 'analysis' ? '🔍 Análisis' :
+                          (quizQuestions[currentQuizIndex]?.type === 'design' || quizQuestions[currentQuizIndex]?.options?.[0]?.includes('solución')) ? '✏️ Diseño' :
+                            quizQuestions[currentQuizIndex]?.type === 'practical' ? '🚀 Aplicación' : '📝 Opción Múltiple'}
+                    </span>
+                  </div>
 
-              <div className="bg-gradient-to-r from-orange-100 to-red-100 rounded-xl p-4 mb-6">
-                <div className="flex items-center justify-center gap-2">
-                  <span className="material-symbols-outlined text-orange-500">local_fire_department</span>
-                  <span className="text-lg font-bold text-orange-600">Racha activada</span>
+                  {/* Scenario for analysis questions */}
+                  {quizQuestions[currentQuizIndex]?.type === 'analysis' && quizQuestions[currentQuizIndex]?.scenario && (
+                    <div className="mb-6 p-4 bg-amber-50 border-l-4 border-amber-400 rounded-r-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="material-symbols-outlined text-amber-600">cases</span>
+                        <span className="font-bold text-amber-700">Escenario</span>
+                      </div>
+                      <p className="text-slate-700 text-sm leading-relaxed">{quizQuestions[currentQuizIndex].scenario}</p>
+                    </div>
+                  )}
+
+                  {/* Real-world example for practical questions */}
+                  {quizQuestions[currentQuizIndex]?.type === 'practical' && quizQuestions[currentQuizIndex]?.realWorldExample && (
+                    <div className="mb-6 p-4 bg-cyan-50 border-l-4 border-cyan-400 rounded-r-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="material-symbols-outlined text-cyan-600">public</span>
+                        <span className="font-bold text-cyan-700">Ejemplo del Mundo Real</span>
+                      </div>
+                      <p className="text-slate-700 text-sm leading-relaxed">{quizQuestions[currentQuizIndex].realWorldExample}</p>
+                    </div>
+                  )}
+
+                  <h2 className="text-2xl font-black text-slate-900 mb-8">{quizQuestions[currentQuizIndex]?.question}</h2>
+
+                  {/* TRUE/FALSE TYPE - Large V/F buttons */}
+                  {quizQuestions[currentQuizIndex]?.type === 'true_false' ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      {['Verdadero', 'Falso'].map((option, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handleQuizAnswer(i)}
+                          disabled={showResult}
+                          className={`p-8 rounded-2xl font-bold text-xl transition-all flex flex-col items-center justify-center gap-3 ${showResult
+                            ? i === quizQuestions[currentQuizIndex].correctIndex
+                              ? 'bg-emerald-100 text-emerald-700 border-4 border-emerald-500 scale-105'
+                              : selectedAnswer === i
+                                ? 'bg-rose-100 text-rose-700 border-4 border-rose-500'
+                                : 'bg-slate-100 text-slate-400'
+                            : selectedAnswer === i
+                              ? i === 0 ? 'bg-emerald-500 text-white scale-105' : 'bg-rose-500 text-white scale-105'
+                              : i === 0 ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-2 border-emerald-200'
+                                : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border-2 border-rose-200'
+                            }`}
+                        >
+                          <span className="material-symbols-outlined text-4xl">
+                            {i === 0 ? 'check_circle' : 'cancel'}
+                          </span>
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (quizQuestions[currentQuizIndex]?.type === 'design' || quizQuestions[currentQuizIndex]?.options?.[0]?.includes('solución')) ? (
+                    /* DESIGN TYPE - Text area for open response */
+                    <div className="space-y-4">
+                      {quizQuestions[currentQuizIndex]?.designPrompt && (
+                        <div className="p-4 bg-purple-50 border-l-4 border-purple-400 rounded-r-xl mb-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="material-symbols-outlined text-purple-600">design_services</span>
+                            <span className="font-bold text-purple-700">Tu Reto</span>
+                          </div>
+                          <p className="text-slate-700 text-sm">{quizQuestions[currentQuizIndex].designPrompt}</p>
+                        </div>
+                      )}
+
+                      {quizQuestions[currentQuizIndex]?.evaluationCriteria && (
+                        <div className="text-xs text-slate-500 mb-2">
+                          <span className="font-semibold">Se evaluará:</span> {quizQuestions[currentQuizIndex].evaluationCriteria?.join(' • ')}
+                        </div>
+                      )}
+
+                      <textarea
+                        value={designAnswer}
+                        onChange={(e) => setDesignAnswer(e.target.value)}
+                        disabled={showResult}
+                        placeholder="Escribe tu solución aquí..."
+                        className="w-full h-40 p-4 border-2 border-slate-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all resize-none text-slate-700"
+                      />
+
+                      {!showResult && (
+                        <button
+                          onClick={() => handleQuizAnswer(0, designAnswer)}
+                          disabled={!designAnswer.trim()}
+                          className={`w-full py-4 font-bold rounded-xl transition-all ${designAnswer.trim()
+                            ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-md transform hover:-translate-y-1'
+                            : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                            }`}
+                        >
+                          Enviar mi Solución
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    /* MULTIPLE CHOICE / ANALYSIS - Standard options */
+                    <div className="space-y-3">
+                      {quizQuestions[currentQuizIndex]?.options.map((option, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handleQuizAnswer(i)}
+                          disabled={showResult}
+                          className={`w-full p-4 rounded-xl text-left font-medium transition-all flex items-center gap-3 ${showResult
+                            ? i === quizQuestions[currentQuizIndex].correctIndex
+                              ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-500'
+                              : selectedAnswer === i
+                                ? 'bg-rose-100 text-rose-700 border-2 border-rose-500'
+                                : 'bg-slate-100 text-slate-500'
+                            : selectedAnswer === i
+                              ? 'bg-primary text-white'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
+                        >
+                          <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${showResult && i === quizQuestions[currentQuizIndex].correctIndex ? 'bg-emerald-500 text-white' :
+                            showResult && selectedAnswer === i ? 'bg-rose-500 text-white' :
+                              selectedAnswer === i ? 'bg-white/20 text-white' : 'bg-white text-slate-600'
+                            }`}>
+                            {String.fromCharCode(65 + i)}
+                          </span>
+                          {option}
+                          {showResult && i === quizQuestions[currentQuizIndex].correctIndex && (
+                            <span className="material-symbols-outlined ml-auto text-emerald-600">check_circle</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {showResult && (
+                    <div className="mt-6 p-4 bg-blue-50 rounded-xl text-sm text-blue-700">
+                      <strong>Explicación:</strong> {quizQuestions[currentQuizIndex].explanation}
+                    </div>
+                  )}
+
+                  {showResult && (
+                    <button
+                      onClick={() => { nextQuizQuestion(); setDesignAnswer(''); }}
+                      className="w-full mt-6 bg-primary text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-all"
+                    >
+                      {currentQuizIndex < quizQuestions.length - 1 ? 'Siguiente Pregunta' : 'Ver Resultados'}
+                    </button>
+                  )}
                 </div>
-              </div>
-
-              <button
-                onClick={handleEndSession}
-                className="w-full bg-gradient-to-r from-rose-600 to-orange-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition"
-              >
-                Finalizar y Guardar Progreso
-              </button>
+              )}
             </div>
-          </div>
-        )}
-        {mode === 'podcast' && (
-          <div className="max-w-4xl mx-auto">
-            <NeuroPodcast
-              context={flashcards.map(f => `Q: ${f.question} A: ${f.answer}`).join('\n\n')}
-              topicTitle={className || "Sesión de Estudio"}
-            />
-          </div>
-        )}
+          )}
+
+          {/* Quiz Complete - Detailed Report */}
+          {mode === 'quiz' && quizComplete && (
+            <div className="w-full max-w-2xl">
+              <div className="bg-white rounded-3xl shadow-2xl p-8">
+                {/* Header */}
+                <div className="text-center mb-8">
+                  <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${score >= (quizQuestions.length * 0.6)
+                    ? 'bg-gradient-to-br from-emerald-400 to-emerald-600'
+                    : 'bg-gradient-to-br from-amber-400 to-amber-600'
+                    }`}>
+                    <span className="material-symbols-outlined text-4xl text-white">
+                      {score >= (quizQuestions.length * 0.6) ? 'school' : 'psychology'}
+                    </span>
+                  </div>
+                  <h2 className="text-3xl font-black text-slate-900 mb-2">Reporte del Quiz</h2>
+                  <p className="text-slate-500">
+                    {score >= (quizQuestions.length * 0.6) ? '¡Excelente trabajo!' : 'Sigue practicando los temas difíciles'}
+                  </p>
+                </div>
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-3 gap-4 mb-8">
+                  <div className="bg-violet-50 rounded-xl p-4 text-center">
+                    <div className="text-3xl font-black text-violet-600">+{xpEarned}</div>
+                    <div className="text-xs text-violet-500 font-bold">XP GANADOS</div>
+                  </div>
+                  <div className={`rounded-xl p-4 text-center ${score >= (quizQuestions.length * 0.6) ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+                    <div className={`text-3xl font-black ${score >= (quizQuestions.length * 0.6) ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {Math.round((score / quizQuestions.length) * 100)}%
+                    </div>
+                    <div className={`text-xs font-bold ${score >= (quizQuestions.length * 0.6) ? 'text-emerald-500' : 'text-rose-500'}`}>PRECISIÓN</div>
+                  </div>
+                  <div className="bg-blue-50 rounded-xl p-4 text-center">
+                    <div className="text-3xl font-black text-blue-600">{score}/{quizQuestions.length}</div>
+                    <div className="text-xs text-blue-500 font-bold">CORRECTAS</div>
+                  </div>
+                </div>
+
+                {/* Topic Breakdown */}
+                {quizReport && quizReport.topicBreakdown.length > 0 && (
+                  <div className="mb-8">
+                    <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-lg">analytics</span>
+                      Rendimiento por Tema
+                    </h3>
+                    <div className="space-y-2">
+                      {quizReport.topicBreakdown.map((topic, i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="font-medium text-slate-700">{topic.topic}</span>
+                              <span className={`font-bold ${topic.percentage >= 60 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                {topic.correct}/{topic.total} ({topic.percentage}%)
+                              </span>
+                            </div>
+                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${topic.percentage >= 60 ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                                style={{ width: `${topic.percentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Questions Review */}
+                <div className="mb-8">
+                  <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-lg">fact_check</span>
+                    Revisión de Preguntas
+                  </h3>
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {quizResults.map((result, i) => (
+                      <div
+                        key={i}
+                        className={`p-3 rounded-xl border-2 ${result.isCorrect ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className={`material-symbols-outlined ${result.isCorrect ? 'text-emerald-500' : 'text-rose-500'}`}>
+                            {result.isCorrect ? 'check_circle' : 'cancel'}
+                          </span>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-slate-800 line-clamp-2">{result.question}</p>
+                            {!result.isCorrect && (
+                              <p className="text-xs text-rose-600 mt-1">
+                                Tu respuesta: {quizQuestions[result.questionIndex]?.options[result.userAnswerIndex]}
+                              </p>
+                            )}
+                            <p className={`text-xs mt-1 ${result.isCorrect ? 'text-emerald-600' : 'text-slate-600'}`}>
+                              Respuesta correcta: {quizQuestions[result.questionIndex]?.options[result.correctAnswerIndex]}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Weak Topics Alert */}
+                {quizReport && quizReport.incorrectQuestions.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+                    <div className="flex items-center gap-2 text-amber-700">
+                      <span className="material-symbols-outlined">lightbulb</span>
+                      <span className="font-bold">El próximo quiz enfatizará:</span>
+                    </div>
+                    <p className="text-sm text-amber-600 mt-1">
+                      Las preguntas que fallaste se repetirán y las que acertaste serán reemplazadas por contenido nuevo o más avanzado.
+                    </p>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-4">
+                  <button
+                    onClick={async () => {
+                      // Generate new adaptive quiz
+                      setQuizComplete(false);
+                      setQuizGenerated(false);
+                      setCurrentQuizIndex(0);
+                      setScore(0);
+                      setXpEarned(0);
+                      setQuizResults([]);
+                      setQuizReport(null);
+                      setSelectedAnswer(null);
+                      setShowResult(false);
+                    }}
+                    className="flex-1 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined">autorenew</span>
+                    Siguiente Quiz
+                  </button>
+                  <button
+                    onClick={handleEndSession}
+                    className="flex-1 bg-slate-100 text-slate-700 font-bold py-4 rounded-xl hover:bg-slate-200 transition"
+                  >
+                    Finalizar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Cramming Mode */}
+          {mode === 'cramming' && !crammingComplete && (
+            <>
+              <div className="text-center text-white mb-8">
+                <span className="material-symbols-outlined text-6xl mb-4 animate-pulse">bolt</span>
+                <h2 className="text-3xl font-black">🔥 Modo Cramming</h2>
+                <p className="text-white/80 mt-2">Repaso intensivo antes del examen</p>
+              </div>
+
+              <div
+                onClick={() => setIsFlipped(!isFlipped)}
+                className="w-full max-w-lg aspect-[4/3] cursor-pointer perspective-1000"
+              >
+                <div className={`relative w-full h-full transition-transform duration-300 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+                  <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden border-4 border-amber-400">
+                    <span className="bg-rose-100 text-rose-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4">⚡ Cramming</span>
+                    <h2 className="text-2xl md:text-3xl font-black text-center text-slate-900 leading-snug">{flashcards[currentIndex]?.question}</h2>
+                  </div>
+                  <div className="absolute w-full h-full bg-white rounded-3xl shadow-2xl flex flex-col items-center justify-center p-8 backface-hidden rotate-y-180 border-4 border-emerald-400">
+                    <span className="bg-emerald-100 text-emerald-600 text-xs font-bold px-3 py-1 rounded-full uppercase mb-4">Respuesta</span>
+                    <p className="text-lg md:text-xl text-center text-slate-700 leading-relaxed">{flashcards[currentIndex]?.answer}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-4 mt-8">
+                <button
+                  onClick={handleDontKnow}
+                  className="bg-white/20 text-white font-bold px-6 py-4 rounded-xl hover:bg-white/30 transition-all"
+                >
+                  Repasar más tarde
+                </button>
+                <button
+                  onClick={handleKnow}
+                  className="bg-white text-rose-600 font-bold px-6 py-4 rounded-xl shadow-lg hover:scale-105 transition-all"
+                >
+                  ¡Lo domino! 🔥
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Cramming Complete Screen */}
+          {mode === 'cramming' && crammingComplete && (
+            <div className="w-full max-w-md">
+              <div className="bg-white rounded-3xl shadow-2xl p-8 text-center">
+                <div className="w-20 h-20 bg-gradient-to-br from-rose-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="material-symbols-outlined text-4xl text-white">bolt</span>
+                </div>
+                <h2 className="text-3xl font-black text-slate-900 mb-2">🔥 ¡Cramming Completado!</h2>
+                <p className="text-slate-500 mb-6">Repaso intensivo terminado</p>
+
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-violet-50 rounded-xl p-4">
+                    <div className="text-3xl font-black text-violet-600">+{xpEarned}</div>
+                    <div className="text-xs text-violet-500 font-bold">XP GANADOS</div>
+                  </div>
+                  <div className="bg-amber-50 rounded-xl p-4">
+                    <div className="text-3xl font-black text-amber-600">{correctFlashcards}/{flashcards.length}</div>
+                    <div className="text-xs text-amber-500 font-bold">DOMINADAS</div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-orange-100 to-red-100 rounded-xl p-4 mb-6">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="material-symbols-outlined text-orange-500">local_fire_department</span>
+                    <span className="text-lg font-bold text-orange-600">Racha activada</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleEndSession}
+                  className="w-full bg-gradient-to-r from-rose-600 to-orange-600 text-white font-bold py-4 rounded-xl hover:opacity-90 transition"
+                >
+                  Finalizar y Guardar Progreso
+                </button>
+              </div>
+            </div>
+          )}
+          {mode === 'podcast' && (
+            <div className="max-w-4xl mx-auto">
+              <NeuroPodcast
+                context={flashcards.map(f => `Q: ${f.question} A: ${f.answer}`).join('\n\n')}
+                topicTitle={className || "Sesión de Estudio"}
+              />
+            </div>
+          )}
+        </div>
       </main>
 
       {/* Statistics Modal */}
