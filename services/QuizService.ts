@@ -186,8 +186,18 @@ export async function generateAdaptiveQuiz(
 
         const { data: flashcards, error: flashcardsError } = await flashcardsQuery;
 
-        if (flashcardsError || !flashcards || flashcards.length === 0) {
-            console.error('Error fetching flashcards:', flashcardsError);
+        // 1b. Fetch notebooks content from study set
+        const { data: notebooks } = await supabase
+            .from('notebooks')
+            .select('title, content, last_saved_content')
+            .eq('study_set_id', studySetId);
+
+        // Allow quiz generation even if no flashcards, as long as there's notebook content
+        const hasFlashcards = flashcards && flashcards.length > 0;
+        const hasNotebooks = notebooks && notebooks.length > 0 && notebooks.some(n => n.content || n.last_saved_content);
+
+        if (!hasFlashcards && !hasNotebooks) {
+            console.error('Error: No flashcards or notebooks found for quiz generation');
             return [];
         }
 
@@ -220,10 +230,47 @@ export async function generateAdaptiveQuiz(
         // 4. Get previously asked questions to avoid repetition
         const previousQuestions = await getPreviousQuestions(studySetId, userId);
 
-        // 5. Build context for Gemini
-        const contentSummary = flashcards
+        // 5. Build context for Gemini (flashcards + notebooks)
+        const flashcardsSummary = (flashcards || [])
             .map(f => `Q: ${f.question}\nA: ${f.answer}\nTopic: ${f.category || 'General'}`)
             .join('\n\n');
+
+        // Extract text from notebooks HTML content
+        const extractTextFromHtml = (html: string): string => {
+            if (!html) return '';
+            return html
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<\/p>/gi, '\n\n')
+                .replace(/<\/li>/gi, '\n')
+                .replace(/<\/h[1-6]>/gi, '\n\n')
+                .replace(/<[^>]+>/g, '')
+                .replace(/&nbsp;/g, ' ')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/\n{3,}/g, '\n\n')
+                .trim();
+        };
+
+        const notebooksSummary = (notebooks || [])
+            .filter(n => n.content || n.last_saved_content)
+            .map(n => {
+                const text = extractTextFromHtml(n.content || n.last_saved_content || '');
+                return `--- Cuaderno: ${n.title} ---\n${text}`;
+            })
+            .join('\n\n');
+
+        // Combine both sources
+        let contentSummary = '';
+        if (flashcardsSummary) {
+            contentSummary += `FLASHCARDS DEL SET:\n${flashcardsSummary}`;
+        }
+        if (notebooksSummary) {
+            contentSummary += `\n\nAPUNTES DE CUADERNOS:\n${notebooksSummary}`;
+        }
+
+        console.log('[Quiz] Content sources - Flashcards:', (flashcards || []).length, 'Notebooks:', (notebooks || []).filter(n => n.content).length);
 
         let scopeInstruction = "";
         if (config?.contentScope === 'weak_topics' && weakTopics.length > 0) {
