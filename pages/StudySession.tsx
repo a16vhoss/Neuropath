@@ -297,12 +297,13 @@ const StudySession: React.FC = () => {
   // NEW: Dedicated effect for Quiz Mode Generation
   useEffect(() => {
     // Only trigger if we have flashcards, haven't generated yet, and we are in quiz mode
-    if (flashcards.length > 0 && !quizGenerated && mode === 'quiz' && !quizConfig && !showQuizConfig && loadingSource !== 'mock') {
+    // AND we are not currently loading a quiz
+    if (flashcards.length > 0 && !quizGenerated && mode === 'quiz' && !quizConfig && !showQuizConfig && loadingSource !== 'mock' && !quizLoading) {
       // Stop! We need config first.
       setQuizConfig(null);
       setShowQuizConfig(true);
     }
-  }, [flashcards, quizGenerated, mode, quizConfig, showQuizConfig, loadingSource]);
+  }, [flashcards, quizGenerated, mode, quizConfig, showQuizConfig, loadingSource, quizLoading]);
 
   // Actual Generation when Config is ready (or if we want to support auto-start later)
   const generateCustomQuiz = async (config: QuizConfig) => {
