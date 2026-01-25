@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
+import Highlight from '@tiptap/extension-highlight';
+import Underline from '@tiptap/extension-underline';
+import BubbleMenuExtension from '@tiptap/extension-bubble-menu';
 import { Notebook, FlashcardPreview, NotebookSaveResult } from '../../types';
 import {
   updateNotebook,
@@ -46,8 +51,16 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
         },
       }),
       Placeholder.configure({
-        placeholder: 'Empieza a escribir tus notas aqui...',
+        placeholder: 'Empieza a escribir tus notas aquí... Usa "/" para comandos rápidos.',
       }),
+      TaskList,
+      TaskItem.configure({
+        nested: true,
+      }),
+      Highlight.configure({
+        multiline: true,
+      }),
+      Underline,
     ],
     content: notebook.content || '',
     editable: canEdit,
@@ -170,16 +183,16 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
     icon: string;
     title: string;
     disabled?: boolean;
-  }> = ({ onClick, isActive, icon, title, disabled }) => (
+    className?: string;
+  }> = ({ onClick, isActive, icon, title, disabled, className }) => (
     <button
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`p-2 rounded-lg transition ${
-        isActive
+      className={`p-2 rounded-lg transition ${isActive
           ? 'bg-primary/10 text-primary'
           : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-      } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        } ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className || ''}`}
     >
       <span className="material-symbols-outlined text-xl">{icon}</span>
     </button>
@@ -233,10 +246,10 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
       </div>
 
       {/* Editor Container */}
-      <div className="flex-1 bg-white rounded-2xl border border-slate-100 overflow-hidden flex flex-col">
+      <div className="flex-1 bg-white rounded-2xl border border-slate-100 overflow-hidden flex flex-col relative group">
         {/* Toolbar */}
         {canEdit && editor && (
-          <div className="flex items-center gap-1 p-2 border-b border-slate-100 bg-slate-50 flex-wrap">
+          <div className="flex items-center gap-1 p-2 border-b border-slate-100 bg-slate-50 flex-wrap sticky top-0 z-10">
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleBold().run()}
               isActive={editor.isActive('bold')}
@@ -250,10 +263,23 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
               title="Cursiva (Ctrl+I)"
             />
             <ToolbarButton
+              onClick={() => editor.chain().focus().toggleUnderline().run()}
+              isActive={editor.isActive('underline')}
+              icon="format_underlined"
+              title="Subrayado (Ctrl+U)"
+            />
+            <ToolbarButton
               onClick={() => editor.chain().focus().toggleStrike().run()}
               isActive={editor.isActive('strike')}
               icon="strikethrough_s"
               title="Tachado"
+            />
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleHighlight().run()}
+              isActive={editor.isActive('highlight')}
+              icon="ink_highlighter"
+              title="Resaltar"
+              className={editor.isActive('highlight') ? 'text-amber-500 bg-amber-50' : ''}
             />
 
             <div className="w-px h-6 bg-slate-200 mx-1" />
@@ -283,13 +309,19 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
               onClick={() => editor.chain().focus().toggleBulletList().run()}
               isActive={editor.isActive('bulletList')}
               icon="format_list_bulleted"
-              title="Lista con vinetas"
+              title="Lista con viñetas"
             />
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleOrderedList().run()}
               isActive={editor.isActive('orderedList')}
               icon="format_list_numbered"
               title="Lista numerada"
+            />
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleTaskList().run()}
+              isActive={editor.isActive('taskList')}
+              icon="check_box"
+              title="Lista de tareas"
             />
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleBlockquote().run()}
@@ -301,7 +333,7 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
               onClick={() => editor.chain().focus().toggleCodeBlock().run()}
               isActive={editor.isActive('codeBlock')}
               icon="code"
-              title="Bloque de codigo"
+              title="Bloque de código"
             />
 
             <div className="w-px h-6 bg-slate-200 mx-1" />
@@ -321,8 +353,37 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
           </div>
         )}
 
-        {/* Editor Content */}
-        <div className="flex-1 overflow-auto p-6">
+        {/* Editor Content with Bubble Menu */}
+        <div className="flex-1 overflow-auto p-6 relative">
+          {editor && (
+            <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }} className="flex bg-slate-900 text-white rounded-lg shadow-xl overflow-hidden p-1 gap-1">
+              <button
+                onClick={() => editor.chain().focus().toggleBold().run()}
+                className={`p-1.5 rounded hover:bg-slate-700 transition ${editor.isActive('bold') ? 'bg-primary text-white' : 'text-slate-300'}`}
+              >
+                <span className="material-symbols-outlined text-lg">format_bold</span>
+              </button>
+              <button
+                onClick={() => editor.chain().focus().toggleItalic().run()}
+                className={`p-1.5 rounded hover:bg-slate-700 transition ${editor.isActive('italic') ? 'bg-primary text-white' : 'text-slate-300'}`}
+              >
+                <span className="material-symbols-outlined text-lg">format_italic</span>
+              </button>
+              <button
+                onClick={() => editor.chain().focus().toggleUnderline().run()}
+                className={`p-1.5 rounded hover:bg-slate-700 transition ${editor.isActive('underline') ? 'bg-primary text-white' : 'text-slate-300'}`}
+              >
+                <span className="material-symbols-outlined text-lg">format_underlined</span>
+              </button>
+              <button
+                onClick={() => editor.chain().focus().toggleHighlight().run()}
+                className={`p-1.5 rounded hover:bg-slate-700 transition ${editor.isActive('highlight') ? 'bg-amber-500 text-white' : 'text-slate-300'}`}
+              >
+                <span className="material-symbols-outlined text-lg">ink_highlighter</span>
+              </button>
+            </BubbleMenu>
+          )}
+
           <EditorContent
             editor={editor}
             className="prose prose-slate max-w-none min-h-[400px] focus:outline-none
@@ -332,7 +393,18 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
               [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-slate-400
               [&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left
               [&_.ProseMirror_p.is-editor-empty:first-child::before]:h-0
-              [&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none"
+              [&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none
+              /* Task List Styles */
+              [&_ul[data-type='taskList']]:list-none
+              [&_ul[data-type='taskList']]:p-0
+              [&_li[data-type='taskItem']]:flex
+              [&_li[data-type='taskItem']]:items-start
+              [&_li[data-type='taskItem']]:gap-2
+              [&_li[data-type='taskItem']]:my-1
+              [&_input[type='checkbox']]:mt-1.5
+              [&_input[type='checkbox']]:cursor-pointer
+              [&_input[type='checkbox']]:accent-primary
+              "
           />
         </div>
       </div>
@@ -342,7 +414,7 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
         <div className="flex items-center justify-between mt-4 p-4 bg-white rounded-xl border border-slate-100">
           <div className="flex items-center gap-2 text-sm text-slate-500">
             <span className="material-symbols-outlined text-base">info</span>
-            Al guardar se generaran flashcards del contenido nuevo
+            Al guardar se generarán flashcards del contenido nuevo
           </div>
 
           <div className="flex items-center gap-3">
