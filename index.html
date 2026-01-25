@@ -109,59 +109,75 @@
       outline: none;
     }
 
-    /* RemNote-style Indentation Guides & Spacing */
+    /* RemNote/Obsidian-style Indentation Guides & Spacing */
 
-    /* 1. Reset standard prose margins for list items to make them tighter */
+    /* 1. Reset & Tighten Item Spacing */
     .ProseMirror li>p {
-      margin-top: 0.2em;
-      margin-bottom: 0.2em;
+      margin-top: 0.25em;
+      margin-bottom: 0.25em;
     }
 
     .ProseMirror li {
-      margin-top: 0.1em;
-      margin-bottom: 0.1em;
+      margin-top: 0px;
+      margin-bottom: 0px;
+      position: relative;
     }
 
     /* 2. Vertical Thread Lines */
+    /* We use strictly positioned borders on the nested list containers */
     .ProseMirror ul ul,
     .ProseMirror ol ol,
     .ProseMirror ul ol,
     .ProseMirror ol ul {
-      border-left: 1px solid #E5E7EB;
-      /* Thin, subtle gray-200 line */
-      margin-left: -1rem;
-      /* Adjust based on parent */
+      border-left: 1px solid #E2E8F0;
+      /* slate-200, crisp line */
+      margin-left: -1.25rem;
+      /* Align perfectly with parent text start */
       padding-left: 1.25rem;
-      /* Space between line and content */
+      /* Push content back */
       position: relative;
+      transition: border-color 0.15s ease;
     }
 
-    /* 3. Refined interactions */
+    /* Specific adjustment for ordered (1. 2. 3.) to line up nicely */
+    .ProseMirror ol ol,
+    .ProseMirror ul ol {
+      margin-left: -1.4rem;
+    }
+
+    /* 3. Thread Hover Interaction (Focus Mode) */
+    /* When hovering a thread, darken the guide line */
     .ProseMirror ul ul:hover,
     .ProseMirror ol ol:hover,
     .ProseMirror ul ol:hover,
     .ProseMirror ol ul:hover {
       border-left-color: #94A3B8;
-      /* Darker slate-400 on hover */
-      transition: border-color 0.15s ease-in-out;
+      /* slate-400 */
     }
 
-    /* 4. Ordered List Number Positioning */
-    /* Ensure numbers don't overlap with the line */
+    /* 4. Markers (Numbers/Bullets) Styling */
+    /* Make them distinct but not overpowering */
     .ProseMirror ol {
       padding-left: 1.6em;
-      /* Ensure space for numbers */
     }
 
     .ProseMirror ol li::marker {
-      color: #9CA3AF;
-      /* Subtle numbers */
-      font-weight: 500;
+      color: #64748B;
+      /* slate-500 - Visible and professional */
+      font-weight: 600;
+      /* Slightly bolder */
+      font-variant-numeric: tabular-nums;
     }
 
     .ProseMirror ul li::marker {
-      color: #CBD5E1;
-      /* Subtle bullets */
+      color: #94A3B8;
+      /* slate-400 bullets */
+    }
+
+    /* 5. Active/Focused Line (Optional tweak for functionality) */
+    .ProseMirror ul:focus-within,
+    .ProseMirror ol:focus-within {
+      /* Could add a subtle highlight to current thread, but relying on hover is cleaner */
     }
   </style>
 
