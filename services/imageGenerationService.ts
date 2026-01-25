@@ -24,16 +24,18 @@ export const generateEducationalImage = async (
   }
 
   try {
-    // Create optimized prompt for educational image
-    const imagePrompt = `Create an educational diagram or illustration about: ${concept}.
-${context ? `Context: ${context.slice(0, 300)}` : ''}
+    // Create optimized prompt for educational image - NO TEXT
+    const imagePrompt = `Create a simple, clean educational illustration about: ${concept}.
 
-Style requirements:
-- Clean, professional educational diagram
-- Labeled parts with clear text
-- Bright, engaging colors
-- Simple shapes and clear visuals
-- No complex text, focus on visual explanation`;
+CRITICAL REQUIREMENTS:
+- NO TEXT whatsoever - no labels, no words, no letters, no numbers
+- Pure visual illustration only
+- Simple, clean vector-style graphics
+- Bright, vibrant colors
+- Easy to understand visually without any text
+- Minimalist design with clear shapes
+- White or light background
+- Professional educational illustration style`;
 
     console.log('Generating educational image with Gemini...');
 

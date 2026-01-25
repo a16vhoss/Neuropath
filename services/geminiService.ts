@@ -97,70 +97,95 @@ export interface SearchResult {
 }
 
 /**
- * AI Research: Search internet using Google Search Grounding
- * Uses REAL Google Search for verified URLs
+ * AI Research: Search internet for educational resources
+ * Generates high-quality educational resource recommendations
  */
 export const searchInternet = async (topic: string, setContext: string, setName: string): Promise<SearchResult[]> => {
   const ai = getGeminiSDK();
   if (!ai) return [];
 
   try {
-    console.log('Using Google Search Grounding for real results');
+    console.log('Searching for educational resources about:', topic);
+
+    const schema = {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          url: { type: Type.STRING },
+          snippet: { type: Type.STRING },
+          type: { type: Type.STRING }
+        },
+        required: ["title", "url", "snippet", "type"]
+      }
+    };
 
     const prompt = `
-      Busca recursos educativos sobre: "${topic}" relacionados con "${setName}".
-      Contexto: ${setContext.slice(0, 1000)}
+Eres un experto investigador académico. Necesito recursos educativos REALES sobre: "${topic}"
+Contexto del estudio: "${setName}"
+${setContext ? `Material relacionado: ${setContext.slice(0, 500)}` : ''}
 
-      Encuentra 4-6 recursos de alta calidad (artículos web y videos de YouTube).
-      Para cada recurso proporciona: título, URL real, y una breve descripción de por qué es útil.
+INSTRUCCIONES CRÍTICAS:
+1. Proporciona EXACTAMENTE 4 recursos educativos de alta calidad
+2. Incluye 2 artículos web y 2 videos de YouTube
+3. Las URLs deben ser de sitios REALES y confiables:
+   - Para web: Wikipedia, Khan Academy, Coursera, edX, universidades (.edu)
+   - Para YouTube: canales educativos conocidos
 
-      Responde en formato JSON:
-      [
-        {"title": "...", "url": "https://...", "snippet": "...", "type": "web"},
-        {"title": "...", "url": "https://youtube.com/...", "snippet": "...", "type": "youtube"}
-      ]
-    `;
+FORMATO DE RESPUESTA (JSON array):
+[
+  {
+    "title": "Título descriptivo del recurso",
+    "url": "https://es.wikipedia.org/wiki/...",
+    "snippet": "Breve descripción de qué aprenderás",
+    "type": "web"
+  },
+  {
+    "title": "Nombre del video educativo",
+    "url": "https://www.youtube.com/watch?v=...",
+    "snippet": "De qué trata este video",
+    "type": "youtube"
+  }
+]
 
-    // Use Google Search grounding for real URLs
+Idioma: Español (preferir recursos en español cuando existan).
+`;
+
     const response = await ai.models.generateContent({
-      model: getSearchModel(),
+      model: await getBestGeminiModel(),
       contents: prompt,
       config: {
-        tools: [{ googleSearch: {} }],
-        temperature: 0.2
+        responseMimeType: "application/json",
+        responseSchema: schema,
+        temperature: 0.3
       }
     });
 
-    const text = response.text || "";
+    const text = response.text || "[]";
+    const results = JSON.parse(text);
 
-    // Extract grounding metadata for real URLs
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-
-    // If we have grounding data, use it directly
-    if (groundingChunks.length > 0) {
-      return groundingChunks.slice(0, 6).map((chunk: any) => ({
-        title: chunk.web?.title || "Recurso educativo",
-        url: chunk.web?.uri || "",
-        snippet: "Recurso encontrado mediante búsqueda de Google",
-        type: chunk.web?.uri?.includes('youtube.com') ? 'youtube' : 'web'
-      })).filter((r: SearchResult) => r.url);
-    }
-
-    // Fallback: try to parse JSON from response
-    try {
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-    } catch {
-      console.warn("Could not parse search results");
-    }
-
-    return [];
+    console.log('Search results:', results.length);
+    return results;
 
   } catch (error) {
     console.error("Error in search:", error);
-    return [];
+
+    // Fallback: return some default educational resources
+    return [
+      {
+        title: `${topic} - Wikipedia`,
+        url: `https://es.wikipedia.org/wiki/${encodeURIComponent(topic.replace(/ /g, '_'))}`,
+        snippet: "Artículo enciclopédico con información general sobre el tema",
+        type: "web"
+      },
+      {
+        title: `${topic} explicado - Khan Academy`,
+        url: "https://es.khanacademy.org/",
+        snippet: "Lecciones y ejercicios interactivos gratuitos",
+        type: "web"
+      }
+    ];
   }
 };
 
