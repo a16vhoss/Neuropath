@@ -43,8 +43,82 @@ const StudyGuideSection: React.FC<StudyGuideSectionProps> = ({
     );
   }
 
-  // H2 Section (main collapsible sections)
-  if (section.level === 2) {
+  // Helper to render content lines
+  const renderContentLines = (content: string[], accentColor: string, textColor: string) => {
+    return content.map((line, lIdx) => {
+      const trimmedLine = line.trim();
+
+      // Bullet points
+      if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('• ')) {
+        return (
+          <li key={lIdx} className="ml-4 text-slate-600 list-none flex gap-2">
+            <span className={`mt-1.5 w-1.5 h-1.5 rounded-full ${accentColor} flex-shrink-0`} />
+            <span className="flex-1">{formatText(trimmedLine.substring(2))}</span>
+          </li>
+        );
+      }
+
+      // Numbered items
+      const numberedMatch = trimmedLine.match(/^(\d+)\.\s+(.*)/);
+      if (numberedMatch) {
+        return (
+          <li key={lIdx} className="ml-4 text-slate-600 list-none flex gap-2">
+            <span className={`font-bold ${textColor} mt-0.5`}>{numberedMatch[1]}.</span>
+            <span className="flex-1">{formatText(numberedMatch[2])}</span>
+          </li>
+        );
+      }
+
+      // Empty lines = spacer
+      if (!trimmedLine) {
+        return <div key={lIdx} className="h-2" />;
+      }
+
+      // Regular paragraph
+      return (
+        <p key={lIdx} className="text-slate-600 leading-relaxed">
+          {formatText(line)}
+        </p>
+      );
+    });
+  };
+
+  // Helper to render H3 subsection
+  const renderH3Section = (child: ParsedSection) => {
+    const childColors = SECTION_COLORS[child.type as SectionType] || SECTION_COLORS.general;
+    return (
+      <div key={child.id} id={child.id} className="mt-5 mb-3">
+        <h3 className="text-md font-bold text-slate-800 flex items-center gap-2 mb-3">
+          <div className={`w-1.5 h-5 ${childColors.accent} rounded-full`} />
+          {child.title}
+        </h3>
+        <div className="pl-4 space-y-2">
+          {renderContentLines(child.content, childColors.accent, childColors.text)}
+          {/* Render H4 children inside H3 */}
+          {child.children?.map(h4Child => renderH4Section(h4Child))}
+        </div>
+      </div>
+    );
+  };
+
+  // Helper to render H4 sub-subsection
+  const renderH4Section = (child: ParsedSection) => {
+    return (
+      <div key={child.id} id={child.id} className="mt-3 mb-2 bg-slate-50 p-4 rounded-xl border border-slate-100">
+        <h4 className="text-sm font-bold text-slate-700 mb-2">{child.title}</h4>
+        <div className="space-y-1">
+          {child.content.map((line, lIdx) => (
+            <p key={lIdx} className="text-sm text-slate-500">
+              {formatText(line)}
+            </p>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // H2 Section (main collapsible sections) - also handle H1 the same way
+  if (section.level === 2 || section.level === 1) {
     return (
       <div
         id={section.id}
@@ -81,45 +155,21 @@ const StudyGuideSection: React.FC<StudyGuideSectionProps> = ({
         {/* Collapsible Content */}
         <div
           className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            isCollapsed ? 'max-h-0' : 'max-h-[5000px]'
+            isCollapsed ? 'max-h-0' : 'max-h-[10000px]'
           }`}
         >
           <div className="p-5 bg-white space-y-3">
-            {section.content.map((line, lIdx) => {
-              const trimmedLine = line.trim();
+            {/* Render direct content of H2 */}
+            {renderContentLines(section.content, colors.accent, colors.text)}
 
-              // Bullet points
-              if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('• ')) {
-                return (
-                  <li key={lIdx} className="ml-4 text-slate-600 list-none flex gap-2">
-                    <span className={`mt-1.5 w-1.5 h-1.5 rounded-full ${colors.accent} flex-shrink-0`} />
-                    <span className="flex-1">{formatText(trimmedLine.substring(2))}</span>
-                  </li>
-                );
+            {/* Render nested H3/H4 children */}
+            {section.children?.map(child => {
+              if (child.level === 3) {
+                return renderH3Section(child);
+              } else if (child.level === 4) {
+                return renderH4Section(child);
               }
-
-              // Numbered items
-              const numberedMatch = trimmedLine.match(/^(\d+)\.\s+(.*)/);
-              if (numberedMatch) {
-                return (
-                  <li key={lIdx} className="ml-4 text-slate-600 list-none flex gap-2">
-                    <span className={`font-bold ${colors.text} mt-0.5`}>{numberedMatch[1]}.</span>
-                    <span className="flex-1">{formatText(numberedMatch[2])}</span>
-                  </li>
-                );
-              }
-
-              // Empty lines = spacer
-              if (!trimmedLine) {
-                return <div key={lIdx} className="h-2" />;
-              }
-
-              // Regular paragraph
-              return (
-                <p key={lIdx} className="text-slate-600 leading-relaxed">
-                  {formatText(line)}
-                </p>
-              );
+              return null;
             })}
           </div>
         </div>

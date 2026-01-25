@@ -24,9 +24,9 @@ export const useStudyGuideProgress = (
   const [progressMap, setProgressMap] = useState<Map<string, boolean>>(new Map());
   const [loading, setLoading] = useState(true);
 
-  // Only count H2 sections for progress
-  const h2Sections = sections.filter(s => s.level === 2);
-  const totalSections = h2Sections.length;
+  // Count H1/H2 sections for progress (main collapsible sections)
+  const mainSections = sections.filter(s => s.level === 1 || s.level === 2);
+  const totalSections = mainSections.length;
 
   // Load initial progress from database
   useEffect(() => {
@@ -72,7 +72,7 @@ export const useStudyGuideProgress = (
   }, [user?.id, studySetId, progressMap]);
 
   // Calculate progress
-  const readCount = h2Sections.filter(s => progressMap.get(s.id)).length;
+  const readCount = mainSections.filter(s => progressMap.get(s.id)).length;
   const progressPercent = totalSections > 0 ? Math.round((readCount / totalSections) * 100) : 0;
 
   return {

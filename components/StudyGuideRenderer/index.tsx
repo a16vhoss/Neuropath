@@ -14,58 +14,145 @@ import StudyGuideSection from './StudyGuideSection';
 import StudyGuideMindMap from './StudyGuideMindMap';
 import { useStudyGuideProgress } from './useStudyGuideProgress';
 
-// Parse markdown content into sections
+// Determine section type based on title content
+const getSectionType = (title: string): SectionType => {
+  if (title.includes('PANORAMA GENERAL') || title.includes('SECCIÓN 1')) return 'overview';
+  if (title.includes('DESARROLLO CONCEPTUAL') || title.includes('SECCIÓN 2')) return 'concept';
+  if (title.includes('INTEGRACIÓN') || title.includes('SECCIÓN 3')) return 'integration';
+  if (title.includes('HERRAMIENTAS') || title.includes('SECCIÓN 4')) return 'tools';
+  if (title.includes('PRÁCTICA') || title.includes('SECCIÓN 5')) return 'practice';
+  if (title.includes('AUTOEVALUACIÓN') || title.includes('SECCIÓN 6')) return 'exam';
+  if (title.includes('PUNTOS CRÍTICOS') || title.includes('SECCIÓN 7')) return 'warning';
+  if (title.includes('INFOGRAFÍA') || title.includes('TÍTULO IMPACTANTE')) return 'infographic';
+  if (title.includes('SLIDE') || title.includes('DIAPOSITIVA')) return 'presentation';
+  return 'general';
+};
+
+// Parse markdown content into sections with nested H3/H4 inside H2
 const parseContent = (text: string): ParsedSection[] => {
   const lines = text.split('\n');
   const sections: ParsedSection[] = [];
-  let currentSection: ParsedSection | null = null;
   let sectionIndex = 0;
+
+  // Track current sections at each level
+  let currentH2: ParsedSection | null = null;
+  let currentH3: ParsedSection | null = null;
+  let currentIntro: ParsedSection | null = null;
+
+  const addContentLine = (line: string) => {
+    // Add content to the deepest current section
+    if (currentH3) {
+      if (line.trim() || currentH3.content.length > 0) {
+        currentH3.content.push(line);
+      }
+    } else if (currentH2) {
+      if (line.trim() || currentH2.content.length > 0) {
+        currentH2.content.push(line);
+      }
+    } else if (currentIntro) {
+      currentIntro.content.push(line);
+    }
+  };
 
   lines.forEach(line => {
     const headerMatch = line.match(/^(#{1,4})\s+(.*)/);
 
     if (headerMatch) {
-      if (currentSection) sections.push(currentSection);
-
       const level = headerMatch[1].length;
       const title = headerMatch[2].trim();
-      let type: SectionType = 'general';
 
-      // Determine section type based on title content
-      if (title.includes('PANORAMA GENERAL') || title.includes('SECCIÓN 1')) type = 'overview';
-      else if (title.includes('DESARROLLO CONCEPTUAL') || title.includes('SECCIÓN 2')) type = 'concept';
-      else if (title.includes('INTEGRACIÓN') || title.includes('SECCIÓN 3')) type = 'integration';
-      else if (title.includes('HERRAMIENTAS') || title.includes('SECCIÓN 4')) type = 'tools';
-      else if (title.includes('PRÁCTICA') || title.includes('SECCIÓN 5')) type = 'practice';
-      else if (title.includes('AUTOEVALUACIÓN') || title.includes('SECCIÓN 6')) type = 'exam';
-      else if (title.includes('PUNTOS CRÍTICOS') || title.includes('SECCIÓN 7')) type = 'warning';
-      else if (title.includes('INFOGRAFÍA') || title.includes('TÍTULO IMPACTANTE')) type = 'infographic';
-      else if (title.includes('SLIDE') || title.includes('DIAPOSITIVA')) type = 'presentation';
-
-      currentSection = {
-        id: `section-${sectionIndex++}`,
-        title,
-        type,
-        level,
-        content: []
-      };
-    } else if (currentSection) {
-      if (line.trim() || currentSection.content.length > 0) {
-        currentSection.content.push(line);
+      if (level === 1) {
+        // H1 - treat like H2 (main section)
+        if (currentIntro) {
+          sections.push(currentIntro);
+          currentIntro = null;
+        }
+        if (currentH2) {
+          sections.push(currentH2);
+        }
+        currentH2 = {
+          id: `section-${sectionIndex++}`,
+          title,
+          type: getSectionType(title),
+          level: 1,
+          content: [],
+          children: []
+        };
+        currentH3 = null;
+      } else if (level === 2) {
+        // H2 - main collapsible section
+        if (currentIntro) {
+          sections.push(currentIntro);
+          currentIntro = null;
+        }
+        if (currentH2) {
+          sections.push(currentH2);
+        }
+        currentH2 = {
+          id: `section-${sectionIndex++}`,
+          title,
+          type: getSectionType(title),
+          level: 2,
+          content: [],
+          children: []
+        };
+        currentH3 = null;
+      } else if (level === 3 && currentH2) {
+        // H3 - subsection inside H2
+        currentH3 = {
+          id: `section-${sectionIndex++}`,
+          title,
+          type: currentH2.type, // Inherit parent type
+          level: 3,
+          content: [],
+          children: []
+        };
+        currentH2.children = currentH2.children || [];
+        currentH2.children.push(currentH3);
+      } else if (level === 4 && currentH3) {
+        // H4 - sub-subsection inside H3
+        const h4Section: ParsedSection = {
+          id: `section-${sectionIndex++}`,
+          title,
+          type: currentH3.type,
+          level: 4,
+          content: []
+        };
+        currentH3.children = currentH3.children || [];
+        currentH3.children.push(h4Section);
+      } else if (level === 4 && currentH2) {
+        // H4 without H3 parent - add directly to H2
+        const h4Section: ParsedSection = {
+          id: `section-${sectionIndex++}`,
+          title,
+          type: currentH2.type,
+          level: 4,
+          content: []
+        };
+        currentH2.children = currentH2.children || [];
+        currentH2.children.push(h4Section);
       }
+    } else if (currentH2 || currentIntro) {
+      addContentLine(line);
     } else if (line.trim()) {
       // Intro text before any header
-      currentSection = {
-        id: `section-${sectionIndex++}`,
-        title: '',
-        type: 'intro',
-        level: 0,
-        content: [line]
-      };
+      if (!currentIntro) {
+        currentIntro = {
+          id: `section-${sectionIndex++}`,
+          title: '',
+          type: 'intro',
+          level: 0,
+          content: []
+        };
+      }
+      currentIntro.content.push(line);
     }
   });
 
-  if (currentSection) sections.push(currentSection);
+  // Push final sections
+  if (currentIntro) sections.push(currentIntro);
+  if (currentH2) sections.push(currentH2);
+
   return sections;
 };
 
@@ -91,10 +178,10 @@ const StudyGuideRenderer: React.FC<StudyGuideRendererProps> = ({
     loading: progressLoading
   } = useStudyGuideProgress(studySetId, sections);
 
-  // Collapsed state for H2 sections
+  // Collapsed state for H1/H2 sections (main collapsible sections)
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
     if (defaultCollapsed) {
-      return new Set(sections.filter(s => s.level === 2).map(s => s.id));
+      return new Set(sections.filter(s => s.level === 1 || s.level === 2).map(s => s.id));
     }
     return new Set();
   });

@@ -722,7 +722,19 @@ export const generateAdvancedQuiz = async (prompt: string): Promise<any[]> => {
           scenario: { type: Type.STRING },
           designPrompt: { type: Type.STRING },
           evaluationCriteria: { type: Type.ARRAY, items: { type: Type.STRING } },
-          realWorldExample: { type: Type.STRING }
+          realWorldExample: { type: Type.STRING },
+          // Advanced types support
+          orderingItems: { type: Type.ARRAY, items: { type: Type.STRING } },
+          matchingPairs: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: { left: { type: Type.STRING }, right: { type: Type.STRING } }
+            }
+          },
+          fillBlankText: { type: Type.STRING },
+          fillBlankAnswers: { type: Type.ARRAY, items: { type: Type.STRING } },
+          errorText: { type: Type.STRING }
         },
         required: ["question", "options", "correctIndex", "explanation", "type"]
       }

@@ -1,6 +1,6 @@
 /**
  * Floating Table of Contents for Study Guide
- * Shows all H2 sections with progress indicators
+ * Shows all H1/H2 sections with progress indicators
  */
 
 import React from 'react';
@@ -13,13 +13,13 @@ const StudyGuideTOC: React.FC<StudyGuideTOCProps> = ({
   progressMap,
   onSectionClick
 }) => {
-  // Filter to only show H2 sections in TOC
-  const h2Sections = sections.filter(s => s.level === 2);
+  // Filter to show H1/H2 sections in TOC (main collapsible sections)
+  const mainSections = sections.filter(s => s.level === 1 || s.level === 2);
 
-  if (h2Sections.length === 0) return null;
+  if (mainSections.length === 0) return null;
 
-  const readCount = h2Sections.filter(s => progressMap.get(s.id)).length;
-  const progressPercent = Math.round((readCount / h2Sections.length) * 100);
+  const readCount = mainSections.filter(s => progressMap.get(s.id)).length;
+  const progressPercent = Math.round((readCount / mainSections.length) * 100);
 
   return (
     <nav className="space-y-2">
@@ -44,7 +44,7 @@ const StudyGuideTOC: React.FC<StudyGuideTOCProps> = ({
 
       {/* Section list */}
       <div className="space-y-1">
-        {h2Sections.map(section => {
+        {mainSections.map(section => {
           const isActive = activeSectionId === section.id;
           const isRead = progressMap.get(section.id) || false;
           // Clean title for display (remove "SECCIÓN X:" prefix)
@@ -90,7 +90,7 @@ const StudyGuideTOC: React.FC<StudyGuideTOCProps> = ({
       {/* Footer stats */}
       <div className="mt-4 pt-4 border-t border-slate-200">
         <p className="text-xs text-slate-400">
-          {readCount} de {h2Sections.length} secciones leídas
+          {readCount} de {mainSections.length} secciones leídas
         </p>
       </div>
     </nav>

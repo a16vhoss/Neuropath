@@ -23,6 +23,7 @@ export interface ParsedSection {
   type: SectionType;    // Section category
   level: number;        // Header depth (1-4 based on # count, 0 for intro)
   content: string[];    // Array of content lines
+  children?: ParsedSection[]; // Nested subsections (H3 inside H2, H4 inside H3)
 }
 
 // Database model for reading progress
