@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getZpBotResponse, generatePromptedFlashcards, searchInternet } from '../services/geminiService';
+import { getZpBotResponse, generatePromptedFlashcards, searchInternet, generateResearchClarifications } from '../services/geminiService';
 import { addFlashcardsBatch, createMaterialWithFlashcards } from '../services/supabaseClient';
 import { generateFlashcardsFromText, generateMaterialSummary } from '../services/pdfProcessingService';
 import {
@@ -41,18 +41,14 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
         }
     }, [studySetId, isOpen]);
 
-    // OMITTED: useEffect on currentSessionId to prevent race conditions.
-    // We will call loadMessages explicitly when selecting a session.
-
     const loadSessions = async () => {
         const list = await getChatSessions(studySetId);
         setSessions(list);
 
-        // Auto-select most recent if exists AND we are just opening
         if (list.length > 0 && !currentSessionId) {
             const mostRecent = list[0];
             setCurrentSessionId(mostRecent.id);
-            loadMessages(mostRecent.id); // Explicit load
+            loadMessages(mostRecent.id);
         }
     };
 
@@ -61,7 +57,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
         try {
             const history = await getSessionMessages(sessionId);
             setMessages(history);
-            setSuggestions([]); // Clear initial suggestions on historic load
+            setSuggestions([]);
         } catch (error) {
             console.error('Error loading messages', error);
         } finally {
@@ -70,19 +66,19 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
     };
 
     const handleNewChat = () => {
-        setCurrentSessionId(null); // Reset to "New Chat" state
+        setCurrentSessionId(null);
         setMessages([]);
         setSuggestions([
             `¿De qué trata "${studySetName}"?`,
             "¿Puedes hacerme un resumen?",
             "¿Qué es lo más importante?"
         ]);
-        setIsSidebarOpen(false); // Close sidebar on mobile/small view if needed
+        setIsSidebarOpen(false);
     };
 
     const handleSelectSession = (sessionId: string) => {
         setCurrentSessionId(sessionId);
-        loadMessages(sessionId); // Explicit load
+        loadMessages(sessionId);
         setIsSidebarOpen(false);
     };
 
@@ -91,8 +87,6 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
         if (!window.confirm('¿Borrar este chat?')) return;
 
         await deleteChatSession(sessionId);
-
-        // Refresh list
         const updated = sessions.filter(s => s.id !== sessionId);
         setSessions(updated);
 
@@ -113,13 +107,14 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
     const [generatedCards, setGeneratedCards] = useState<any[]>([]);
 
     // Research Wizard State
-    const [researchMode, setResearchMode] = useState<'idle' | 'asking_topic' | 'searching' | 'results'>('idle');
+    const [researchMode, setResearchMode] = useState<'idle' | 'asking_topic' | 'clarifying' | 'searching' | 'results'>('idle');
     const [researchResults, setResearchResults] = useState<any[]>([]);
+    const [clarificationData, setClarificationData] = useState<{ question: string; options: string[] } | null>(null);
 
     // Auto-scroll
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isOpen, suggestions, fcMode, generatedCards]);
+    }, [messages, isOpen, suggestions, fcMode, researchMode, researchResults]);
 
     const startFlashcardFlow = () => {
         setFcMode('asking_topic');
@@ -146,9 +141,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
     };
 
     const handlePerformResearch = async (topic: string) => {
-        setResearchMode('searching');
-        const loadingMsgId = Date.now().toString();
-
+        setLoading(true);
         setMessages(prev => [...prev, {
             id: Date.now().toString(),
             role: 'user',
@@ -159,38 +152,59 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
             session_id: currentSessionId || 'temp'
         }]);
 
+        try {
+            setResearchMode('clarifying');
+            const clarifications = await generateResearchClarifications(topic, contextText || '', studySetName);
+            setClarificationData(clarifications);
+
+            setMessages(prev => [...prev, {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: clarifications.question,
+                created_at: new Date().toISOString(),
+                study_set_id: studySetId,
+                user_id: 'system'
+            }]);
+
+            setSuggestions(clarifications.options);
+
+        } catch (error) {
+            console.error("Research clarification failed", error);
+            proceedWithSearch(topic);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const proceedWithSearch = async (finalQuery: string) => {
+        setResearchMode('searching');
+        setSuggestions([]);
+        const loadingMsgId = Date.now().toString();
+
         setMessages(prev => [...prev, {
             id: loadingMsgId,
             role: 'assistant',
-            content: '🌐 Buscando los mejores recursos en internet para ti... Esto tomará un momento.',
+            content: `🌐 Excelente elección. Buscando los mejores recursos sobre "${finalQuery}"...`,
             created_at: new Date().toISOString(),
             study_set_id: studySetId,
             user_id: 'system'
         }]);
 
         try {
-            const results = await searchInternet(topic);
+            const results = await searchInternet(finalQuery);
             setResearchResults(results);
             setResearchMode('results');
 
             setMessages(prev => prev.filter(m => m.id !== loadingMsgId).concat({
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
-                content: `✅ He encontrado ${results.length} recursos de alta calidad sobre "${topic}". Revísalos abajo y dime cuál quieres añadir a tus materiales.`,
+                content: `✅ He encontrado ${results.length} recursos de alta calidad. Revísalos abajo.`,
                 created_at: new Date().toISOString(),
                 study_set_id: studySetId,
                 user_id: 'system'
             }));
         } catch (error) {
             console.error(error);
-            setMessages(prev => prev.filter(m => m.id !== loadingMsgId).concat({
-                id: Date.now().toString(),
-                role: 'assistant',
-                content: '❌ No pude completar la investigación en este momento. Intenta de nuevo.',
-                created_at: new Date().toISOString(),
-                study_set_id: studySetId,
-                user_id: 'system'
-            }));
             setResearchMode('idle');
         }
     };
@@ -198,14 +212,12 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
     const handleAddResourceAsMaterial = async (resource: any) => {
         setLoading(true);
         try {
-            // 1. Generate some initial flashcards from the snippet/title
             const initialCards = await generateFlashcardsFromText(
                 `Título: ${resource.title}\nDescripción: ${resource.snippet}`,
-                resource.title, // Use title as topic
-                3 // Generate 3 initial cards
+                resource.title,
+                3
             ) || [];
 
-            // 2. This is a specialized material addition for URL
             await createMaterialWithFlashcards({
                 study_set_id: studySetId,
                 name: resource.title,
@@ -225,9 +237,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                 user_id: 'system'
             }]);
 
-            // Optional: Auto-refresh list after a bit
             setTimeout(() => window.location.reload(), 2000);
-
         } catch (error) {
             console.error('Error adding resource:', error);
             alert('Error al añadir material');
@@ -240,8 +250,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
         setFcMode('generating');
         const loadingMsgId = Date.now().toString();
 
-        // Add optimistic user message for the topic
-        const userMsg: ChatMessage = {
+        setMessages(prev => [...prev, {
             id: Date.now().toString(),
             role: 'user',
             content: topic,
@@ -249,10 +258,8 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
             study_set_id: studySetId,
             user_id: 'me',
             session_id: currentSessionId || 'temp'
-        };
-        setMessages(prev => [...prev, userMsg]);
+        }]);
 
-        // Add loading indicator
         setMessages(prev => [...prev, {
             id: loadingMsgId,
             role: 'assistant',
@@ -263,7 +270,6 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
         }]);
 
         try {
-            // Save user message to DB if session exists
             if (currentSessionId) {
                 await saveChatMessage(studySetId, 'user', topic, currentSessionId);
             }
@@ -272,7 +278,6 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
             setGeneratedCards(cards);
             setFcMode('preview');
 
-            // Replace loading message with success
             setMessages(prev => prev.filter(m => m.id !== loadingMsgId).concat({
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
@@ -320,9 +325,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
 
             setGeneratedCards([]);
             setFcMode('idle');
-            // Refresh web app state? ideally study set details should listen or re-fetch
-            window.location.reload(); // Hard refresh to show new cards for now (easiest way without prop callbacks)
-
+            window.location.reload();
         } catch (error) {
             console.error(error);
             alert('Error al guardar');
@@ -335,7 +338,6 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
         const userText = text || input;
         if (!userText.trim() || loading) return;
 
-        // If in wizard mode, intercept input
         if (fcMode === 'asking_topic') {
             setInput('');
             handleGenerateFlashcards(userText);
@@ -348,11 +350,25 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
             return;
         }
 
+        if (researchMode === 'clarifying') {
+            setInput('');
+            setMessages(prev => [...prev, {
+                id: Date.now().toString(),
+                role: 'user',
+                content: userText,
+                created_at: new Date().toISOString(),
+                study_set_id: studySetId,
+                user_id: 'me',
+                session_id: currentSessionId || 'temp'
+            }]);
+            proceedWithSearch(userText);
+            return;
+        }
+
         setInput('');
         setSuggestions([]);
         setLoading(true);
 
-        // Optimistic UI
         const tempUserMsg: ChatMessage = {
             id: Date.now().toString(),
             role: 'user',
@@ -367,9 +383,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
         try {
             let activeSessionId = currentSessionId;
 
-            // Create session if new
             if (!activeSessionId) {
-                // Generate simple title from first few words of message
                 const newTitle = userText.length > 30 ? userText.substring(0, 30) + '...' : userText;
                 const newSession = await createChatSession(studySetId, newTitle);
                 if (newSession) {
@@ -379,17 +393,13 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                 }
             }
 
-            // 1. Save User Message
             await saveChatMessage(studySetId, 'user', userText, activeSessionId || undefined);
 
-            // 2. AI Response
             const historyForAI = messages.map(m => ({ role: m.role, content: m.content }));
             const aiResponse = await getZpBotResponse(userText, contextText || '', historyForAI);
 
-            // 3. Save AI Message
             const savedAiMsg = await saveChatMessage(studySetId, 'assistant', aiResponse.text, activeSessionId || undefined);
 
-            // 4. Update UI
             const aiMsgDisplay = savedAiMsg || {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
@@ -420,7 +430,6 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
 
     return (
         <>
-            {/* Floating Button */}
             {!isOpen && (
                 <button
                     onClick={() => setIsOpen(true)}
@@ -430,11 +439,8 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                 </button>
             )}
 
-            {/* Main Window */}
             {isOpen && (
                 <div className="fixed bottom-6 right-6 w-[400px] h-[600px] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex overflow-hidden z-50 animate-in slide-in-from-bottom-10 fade-in duration-300">
-
-                    {/* Sidebar (History) */}
                     <div className={`${isSidebarOpen ? 'w-64' : 'w-0'} bg-slate-950 transition-all duration-300 border-r border-slate-800 flex flex-col overflow-hidden relative`}>
                         <div className="p-3 border-b border-slate-800 flex justify-between items-center min-w-[256px]">
                             <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Historial</span>
@@ -443,7 +449,6 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-2 min-w-[256px]">
-                            {/* New Chat Button in Sidebar */}
                             <button
                                 onClick={handleNewChat}
                                 className="w-full mb-3 flex items-center gap-2 p-3 bg-cyan-600/10 hover:bg-cyan-600/20 text-cyan-400 rounded-xl border border-dashed border-cyan-500/30 transition-all"
@@ -452,7 +457,6 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                                 <span className="text-sm font-medium">Nuevo Chat</span>
                             </button>
 
-                            {/* Session List */}
                             {sessions.map(session => (
                                 <div
                                     key={session.id}
@@ -474,10 +478,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                         </div>
                     </div>
 
-                    {/* Chat Content */}
                     <div className="flex-1 flex flex-col w-full h-full relative">
-
-                        {/* Header */}
                         <div className="bg-slate-800 p-3 border-b border-slate-700 flex items-center justify-between shrink-0">
                             <div className="flex items-center gap-2">
                                 <button
@@ -524,7 +525,6 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                             </div>
                         </div>
 
-                        {/* Messages */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-900/95 scrollbar-thin scrollbar-thumb-slate-700">
                             {!currentSessionId && messages.length === 0 && (
                                 <div className="h-full flex flex-col items-center justify-center text-slate-500 p-6 text-center animate-in fade-in zoom-in duration-500">
@@ -564,7 +564,6 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                                 </div>
                             )}
 
-                            {/* Generated Cards Preview */}
                             {fcMode === 'preview' && generatedCards.length > 0 && (
                                 <div className="space-y-3 pl-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="bg-slate-800 border border-emerald-500/30 rounded-2xl p-4 shadow-lg shadow-emerald-900/10">
@@ -599,7 +598,6 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                                 </div>
                             )}
 
-                            {/* Research Results Preview */}
                             {researchMode === 'results' && researchResults.length > 0 && (
                                 <div className="space-y-3 pl-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="bg-slate-800 border border-cyan-500/30 rounded-2xl p-4 shadow-lg shadow-cyan-900/10">
@@ -641,6 +639,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                                     </div>
                                 </div>
                             )}
+
                             {!loading && suggestions.length > 0 && (
                                 <div className="pl-2 space-y-2 animate-in slide-in-from-left-2 fade-in duration-300">
                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider ml-1 mb-1">Sugerencias Inteligentes</p>
@@ -660,7 +659,6 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Input Area */}
                         <div className="p-3 bg-slate-800 border-t border-slate-700">
                             <div className="relative flex items-center gap-2">
                                 <input
@@ -681,7 +679,6 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                                 </button>
                             </div>
                         </div>
-
                     </div>
                 </div>
             )}

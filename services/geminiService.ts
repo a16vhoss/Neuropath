@@ -115,6 +115,71 @@ export const searchInternet = async (topic: string): Promise<{ title: string; ur
 };
 
 /**
+ * Intelligent Clarification: Asks questions to narrow down research intent
+ */
+export const generateResearchClarifications = async (
+  userInput: string,
+  setContext: string,
+  setName: string
+): Promise<{ question: string; options: string[] }> => {
+  const genAI = getGeminiSDK();
+  if (!genAI) return { question: "¿Qué te gustaría investigar exactamente?", options: [] };
+
+  try {
+    const modelName = await getBestGeminiModel('flash'); // Fast for conversation
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: SchemaType.OBJECT,
+          properties: {
+            question: { type: SchemaType.STRING },
+            options: {
+              type: SchemaType.ARRAY,
+              items: { type: SchemaType.STRING }
+            }
+          },
+          required: ["question", "options"]
+        }
+      }
+    });
+
+    const prompt = `
+      Eres ZpBot, un asistente de estudio inteligente. El usuario quiere investigar sobre: "${userInput}".
+      CONTEXTO DEL SET DE ESTUDIO ("${setName}"):
+      ${setContext.slice(0, 1000)}
+      
+      OBJETIVO:
+      En lugar de buscar directamente, haz una pregunta aclaratoria inteligente para guiar la investigación. 
+      Si el usuario fue vago (ej: "investiga algo de este tema"), usa el contexto del set para sugerir temas específicos.
+      
+      REQUISITOS:
+      1. Genera una pregunta amable y conversacional.
+      2. Ofrece 3 opciones (chips/botones) claras y cortas basándote en el contenido del set.
+      3. Idioma: Español.
+      
+      EJEMPLO DE SALIDA:
+      {
+        "question": "Entiendo que quieres profundizar en Probabilidades. ¿Qué área te interesa más hoy?",
+        "options": ["Casos Prácticos", "Teoría de Bayes", "Ejercicios de Examen"]
+      }
+    `;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    return JSON.parse(text);
+
+  } catch (error) {
+    console.error("Error generating clarifications:", error);
+    return {
+      question: "¿Qué aspecto específico de este tema te gustaría investigar?",
+      options: ["Conceptos clave", "Ejemplos prácticos", "Ejercicios"]
+    };
+  }
+};
+
+/**
  * Generate Flashcards from a Specific Prompt (ZpBot)
  */
 export const generatePromptedFlashcards = async (userPrompt: string, materialContext: string, studySetName: string, count: number = 5) => {
