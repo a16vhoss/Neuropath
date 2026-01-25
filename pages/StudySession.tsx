@@ -13,7 +13,8 @@ import SRSRatingButtons from '../components/SRSRatingButtons';
 import { updateCardAfterReview, Rating, getRatingLabel, getCardsForSession, FlashcardWithSRS } from '../services/AdaptiveLearningService';
 import { handleSessionComplete, handleStrugglingSession, updateConsecutiveCorrect, DIFFICULTY_TIERS } from '../services/DynamicContentService';
 import StudySetStatistics from '../components/StudySetStatistics';
-import { generateAdaptiveQuiz, saveQuizSession, QuizQuestion as AdaptiveQuizQuestion, QuizResult, QuizReport, QuestionType } from '../services/QuizService';
+import { generateAdaptiveQuiz, saveQuizSession, QuizQuestion as AdaptiveQuizQuestion, QuizResult, QuizReport, QuestionType, QuizConfig } from '../services/QuizService';
+import QuizConfigModal from '../components/QuizConfigModal';
 
 type StudyMode = 'flashcards' | 'quiz' | 'cramming' | 'podcast' | 'daily';
 
@@ -94,6 +95,12 @@ const StudySession: React.FC = () => {
   const [quizLoading, setQuizLoading] = useState(false);
   const [quizStartTime, setQuizStartTime] = useState<number>(Date.now());
   const [designAnswer, setDesignAnswer] = useState<string>(''); // For design type questions
+
+  // Custom Quiz Configuration
+  const [showQuizConfig, setShowQuizConfig] = useState(false);
+  const [quizConfig, setQuizConfig] = useState<QuizConfig | null>(null);
+  const [questionTimer, setQuestionTimer] = useState<number>(0); // Current question timer
+  const [questionTimeExpired, setQuestionTimeExpired] = useState(false);
 
   // Exam state
   const [examTime, setExamTime] = useState(15 * 60); // 15 minutes
@@ -285,51 +292,61 @@ const StudySession: React.FC = () => {
   // Effect to generate quiz when flashcards change (and are not empty)
   const [quizGenerated, setQuizGenerated] = useState(false);
 
+
+
+  // NEW: Dedicated effect for Quiz Mode Generation
   useEffect(() => {
-    const generateQuizAndExam = async () => {
-      // Only generate once when we have real flashcards loaded
-      if (flashcards.length > 0 && !quizGenerated && loadingSource !== 'mock' && studySetId && user) {
-        setQuizLoading(true);
-        try {
-          console.log('Generating adaptive quiz from flashcards...');
+    // Only trigger if we have flashcards, haven't generated yet, and we are in quiz mode
+    if (flashcards.length > 0 && !quizGenerated && mode === 'quiz' && !quizConfig && !showQuizConfig && loadingSource !== 'mock') {
+      // Stop! We need config first.
+      setQuizConfig(null);
+      setShowQuizConfig(true);
+    }
+  }, [flashcards, quizGenerated, mode, quizConfig, showQuizConfig, loadingSource]);
 
-          // Use adaptive quiz service that considers weak topics
-          const adaptiveQuestions = await generateAdaptiveQuiz(studySetId, user.id, 5);
+  // Actual Generation when Config is ready (or if we want to support auto-start later)
+  const generateCustomQuiz = async (config: QuizConfig) => {
+    if (!user || !studySetId) return;
 
-          if (adaptiveQuestions && adaptiveQuestions.length > 0) {
-            // Map to local QuizQuestion format
-            const mappedQuestions: QuizQuestion[] = adaptiveQuestions.map((q, i) => ({
-              id: q.id,
-              question: q.question,
-              options: q.options,
-              correctIndex: q.correctIndex,
-              explanation: q.explanation
-            }));
+    setQuizLoading(true);
+    setShowQuizConfig(false);
 
-            setQuizQuestions(mappedQuestions);
-            setQuizGenerated(true);
-            setQuizStartTime(Date.now());
-            setQuizResults([]);
-            console.log('Adaptive quiz generated:', mappedQuestions.length);
-          } else {
-            // Fallback to basic generation
-            const context = flashcards.slice(0, 15).map(c => `Q: ${c.question} A: ${c.answer}`).join('\n');
-            const generatedQuiz = await generateQuizQuestions(context);
-            if (generatedQuiz && generatedQuiz.length > 0) {
-              setQuizQuestions(generatedQuiz);
-              setQuizGenerated(true);
-              setQuizStartTime(Date.now());
-            }
-          }
-        } catch (e) {
-          console.error("Quiz gen error", e);
-        } finally {
-          setQuizLoading(false);
+    try {
+      console.log('Generating CUSTOM quiz with config:', config);
+      const adaptiveQuestions = await generateAdaptiveQuiz(studySetId, user.id, config);
+
+      if (adaptiveQuestions && adaptiveQuestions.length > 0) {
+        const mappedQuestions: QuizQuestion[] = adaptiveQuestions.map((q, i) => ({
+          id: q.id,
+          question: q.question,
+          options: q.options,
+          correctIndex: q.correctIndex,
+          explanation: q.explanation,
+          type: q.type as any, // Cast if needed
+          scenario: q.scenario,
+          designPrompt: q.designPrompt,
+          evaluationCriteria: q.evaluationCriteria,
+          realWorldExample: q.realWorldExample
+        }));
+
+        setQuizQuestions(mappedQuestions);
+        setQuizGenerated(true);
+        setQuizStartTime(Date.now());
+        setQuizResults([]);
+        setQuizConfig(config);
+
+        // Setup first question timer if enabled
+        if (config.timeLimitPerQuestion && config.timeLimitPerQuestion > 0) {
+          setQuestionTimer(config.timeLimitPerQuestion);
+          setQuestionTimeExpired(false);
         }
       }
+    } catch (e) {
+      console.error("Custom quiz gen error", e);
+    } finally {
+      setQuizLoading(false);
     }
-    generateQuizAndExam();
-  }, [flashcards, loadingSource, quizGenerated, studySetId, user]);
+  };
 
 
   // Exam timer
@@ -516,16 +533,60 @@ const StudySession: React.FC = () => {
 
   const triggerConfetti = () => {
     setShowConfetti(true);
-    setTimeout(() => setShowConfetti(false), 1000);
+    setTimeout(() => setShowConfetti(false), 2000);
   };
 
-  const handleQuizAnswer = (optionIndex: number, textAnswer?: string) => {
-    if (showResult) return;
+  // Timer Effect
+  useEffect(() => {
+    if (questionTimer > 0 && !questionTimeExpired) {
+      const timeout = setTimeout(() => {
+        setQuestionTimer(prev => prev - 1);
+      }, 1000);
+      return () => clearTimeout(timeout);
+    } else if (questionTimer === 0 && !questionTimeExpired && quizConfig?.timeLimitPerQuestion) {
+      // Time expired for this question
+      setQuestionTimeExpired(true);
+      // If immediate feedback is on, show result. If not, auto-advance??
+      // Ideally: Mark as incorrect (or unanswered) and show result if immediate feedback
+      if (quizConfig.immediateFeedback) {
+        // Mock wrong answer selection to trigger reveal
+        // OR just show result with no selection
+        setShowResult(true);
+        // Maybe auto-mark as wrong?
+      } else {
+        // Just move next? Or record as skipped?
+        // Let's record as skipped/wrong and move next
+        handleQuizAnswer(-1, undefined, true); // -1 indicating timeout
+      }
+    }
+  }, [questionTimer, questionTimeExpired, quizConfig]);
+
+
+  const handleQuizAnswer = (optionIndex: number, textAnswer?: string, isTimeout: boolean = false) => {
+    // Prevent answer if result is already shown (unless it's a timeout forcing it)
+    if (showResult && !isTimeout) return;
+
+    // If we have a timeout but user answered, that's fine, we process it.
+
     setSelectedAnswer(optionIndex);
-    setShowResult(true);
+
+    // Logic for "Immediate Feedback" toggle
+    const feedbackMode = quizConfig?.immediateFeedback ?? true;
+
+    if (feedbackMode) {
+      setShowResult(true);
+    } else {
+      // If NO immediate feedback, we just record and maybe auto-advance or wait for user to click separate "Next"
+      // For flow, let's just set selectedAnswer. The UI needs to show "Next" button instead of "Check"
+    }
 
     const currentQ = quizQuestions[currentQuizIndex];
-    const isCorrect = optionIndex === currentQ.correctIndex;
+    // ... rest of logic ...
+    // Note: correctIndex check
+    let isCorrect = false;
+    if (!isTimeout && optionIndex !== -1) {
+      isCorrect = optionIndex === currentQ.correctIndex;
+    }
 
     // Track this result
     const result: QuizResult = {
@@ -542,28 +603,21 @@ const StudySession: React.FC = () => {
     if (isCorrect) {
       setScore(score + 1);
       setXpEarned(prev => prev + 20);
-      triggerConfetti();
+      if (feedbackMode) triggerConfetti();
 
-      // Update Adaptive SRS for correct answer (Rating 4 - Easy/Perfect)
+      // Update Adaptive SRS
       if (user && flashcards[currentQuizIndex]?.id) {
-        updateCardAfterReview(
-          user.id,
-          flashcards[currentQuizIndex].id,
-          4, // Easy/Perfect
-          5000 // Assumed response time
-        ).catch(console.error);
+        updateCardAfterReview(user.id, flashcards[currentQuizIndex].id, 4, 5000).catch(console.error);
       }
     } else {
-      // Update Adaptive SRS for incorrect answer (Rating 1 - Again)
+      // Update Adaptive SRS
       if (user && flashcards[currentQuizIndex]?.id) {
-        updateCardAfterReview(
-          user.id,
-          flashcards[currentQuizIndex].id,
-          1, // Again/Fail
-          5000
-        ).catch(console.error);
+        updateCardAfterReview(user.id, flashcards[currentQuizIndex].id, 1, 5000).catch(console.error);
       }
     }
+
+    // If deferred feedback, we might want to auto-advance or let user click Next.
+    // Let's wait for Next click in UI.
   };
 
   const nextQuizQuestion = async () => {
@@ -571,6 +625,13 @@ const StudySession: React.FC = () => {
       setCurrentQuizIndex(currentQuizIndex + 1);
       setSelectedAnswer(null);
       setShowResult(false);
+      setDesignAnswer(''); // Reset design answer
+
+      // Reset Timer
+      if (quizConfig?.timeLimitPerQuestion) {
+        setQuestionTimer(quizConfig.timeLimitPerQuestion);
+        setQuestionTimeExpired(false);
+      }
     } else {
       // Quiz complete - save session and generate report
       setQuizComplete(true);
@@ -663,20 +724,20 @@ const StudySession: React.FC = () => {
 
       // Update streak
       await GamificationService.updateStreak(user.id);
-      
+
       // Check for unlocked achievements
       const unlocked = await GamificationService.checkAndUnlockAchievements(user.id);
-      
+
       if (unlocked.length > 0) {
         // Trigger confetti again for achievement
         setShowConfetti(true);
         setTimeout(() => setShowConfetti(false), 5000);
-        
+
         // Show alert/toast for the first unlocked achievement
         const ach = unlocked[0];
         alert(`🏆 ¡Logro Desbloqueado: ${ach.name}!\n\n${ach.description}\n+${ach.xp_reward} XP`);
       }
-      
+
       navigate(-1);
     } catch (error) {
       console.error('ERROR in handleEndSession:', error);
@@ -808,6 +869,19 @@ const StudySession: React.FC = () => {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Quiz Config Modal */}
+      {showQuizConfig && user && studySetId && (
+        <QuizConfigModal
+          studySetId={studySetId}
+          userId={user.id}
+          onStart={generateCustomQuiz}
+          onCancel={() => {
+            setShowQuizConfig(false);
+            navigate(-1); // Go back if cancelled
+          }}
+        />
       )}
 
       {/* Main Content */}
@@ -1225,8 +1299,8 @@ const StudySession: React.FC = () => {
                         onClick={() => handleQuizAnswer(0, designAnswer)}
                         disabled={!designAnswer.trim()}
                         className={`w-full py-4 font-bold rounded-xl transition-all ${designAnswer.trim()
-                            ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-md transform hover:-translate-y-1'
-                            : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-md transform hover:-translate-y-1'
+                          : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                           }`}
                       >
                         Enviar mi Solución

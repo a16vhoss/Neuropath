@@ -135,29 +135,70 @@ function getQuestionTypeDistribution(totalQuestions: number): Record<QuestionTyp
 /**
  * Generate an adaptive quiz based on study set content and previous performance
  */
+export interface QuizConfig {
+    questionCount: number;
+    questionTypes: QuestionType[];
+    difficultyLevel?: number; // 1-4, if user overrides
+    contentScope: 'all' | 'weak_topics' | 'specific_topics';
+    selectedTopics?: string[]; // if specific_topics
+    timeLimitPerQuestion?: number; // seconds, 0 for none
+    immediateFeedback: boolean;
+}
+
+/**
+ * Generate an adaptive quiz based on study set content and previous performance
+ */
 export async function generateAdaptiveQuiz(
     studySetId: string,
     userId: string,
-    questionCount: number = 5
+    config?: QuizConfig // Now optional/customizable
 ): Promise<QuizQuestion[]> {
     try {
+        const questionCount = config?.questionCount || 5;
+
         // 1. Fetch flashcards from study set for content
-        const { data: flashcards, error: flashcardsError } = await supabase
+        let flashcardsQuery = supabase
             .from('flashcards')
             .select('question, answer, category')
             .eq('study_set_id', studySetId);
+
+        // Filter by topic if requested
+        if (config?.contentScope === 'specific_topics' && config.selectedTopics && config.selectedTopics.length > 0) {
+            flashcardsQuery = flashcardsQuery.in('category', config.selectedTopics);
+        }
+
+        const { data: flashcards, error: flashcardsError } = await flashcardsQuery;
 
         if (flashcardsError || !flashcards || flashcards.length === 0) {
             console.error('Error fetching flashcards:', flashcardsError);
             return [];
         }
 
-        // 2. Get user's mastery level
-        const userLevel = await getUserMasteryLevel(studySetId, userId);
-        console.log(`[Quiz] User level for study set: ${userLevel}`);
+        // 2. Determine User Level (Auto or Manual)
+        let userLevel = 1;
+        if (config?.difficultyLevel) {
+            userLevel = config.difficultyLevel;
+            console.log(`[Quiz] Using MANUAL difficulty level: ${userLevel}`);
+        } else {
+            userLevel = await getUserMasteryLevel(studySetId, userId);
+            console.log(`[Quiz] Using AUTO difficulty level: ${userLevel}`);
+        }
 
-        // 3. Get weak topics from previous quiz sessions
-        const weakTopics = await getWeakTopics(studySetId, userId);
+        // 3. Get weak topics logic (only if scope is not specific)
+        let weakTopics: string[] = [];
+        if (config?.contentScope === 'weak_topics') {
+            weakTopics = await getWeakTopics(studySetId, userId);
+            // If no weak topics found but requested, warn or fallback? 
+            // Logic below handles empty weakTopics by just not adding the specific prompt context, 
+            // but for "weak_topics" scope we might want to prioritize differently.
+            // For now, we'll let the prompt handle the emphasis.
+            if (weakTopics.length === 0) {
+                console.log('[Quiz] No weak topics found for review mode, defaulting to general mix');
+            }
+        } else if (config?.contentScope === 'all') {
+            // Still fetch them to possibly weight them, but not exclusively
+            weakTopics = await getWeakTopics(studySetId, userId);
+        }
 
         // 4. Get previously asked questions to avoid repetition
         const previousQuestions = await getPreviousQuestions(studySetId, userId);
@@ -167,24 +208,42 @@ export async function generateAdaptiveQuiz(
             .map(f => `Q: ${f.question}\nA: ${f.answer}\nTopic: ${f.category || 'General'}`)
             .join('\n\n');
 
-        const weakTopicsContext = weakTopics.length > 0
-            ? `\n\nIMPORTANT: The student has struggled with these topics. Include questions about them: ${weakTopics.join(', ')}`
-            : '';
+        let scopeInstruction = "";
+        if (config?.contentScope === 'weak_topics' && weakTopics.length > 0) {
+            scopeInstruction = `\n\nIMPORTANT: FOCUS EXCLUSIVELY on these weak topics: ${weakTopics.join(', ')}. Do not generate questions for other topics unless necessary.`;
+        } else if (config?.contentScope === 'specific_topics' && config?.selectedTopics) {
+            scopeInstruction = `\n\nIMPORTANT: Focus ONLY on these selected topics: ${config.selectedTopics.join(', ')}.`;
+        } else {
+            // Normal adaptive behavior
+            scopeInstruction = weakTopics.length > 0
+                ? `\n\nIMPORTANT: The student has struggled with these topics. Include questions about them: ${weakTopics.join(', ')}`
+                : '';
+        }
 
         const avoidContext = previousQuestions.length > 0
             ? `\n\nAvoid repeating these exact questions:\n${previousQuestions.slice(0, 10).join('\n')}`
             : '';
 
-        // 6. Get question type distribution (balanced mix for all users)
-        const distribution = getQuestionTypeDistribution(questionCount);
+        // 6. Get question type distribution 
+        // Logic: Use user selection if provided, otherwise default balanced
+        let typeCounts: Record<string, number> = {};
+
+        if (config && config.questionTypes && config.questionTypes.length > 0) {
+            // Distribute evenly among selected types
+            const typeCount = Math.floor(questionCount / config.questionTypes.length);
+            const remainder = questionCount % config.questionTypes.length;
+
+            config.questionTypes.forEach((type, index) => {
+                typeCounts[type] = typeCount + (index < remainder ? 1 : 0);
+            });
+        } else {
+            // Default balanced
+            typeCounts = getQuestionTypeDistribution(questionCount);
+        }
 
         const typeInstructions = `
 QUESTION TYPE DISTRIBUTION (generate exactly this mix):
-- True/False questions: ${distribution.true_false}
-- Multiple Choice questions (4 options): ${distribution.multiple_choice}
-- Analysis questions (scenario-based): ${distribution.analysis}
-- Design questions (open-ended solutions): ${distribution.design}
-- Practical Application questions: ${distribution.practical}
+${Object.entries(typeCounts).map(([type, count]) => `- ${type}: ${count}`).join('\n')}
 
 QUESTION TYPE FORMATS:
 
@@ -224,7 +283,7 @@ STUDENT LEVEL: ${userLevel}/4 (${['Básico', 'Intermedio', 'Avanzado', 'Experto'
 
 Study Material:
 ${contentSummary}
-${weakTopicsContext}
+${scopeInstruction}
 ${avoidContext}
 
 ${typeInstructions}
