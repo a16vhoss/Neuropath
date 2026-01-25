@@ -868,46 +868,48 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
             {/* Header */}
             <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
                 <div className="max-w-5xl mx-auto px-4 py-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                        <div className="flex items-center gap-4 min-w-0 flex-1">
                             {!embedded && (
                                 <button
                                     onClick={() => navigate('/student')}
-                                    className="p-2 hover:bg-slate-100 rounded-lg transition"
+                                    className="p-2 hover:bg-slate-100 rounded-lg transition shrink-0"
                                 >
                                     <span className="material-symbols-outlined">arrow_back</span>
                                 </button>
                             )}
 
                             {isEditingName ? (
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 w-full">
                                     <input
                                         type="text"
                                         value={editName}
                                         onChange={(e) => setEditName(e.target.value)}
-                                        className="text-xl font-bold border-b-2 border-primary outline-none bg-transparent"
+                                        className="text-xl font-bold text-slate-900 border-b-2 border-primary focus:outline-none w-full"
                                         autoFocus
+                                        onBlur={handleUpdateDetails}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleUpdateDetails()}
                                     />
-                                    <button onClick={handleUpdateDetails} className="text-primary">
+                                    <button onClick={handleUpdateDetails} className="p-1 text-green-600 hover:bg-green-50 rounded shrink-0">
                                         <span className="material-symbols-outlined">check</span>
                                     </button>
-                                    <button onClick={() => setIsEditingName(false)} className="text-slate-400">
+                                    <button onClick={() => setIsEditingName(false)} className="p-1 text-slate-400 hover:bg-slate-100 rounded shrink-0">
                                         <span className="material-symbols-outlined">close</span>
                                     </button>
                                 </div>
                             ) : (
-                                <div className="flex items-center gap-2">
-                                    <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center">
+                                <div className="flex items-center gap-4 min-w-0 flex-1">
+                                    <div className="w-10 h-10 shrink-0 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center">
                                         <span className="material-symbols-outlined text-white">folder</span>
                                     </div>
-                                    <div>
-                                        <h1 className="text-xl font-bold text-slate-900">{studySet.name}</h1>
+                                    <div className="min-w-0 flex-1">
+                                        <h1 className="text-xl font-bold text-slate-900 truncate pr-2">{studySet.name}</h1>
                                         <p className="text-sm text-slate-500">{studySet.flashcard_count} flashcards</p>
                                     </div>
                                     {canEdit && (
                                         <button
                                             onClick={() => setIsEditingName(true)}
-                                            className="p-1 hover:bg-slate-100 rounded-lg text-slate-400"
+                                            className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 shrink-0"
                                         >
                                             <span className="material-symbols-outlined text-sm">edit</span>
                                         </button>
@@ -916,10 +918,10 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                             )}
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
                             <button
                                 onClick={() => navigate(`/student/study-set/${studySet.id}?mode=flashcards`)}
-                                className="bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold px-3 md:px-6 py-2 rounded-xl hover:opacity-90 transition flex items-center gap-2 text-sm md:text-base"
+                                className="bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold px-3 md:px-6 py-2 rounded-xl hover:opacity-90 transition flex items-center gap-2 text-sm md:text-base shadow-sm shadow-violet-200"
                             >
                                 <span className="material-symbols-outlined text-lg">auto_awesome</span>
                                 <span className="hidden md:inline">Estudiar (Adaptativo)</span>
@@ -935,7 +937,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                             {!readOnly && isOwner && (
                                 <button
                                     onClick={handleDeleteSet}
-                                    className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                                    className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition shrink-0"
                                     title="Eliminar set"
                                 >
                                     <span className="material-symbols-outlined">delete</span>
@@ -945,24 +947,34 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                     </div>
 
                     {/* Tabs */}
-                    <div className="flex gap-6 mt-4 border-t border-slate-100 pt-4 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
-                        {(['overview', 'flashcards', 'materials', 'notebooks', 'reports', 'people'] as TabType[]).map((tab) => (
-                            <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab)}
-                                className={`pb-2 font-medium transition whitespace-nowrap ${activeTab === tab
-                                    ? 'text-primary border-b-2 border-primary'
-                                    : 'text-slate-500 hover:text-slate-700'
-                                    }`}
-                            >
-                                {tab === 'overview' && 'Resumen'}
-                                {tab === 'flashcards' && `Flashcards (${studySet.flashcard_count})`}
-                                {tab === 'materials' && `Materiales (${studySet.material_count})`}
-                                {tab === 'notebooks' && `Cuadernos (${notebooks.length})`}
-                                {tab === 'reports' && 'Reportes'}
-                                {tab === 'people' && 'Personas'}
-                            </button>
-                        ))}
+                    <div className="relative">
+                        <div
+                            className="flex gap-6 mt-4 border-t border-slate-100 pt-4 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide"
+                            style={{
+                                maskImage: 'linear-gradient(to right, black 85%, transparent 100%)',
+                                WebkitMaskImage: 'linear-gradient(to right, black 85%, transparent 100%)'
+                            }}
+                        >
+                            {(['overview', 'flashcards', 'materials', 'notebooks', 'reports', 'people'] as TabType[]).map((tab) => (
+                                <button
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab)}
+                                    className={`pb-2 font-medium transition whitespace-nowrap snap-start ${activeTab === tab
+                                        ? 'text-primary border-b-2 border-primary'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    {tab === 'overview' && 'Resumen'}
+                                    {tab === 'flashcards' && `Flashcards (${studySet.flashcard_count})`}
+                                    {tab === 'materials' && `Materiales (${studySet.material_count})`}
+                                    {tab === 'notebooks' && `Cuadernos (${notebooks.length})`}
+                                    {tab === 'reports' && 'Reportes'}
+                                    {tab === 'people' && 'Personas'}
+                                </button>
+                            ))}
+                            {/* Spacer to ensure last item is not cut off flush */}
+                            <div className="w-4 shrink-0" />
+                        </div>
                     </div>
                 </div>
             </header>
