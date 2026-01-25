@@ -383,18 +383,29 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
             setGeneratingGuide(true);
             console.log('Regenerating study guide...');
 
-            // Collect existing texts + new one
-            // Lowered threshold to 10 chars to be safer
-            const materials = studySet.materials.filter(m => m.content_text && m.content_text.length > 10).map(m => m.content_text!);
-            if (newMaterialText) materials.push(newMaterialText);
+            // Collect content from materials
+            const materialContents = studySet.materials
+                .filter(m => m.content_text && m.content_text.length > 10)
+                .map(m => `[MATERIAL: ${m.name}]\n${m.content_text}`);
 
-            if (materials.length === 0) {
-                console.log('No materials to generate guide from');
-                alert('No se encontraron materiales con texto suficiente para generar la guía. Sube un PDF o agrega notas.');
+            // Collect content from notebooks
+            const notebookContents = notebooks
+                .filter(n => n.content && n.content.trim().length > 10)
+                .map(n => `[CUADERNO: ${n.title}]\n${n.content}`);
+
+            // Combine all content sources
+            const allContents = [...materialContents, ...notebookContents];
+            if (newMaterialText) allContents.push(newMaterialText);
+
+            console.log(`Found ${materialContents.length} materials and ${notebookContents.length} notebooks for guide generation`);
+
+            if (allContents.length === 0) {
+                console.log('No content to generate guide from');
+                alert('No se encontraron materiales ni cuadernos con texto suficiente para generar la guía. Sube un PDF, agrega notas o escribe en un cuaderno.');
                 return;
             }
 
-            const guide = await generateStudyGuideFromMaterials(materials, studySet.name, studySet.description);
+            const guide = await generateStudyGuideFromMaterials(allContents, studySet.name, studySet.description);
             if (guide) {
                 await updateStudySet(studySet.id, { description: guide });
                 setStudySet(prev => prev ? { ...prev, description: guide } : null);
@@ -1283,13 +1294,19 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                     console.log('[Generation Flow] Starting infographic generation...');
                                                     setGeneratingInfographic(true);
                                                     try {
-                                                        const contents = studySet?.materials
+                                                        // Include materials
+                                                        const materialContents = studySet?.materials
                                                             .map(m => m.content_text || m.summary || '')
                                                             .filter(t => (t?.trim().length || 0) > 10) || [];
+                                                        // Include notebooks
+                                                        const notebookContents = notebooks
+                                                            .filter(n => n.content && n.content.trim().length > 10)
+                                                            .map(n => n.content);
+                                                        const contents = [...materialContents, ...notebookContents];
 
-                                                        console.log(`[Generation Flow] Found ${contents.length} materials with text.`);
+                                                        console.log(`[Generation Flow] Found ${materialContents.length} materials and ${notebookContents.length} notebooks.`);
                                                         if (contents.length === 0) {
-                                                            alert('No hay suficiente texto en los materiales para generar la infografía.');
+                                                            alert('No hay suficiente texto en los materiales o cuadernos para generar la infografía.');
                                                             return;
                                                         }
 
@@ -1324,13 +1341,19 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                     console.log('[Generation Flow] Starting presentation generation...');
                                                     setGeneratingPresentation(true);
                                                     try {
-                                                        const contents = studySet?.materials
+                                                        // Include materials
+                                                        const materialContents = studySet?.materials
                                                             .map(m => m.content_text || m.summary || '')
                                                             .filter(t => (t?.trim().length || 0) > 10) || [];
+                                                        // Include notebooks
+                                                        const notebookContents = notebooks
+                                                            .filter(n => n.content && n.content.trim().length > 10)
+                                                            .map(n => n.content);
+                                                        const contents = [...materialContents, ...notebookContents];
 
-                                                        console.log(`[Generation Flow] Found ${contents.length} materials with text.`);
+                                                        console.log(`[Generation Flow] Found ${materialContents.length} materials and ${notebookContents.length} notebooks.`);
                                                         if (contents.length === 0) {
-                                                            alert('No hay suficiente texto en los materiales para generar la presentación.');
+                                                            alert('No hay suficiente texto en los materiales o cuadernos para generar la presentación.');
                                                             return;
                                                         }
 
@@ -1409,18 +1432,24 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                             <EmptyAIBox
                                                 icon="leaderboard"
                                                 title="Visualiza tu conocimiento"
-                                                desc="Genera una infografía estructurada basada en tus materiales de estudio."
+                                                desc="Genera una infografía estructurada basada en tus materiales y cuadernos."
                                                 onAction={async () => {
                                                     console.log('[Generation Flow] Starting infographic generation from empty box...');
                                                     setGeneratingInfographic(true);
                                                     try {
-                                                        const contents = studySet?.materials
+                                                        // Include materials
+                                                        const materialContents = studySet?.materials
                                                             .map(m => m.content_text || m.summary || '')
                                                             .filter(t => (t?.trim().length || 0) > 10) || [];
+                                                        // Include notebooks
+                                                        const notebookContents = notebooks
+                                                            .filter(n => n.content && n.content.trim().length > 10)
+                                                            .map(n => n.content);
+                                                        const contents = [...materialContents, ...notebookContents];
 
-                                                        console.log(`[Generation Flow] Found ${contents.length} materials with text.`);
+                                                        console.log(`[Generation Flow] Found ${materialContents.length} materials and ${notebookContents.length} notebooks.`);
                                                         if (contents.length === 0) {
-                                                            alert('No hay suficiente texto en los materiales para generar la infografía.');
+                                                            alert('No hay suficiente texto en los materiales o cuadernos para generar la infografía.');
                                                             return;
                                                         }
 
@@ -1469,13 +1498,19 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                     console.log('[Generation Flow] Starting presentation generation from empty box...');
                                                     setGeneratingPresentation(true);
                                                     try {
-                                                        const contents = studySet?.materials
+                                                        // Include materials
+                                                        const materialContents = studySet?.materials
                                                             .map(m => m.content_text || m.summary || '')
                                                             .filter(t => (t?.trim().length || 0) > 10) || [];
+                                                        // Include notebooks
+                                                        const notebookContents = notebooks
+                                                            .filter(n => n.content && n.content.trim().length > 10)
+                                                            .map(n => n.content);
+                                                        const contents = [...materialContents, ...notebookContents];
 
-                                                        console.log(`[Generation Flow] Found ${contents.length} materials with text.`);
+                                                        console.log(`[Generation Flow] Found ${materialContents.length} materials and ${notebookContents.length} notebooks with text.`);
                                                         if (contents.length === 0) {
-                                                            alert('No hay suficiente texto en los materiales para generar la presentación.');
+                                                            alert('No hay suficiente texto en los materiales o cuadernos para generar la presentación.');
                                                             return;
                                                         }
 
