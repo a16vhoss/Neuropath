@@ -28,17 +28,7 @@ interface NotebookEditorProps {
   onSaveComplete: () => void;
 }
 
-const ToolbarButton = ({ onClick, isActive, icon, title, disabled, className }: any) => (
-  <button
-    onClick={onClick}
-    disabled={disabled}
-    className={`p-1.5 rounded-lg transition-all text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed ${isActive ? 'bg-indigo-100 text-indigo-700 shadow-sm ring-1 ring-indigo-200' : ''
-      } ${className}`}
-    title={title}
-  >
-    <span className="material-symbols-outlined text-[20px]">{icon}</span>
-  </button>
-);
+
 
 const NotebookEditor: React.FC<NotebookEditorProps> = ({
   notebook,
@@ -329,7 +319,7 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
         ref={scrollContainerRef}
         className="flex-1 overflow-auto bg-white/40 custom-scrollbar relative"
       >
-        <div className="max-w-4xl mx-auto my-8 bg-white min-h-[85vh] shadow-sm rounded-xl border border-slate-100/50 relative flex flex-col transition-shadow hover:shadow-md duration-500">
+        <div className="max-w-5xl mx-auto my-0 bg-transparent min-h-screen relative flex flex-col">
 
           {/* Toolbar - Sticky & Glassmorphic */}
           {canEdit && editor && (
@@ -421,47 +411,21 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
             </div>
           )}
 
+  // Toolbar button component already defined above or will be used from props if external.
+          // Actually, we should use the one defined inside or clean it up. The previous duplicate was at the top level.
+          // I will just use the internal definition logic if needed, but usually it's better to extract.
+          // For now, I'll keep the internal interaction logic if it relies on closures, but the duplicate at top was unused or shadowed.
+          // Wait, the top one (lines 31-41) was `const ToolbarButton`. The internal one (257) is also `const ToolbarButton`.
+          // I will remove the internal definition if I can, or just keep it and ignore the top one. 
+          // However, `replace_file_content` targeting the body section (Cover/Title) won't see the top level one.
+          // I will target the container and body.
+
           {/* Main Paper Container */}
-          <div className="max-w-4xl mx-auto mt-8 mb-32 bg-white min-h-[calc(100vh-12rem)] shadow-sm rounded-none md:rounded-xl border-x-0 md:border md:border-slate-100 relative transition-all duration-300">
-            {/* Cover Image Placeholder */}
-            <div className="h-32 md:h-48 rounded-t-none md:rounded-t-xl bg-gradient-to-r from-slate-100 to-slate-50 group relative overflow-hidden border-b border-slate-50">
-              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <button className="bg-white/90 backdrop-blur-sm text-xs font-bold px-3 py-1.5 rounded-full shadow-sm text-slate-600 hover:text-indigo-600 flex items-center gap-1">
-                  <span className="material-symbols-outlined text-sm">add_photo_alternate</span>
-                  Añadir portada
-                </button>
-              </div>
-            </div>
-
-            {/* Icon & Title Area */}
-            <div className="px-4 md:px-12 md:-mt-8 relative z-10 mb-8">
-              <div className="w-16 h-16 md:w-20 md:h-20 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center justify-center text-4xl mb-6 relative group cursor-pointer hover:shadow-md transition-all">
-                <span>📝</span>
-                <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-1 shadow-sm border border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span className="material-symbols-outlined text-xs text-slate-400">edit</span>
-                </div>
-              </div>
-
-              <input
-                type="text"
-                value={notebook.name}
-                readOnly
-                className="text-3xl md:text-5xl font-black text-slate-900 placeholder:text-slate-300 bg-transparent outline-none w-full border-none focus:ring-0 p-0"
-                placeholder="Sin título"
-              />
-              <div className="flex items-center gap-2 mt-4 text-sm text-slate-400 font-medium">
-                <span className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-base">folder_open</span>
-                  {studySetName}
-                </span>
-                <span>•</span>
-                <span>Editado hace un momento</span>
-              </div>
-            </div>
+          <div className="max-w-5xl mx-auto mt-6 mb-32 bg-transparent min-h-[calc(100vh-10rem)] relative px-4 md:px-12">
 
             {/* Document Content Area */}
             <div
-              className="prose prose-slate prose-lg max-w-none px-4 md:px-12 pb-24 focus:outline-none 
+              className="prose prose-slate prose-lg max-w-none focus:outline-none 
                 prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-slate-900
                 prose-h1:text-4xl prose-h2:text-3xl prose-h3:text-2xl 
                 prose-p:text-slate-600 prose-p:leading-relaxed
