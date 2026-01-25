@@ -21,6 +21,7 @@ import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL, autoCat
 import CumulativeReportsCard from '../components/CumulativeReportsCard';
 import VisualProgressionMap from '../components/VisualProgressionMap';
 import StudyGuideRenderer from '../components/StudyGuideRenderer';
+import ZpBotChat from '../components/ZpBotChat';
 
 interface Flashcard {
     id: string;
@@ -2128,6 +2129,15 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                         </div>
                     </div>
                 </div>
+            )}
+            {/* ZpBot Chat Integration */}
+            {studySet && (
+                <ZpBotChat
+                    studySetId={studySet.id}
+                    contextText={studySet.materials
+                        ?.map(m => `--- MATERIAL: ${m.name} ---\n${m.content_text || ''}`)
+                        .join('\n\n')}
+                />
             )}
         </div>
     );
