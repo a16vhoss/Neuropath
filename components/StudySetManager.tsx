@@ -210,13 +210,13 @@ const StudySetManager: React.FC<StudySetManagerProps> = ({ studySet, onClose, on
                                         placeholder="Question / Term"
                                         value={newQuestion}
                                         onChange={(e) => setNewQuestion(e.target.value)}
-                                        className="w-full p-2 border rounded text-sm"
+                                        className="w-full p-3 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 bg-white"
                                     />
                                     <input
                                         placeholder="Answer / Definition"
                                         value={newAnswer}
                                         onChange={(e) => setNewAnswer(e.target.value)}
-                                        className="w-full p-2 border rounded text-sm"
+                                        className="w-full p-3 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 bg-white"
                                     />
                                     <button
                                         onClick={handleAddFlashcard}
@@ -266,22 +266,22 @@ const StudySetManager: React.FC<StudySetManagerProps> = ({ studySet, onClose, on
                                             </div>
                                         ) : (
                                             // View Mode
-                                            <div className="flex justify-between items-start">
+                                            <div className="flex justify-between items-start gap-4">
                                                 <div className="flex-1">
                                                     <p className="text-sm font-medium text-gray-900">{card.question}</p>
                                                     <p className="text-sm text-gray-600 mt-1">{card.answer}</p>
                                                 </div>
-                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0">
                                                     <button
                                                         onClick={() => setEditingFlashcardId(card.id)}
-                                                        className="text-gray-400 hover:text-indigo-600"
+                                                        className="p-2 text-gray-400 hover:text-indigo-600 bg-gray-50 md:bg-transparent rounded-full md:rounded-none"
                                                         title="Edit"
                                                     >
                                                         ✎
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteFlashcard(card.id)}
-                                                        className="text-gray-400 hover:text-red-600"
+                                                        className="p-2 text-gray-400 hover:text-red-600 bg-gray-50 md:bg-transparent rounded-full md:rounded-none"
                                                         title="Delete"
                                                     >
                                                         🗑️

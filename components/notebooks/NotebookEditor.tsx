@@ -56,6 +56,21 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
   const [saveResult, setSaveResult] = useState<NotebookSaveResult | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [currentContent, setCurrentContent] = useState(notebook.content || '');
+  const [scrolled, setScrolled] = useState(false);
+
+  // Track scroll for sticky toolbar styling
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      setScrolled(container.scrollTop > 20);
+    };
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // TipTap Editor
   const editor = useEditor({
@@ -310,143 +325,155 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
       </div>
 
       {/* Main Scrollable Canvas */}
-      <div className="flex-1 overflow-auto bg-white/40 custom-scrollbar">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-auto bg-white/40 custom-scrollbar relative"
+      >
         <div className="max-w-4xl mx-auto my-8 bg-white min-h-[85vh] shadow-sm rounded-xl border border-slate-100/50 relative flex flex-col transition-shadow hover:shadow-md duration-500">
 
-          {/* Floating/Sticky Toolbar inside the page */}
+          {/* Toolbar - Sticky & Glassmorphic */}
           {canEdit && editor && (
-            <div className="sticky top-0 z-10 px-4 py-3 bg-white/95 backdrop-blur-sm border-b border-slate-100 flex items-center gap-1 flex-wrap justify-center rounded-t-xl transition-all">
-              <div className="flex items-center bg-slate-100/50 p-1 rounded-lg gap-0.5">
+            <div className={`sticky top-4 z-20 transition-all duration-300 ${scrolled ? 'translate-y-0' : 'translate-y-2'}`}>
+              <div className="mx-auto max-w-3xl bg-white/80 backdrop-blur-xl border border-white/40 shadow-sm rounded-2xl p-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar ring-1 ring-slate-900/5 support-touch-scroll">
+
                 <ToolbarButton
                   onClick={() => editor.chain().focus().toggleBold().run()}
+                  disabled={!editor.can().chain().focus().toggleBold().run()}
                   isActive={editor.isActive('bold')}
                   icon="format_bold"
-                  title="Negrita"
+                  title="Negrita (Cmd+B)"
                 />
                 <ToolbarButton
                   onClick={() => editor.chain().focus().toggleItalic().run()}
+                  disabled={!editor.can().chain().focus().toggleItalic().run()}
                   isActive={editor.isActive('italic')}
                   icon="format_italic"
-                  title="Cursiva"
+                  title="Cursiva (Cmd+I)"
                 />
                 <ToolbarButton
                   onClick={() => editor.chain().focus().toggleUnderline().run()}
+                  disabled={!editor.can().chain().focus().toggleUnderline().run()}
                   isActive={editor.isActive('underline')}
                   icon="format_underlined"
-                  title="Subrayado"
+                  title="Subrayado (Cmd+U)"
                 />
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().toggleHighlight().run()}
-                  isActive={editor.isActive('highlight')}
-                  icon="ink_highlighter"
-                  title="Resaltar"
-                  className={editor.isActive('highlight') ? 'text-amber-500 bg-amber-100' : ''}
-                />
-              </div>
-
-              <div className="w-px h-5 bg-slate-200 mx-2" />
-
-              <div className="flex items-center bg-slate-100/50 p-1 rounded-lg gap-0.5">
+                <div className="w-px h-5 bg-slate-300/50 mx-1 flex-shrink-0" />
                 <ToolbarButton
                   onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
                   isActive={editor.isActive('heading', { level: 1 })}
                   icon="format_h1"
-                  title="Título Grande"
+                  title="Título 1"
                 />
                 <ToolbarButton
                   onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
                   isActive={editor.isActive('heading', { level: 2 })}
                   icon="format_h2"
-                  title="Subtítulo"
+                  title="Título 2"
                 />
                 <ToolbarButton
                   onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
                   isActive={editor.isActive('heading', { level: 3 })}
                   icon="format_h3"
-                  title="Título Pequeño"
+                  title="Título 3"
                 />
-              </div>
-
-              <div className="w-px h-5 bg-slate-200 mx-2" />
-
-              <div className="flex items-center bg-slate-100/50 p-1 rounded-lg gap-0.5">
+                <div className="w-px h-5 bg-slate-300/50 mx-1 flex-shrink-0" />
                 <ToolbarButton
                   onClick={() => editor.chain().focus().toggleBulletList().run()}
                   isActive={editor.isActive('bulletList')}
                   icon="format_list_bulleted"
-                  title="Viñetas"
+                  title="Lista con viñetas"
                 />
                 <ToolbarButton
                   onClick={() => editor.chain().focus().toggleOrderedList().run()}
                   isActive={editor.isActive('orderedList')}
                   icon="format_list_numbered"
-                  title="Numeración"
+                  title="Lista numerada"
                 />
                 <ToolbarButton
                   onClick={() => editor.chain().focus().toggleTaskList().run()}
                   isActive={editor.isActive('taskList')}
                   icon="check_box"
-                  title="Checklist"
+                  title="Lista de tareas"
                 />
-              </div>
+                <div className="w-px h-5 bg-slate-300/50 mx-1 flex-shrink-0" />
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().toggleHighlight().run()}
+                  isActive={editor.isActive('highlight')}
+                  icon="ink_highlighter"
+                  title="Resaltar"
+                  className="text-amber-500 hover:bg-amber-50 hover:text-amber-600"
+                />
 
-              <div className="w-px h-5 bg-slate-200 mx-2" />
-
-              <div className="flex items-center bg-slate-100/50 p-1 rounded-lg gap-0.5">
+                <div className="w-px h-5 bg-slate-300/50 mx-1 flex-shrink-0" />
                 <ToolbarButton
                   onClick={() => editor.chain().focus().undo().run()}
-                  disabled={!editor.can().undo()}
+                  disabled={!editor.can().chain().focus().undo().run()}
                   icon="undo"
-                  title="Deshacer"
+                  title="Deshacer (Cmd+Z)"
                 />
                 <ToolbarButton
                   onClick={() => editor.chain().focus().redo().run()}
-                  disabled={!editor.can().redo()}
+                  disabled={!editor.can().chain().focus().redo().run()}
                   icon="redo"
-                  title="Rehacer"
+                  title="Rehacer (Cmd+Shift+Z)"
                 />
               </div>
             </div>
           )}
 
-          {/* Document Content Area */}
-          <div className="flex-1 px-12 py-8 md:px-16 md:py-12 cursor-text" onClick={() => editor?.commands.focus()}>
-            {editor && (
-              <BubbleMenu editor={editor} tippyOptions={{ duration: 100, maxWidth: 400 }} className="flex items-center bg-slate-800 text-white rounded-full shadow-2xl py-1 px-2 gap-1 animate-in zoom-in-95 duration-100">
-                <button onClick={() => editor.chain().focus().toggleBold().run()} className={`p-1.5 rounded-full hover:bg-white/20 transition ${editor.isActive('bold') ? 'text-indigo-300' : 'text-slate-300'}`}><span className="material-symbols-outlined text-[18px]">format_bold</span></button>
-                <button onClick={() => editor.chain().focus().toggleItalic().run()} className={`p-1.5 rounded-full hover:bg-white/20 transition ${editor.isActive('italic') ? 'text-indigo-300' : 'text-slate-300'}`}><span className="material-symbols-outlined text-[18px]">format_italic</span></button>
-                <button onClick={() => editor.chain().focus().toggleHighlight().run()} className={`p-1.5 rounded-full hover:bg-white/20 transition ${editor.isActive('highlight') ? 'text-amber-400' : 'text-slate-300'}`}><span className="material-symbols-outlined text-[18px]">ink_highlighter</span></button>
-                <div className="w-px h-4 bg-white/20 mx-1"></div>
-                <button onClick={() => { window.dispatchEvent(new CustomEvent('notebook-ai-command', { detail: { action: 'expand' } })) }} className="flex items-center gap-1 pl-1 pr-2 py-0.5 rounded-full hover:bg-indigo-600 transition text-xs font-medium bg-indigo-500/50 text-indigo-100">
-                  <span className="material-symbols-outlined text-[14px]">auto_awesome</span> Expandir
+          {/* Main Paper Container */}
+          <div className="max-w-4xl mx-auto mt-8 mb-32 bg-white min-h-[calc(100vh-12rem)] shadow-sm rounded-none md:rounded-xl border-x-0 md:border md:border-slate-100 relative transition-all duration-300">
+            {/* Cover Image Placeholder */}
+            <div className="h-32 md:h-48 rounded-t-none md:rounded-t-xl bg-gradient-to-r from-slate-100 to-slate-50 group relative overflow-hidden border-b border-slate-50">
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <button className="bg-white/90 backdrop-blur-sm text-xs font-bold px-3 py-1.5 rounded-full shadow-sm text-slate-600 hover:text-indigo-600 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">add_photo_alternate</span>
+                  Añadir portada
                 </button>
-              </BubbleMenu>
-            )}
+              </div>
+            </div>
 
-            <EditorContent
-              editor={editor}
-              className="prose prose-lg prose-slate max-w-none focus:outline-none
-                prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-slate-800
+            {/* Icon & Title Area */}
+            <div className="px-4 md:px-12 md:-mt-8 relative z-10 mb-8">
+              <div className="w-16 h-16 md:w-20 md:h-20 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center justify-center text-4xl mb-6 relative group cursor-pointer hover:shadow-md transition-all">
+                <span>📝</span>
+                <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-1 shadow-sm border border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="material-symbols-outlined text-xs text-slate-400">edit</span>
+                </div>
+              </div>
+
+              <input
+                type="text"
+                value={notebook.name}
+                readOnly
+                className="text-3xl md:text-5xl font-black text-slate-900 placeholder:text-slate-300 bg-transparent outline-none w-full border-none focus:ring-0 p-0"
+                placeholder="Sin título"
+              />
+              <div className="flex items-center gap-2 mt-4 text-sm text-slate-400 font-medium">
+                <span className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-base">folder_open</span>
+                  {studySetName}
+                </span>
+                <span>•</span>
+                <span>Editado hace un momento</span>
+              </div>
+            </div>
+
+            {/* Document Content Area */}
+            <div
+              className="prose prose-slate prose-lg max-w-none px-4 md:px-12 pb-24 focus:outline-none 
+                prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-slate-900
+                prose-h1:text-4xl prose-h2:text-3xl prose-h3:text-2xl 
                 prose-p:text-slate-600 prose-p:leading-relaxed
-                prose-a:text-indigo-600 prose-a:no-underline hover:prose-a:underline
-                prose-blockquote:border-l-4 prose-blockquote:border-indigo-400 prose-blockquote:bg-slate-50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:not-italic prose-blockquote:rounded-r-lg
-                prose-li:marker:text-slate-400
-                [&_.ProseMirror]:min-h-[500px]
-                [&_.ProseMirror]:focus:outline-none
-                [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]
-                [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-slate-300
-                [&_.ProseMirror_p.is-editor-empty:first-child::before]:font-light
-                [&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left
-                [&_.ProseMirror_p.is-editor-empty:first-child::before]:h-0
-                [&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none
-                /* Task List Styles */
-                [&_ul[data-type='taskList']]:list-none
-                [&_ul[data-type='taskList']]:p-0
-                [&_li[data-type='taskItem']]:flex
-                [&_li[data-type='taskItem']]:items-start
-                [&_li[data-type='taskItem']]:gap-3
-                [&_li[data-type='taskItem']]:my-2
+                prose-blockquote:border-l-4 prose-blockquote:border-indigo-500 prose-blockquote:bg-indigo-50/30 prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg prose-blockquote:not-italic
+                prose-li:marker:text-slate-300
+                [&_ul[data-type='taskList']]:list-none 
+                [&_ul[data-type='taskList']]:pl-0 
+                [&_ul[data-type='taskList']_li]:flex 
+                [&_ul[data-type='taskList']_li]:items-start 
+                [&_ul[data-type='taskList']_li]:gap-2
                 [&_input[type='checkbox']]:mt-1.5
+                [&_input[type='checkbox']]:appearance-none
                 [&_input[type='checkbox']]:w-4
                 [&_input[type='checkbox']]:h-4
                 [&_input[type='checkbox']]:rounded-md
@@ -454,10 +481,25 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
                 [&_input[type='checkbox']]:text-indigo-600
                 [&_input[type='checkbox']]:focus:ring-indigo-500
                 "
-            />
+              onClick={() => editor?.commands.focus()}
+            >
+              {editor && (
+                <BubbleMenu editor={editor} tippyOptions={{ duration: 100, maxWidth: 400 }} className="flex items-center bg-slate-800 text-white rounded-full shadow-2xl py-1 px-2 gap-1 animate-in zoom-in-95 duration-100">
+                  <button onClick={() => editor.chain().focus().toggleBold().run()} className={`p-1.5 rounded-full hover:bg-white/20 transition ${editor.isActive('bold') ? 'text-indigo-300' : 'text-slate-300'}`}><span className="material-symbols-outlined text-[18px]">format_bold</span></button>
+                  <button onClick={() => editor.chain().focus().toggleItalic().run()} className={`p-1.5 rounded-full hover:bg-white/20 transition ${editor.isActive('italic') ? 'text-indigo-300' : 'text-slate-300'}`}><span className="material-symbols-outlined text-[18px]">format_italic</span></button>
+                  <button onClick={() => editor.chain().focus().toggleHighlight().run()} className={`p-1.5 rounded-full hover:bg-white/20 transition ${editor.isActive('highlight') ? 'text-amber-400' : 'text-slate-300'}`}><span className="material-symbols-outlined text-[18px]">ink_highlighter</span></button>
+                  <div className="w-px h-4 bg-white/20 mx-1"></div>
+                  <button onClick={() => { window.dispatchEvent(new CustomEvent('notebook-ai-command', { detail: { action: 'expand' } })) }} className="flex items-center gap-1 pl-1 pr-2 py-0.5 rounded-full hover:bg-indigo-600 transition text-xs font-medium bg-indigo-500/50 text-indigo-100">
+                    <span className="material-symbols-outlined text-[14px]">auto_awesome</span> Expandir
+                  </button>
+                </BubbleMenu>
+              )}
+
+              <EditorContent editor={editor} />
+            </div>
+            <div className="h-20"></div> {/* Bottom spacer */}
           </div>
         </div>
-        <div className="h-20"></div> {/* Bottom spacer */}
       </div>
 
       {/* Floating Dock (Bottom Center) */}
@@ -469,8 +511,8 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
             onClick={handleQuickSave}
             disabled={isSaving || !hasUnsavedChanges}
             className={`p-3 rounded-full transition-all duration-300 flex items-center justify-center ${hasUnsavedChanges
-                ? 'bg-slate-50 text-slate-600 hover:bg-white hover:shadow-sm hover:text-indigo-600'
-                : 'bg-transparent text-slate-300'
+              ? 'bg-slate-50 text-slate-600 hover:bg-white hover:shadow-sm hover:text-indigo-600'
+              : 'bg-transparent text-slate-300'
               }`}
             title={hasUnsavedChanges ? "Guardar borrador" : "Sin cambios"}
           >

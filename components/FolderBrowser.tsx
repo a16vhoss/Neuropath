@@ -256,7 +256,7 @@ const FolderBrowser: React.FC<FolderBrowserProps> = ({ userId, classId = null, o
                                             setItemToMove({ id: set.id, type: 'set', name: set.name });
                                             setMoveModalOpen(true);
                                         }}
-                                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-all"
+                                        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-all bg-slate-50 md:bg-transparent"
                                         title="Mover"
                                     >
                                         <span className="material-symbols-outlined text-lg">drive_file_move</span>

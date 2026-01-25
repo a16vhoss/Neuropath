@@ -119,7 +119,7 @@ const FolderItem: React.FC<FolderItemProps> = ({
                         e.stopPropagation();
                         setShowOptions(!showOptions);
                     }}
-                    className="absolute top-2 right-2 p-1 text-slate-300 hover:text-slate-600 rounded-full hover:bg-slate-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-2 right-2 p-1 text-slate-300 hover:text-slate-600 rounded-full hover:bg-slate-100 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-white/80 md:bg-transparent"
                 >
                     <span className="material-symbols-outlined text-lg">more_vert</span>
                 </button>
