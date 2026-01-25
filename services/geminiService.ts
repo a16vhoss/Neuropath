@@ -60,6 +60,61 @@ export const generateStudyFlashcards = async (topic: string) => {
 };
 
 /**
+ * AI Research: Search internet for high-quality resources
+ */
+export const searchInternet = async (topic: string): Promise<{ title: string; url: string; snippet: string; type: 'web' | 'youtube' }[]> => {
+  const genAI = getGeminiSDK();
+  if (!genAI) return [];
+
+  try {
+    const modelName = await getBestGeminiModel('pro');
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        maxOutputTokens: 2000,
+        temperature: 0.2, // Low temperature for factual consistency
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              title: { type: SchemaType.STRING },
+              url: { type: SchemaType.STRING },
+              snippet: { type: SchemaType.STRING },
+              type: { type: SchemaType.STRING }
+            },
+            required: ["title", "url", "snippet", "type"]
+          }
+        }
+      }
+    });
+
+    const prompt = `
+      OBJETIVO: Identifica los 4 mejores recursos académicos y educativos disponibles en internet sobre el tema: "${topic}".
+      
+      REQUISITOS DE LOS RESULTADOS:
+      1. CALIDAD: Selecciona solo sitios web de alta autoridad (.edu, .org, sitios oficiales de tecnología/ciencia) o videos de YouTube educativos (canales verificados).
+      2. VARIEDAD: Incluye al menos 2 videos de YouTube y 2 artículos web.
+      3. ACTUALIDAD: Prefiere recursos actualizados si el tema es tecnológico o científico.
+      4. ESTRUCTURA JSON: Devuelve un array de objetos con "title", "url", "snippet" (resumen breve del recurso) y "type" ("web" o "youtube").
+      
+      IMPORTANTE: Devuelve únicamente el JSON. Si no conoces URLs exactas con absoluta certeza, genera una descripción que permita al usuario buscarlas o usa dominios confiables como Wikipedia, Khan Academy, Coursera o YouTube.
+      
+      IDIOMA: Español.
+    `;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    return JSON.parse(text);
+
+  } catch (error) {
+    console.error("Error in AI Research:", error);
+    return [];
+  }
+};
+
+/**
  * Generate Flashcards from a Specific Prompt (ZpBot)
  */
 export const generatePromptedFlashcards = async (userPrompt: string, materialContext: string, studySetName: string, count: number = 5) => {

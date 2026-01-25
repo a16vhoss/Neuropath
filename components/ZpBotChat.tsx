@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getZpBotResponse, generatePromptedFlashcards } from '../services/geminiService';
-import { addFlashcardsBatch } from '../services/supabaseClient';
+import { getZpBotResponse, generatePromptedFlashcards, searchInternet } from '../services/geminiService';
+import { addFlashcardsBatch, createMaterialWithFlashcards } from '../services/supabaseClient';
+import { generateFlashcardsFromText, generateMaterialSummary } from '../services/pdfProcessingService';
 import {
     saveChatMessage,
     ChatMessage,
@@ -111,6 +112,10 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
     const [fcTopic, setFcTopic] = useState('');
     const [generatedCards, setGeneratedCards] = useState<any[]>([]);
 
+    // Research Wizard State
+    const [researchMode, setResearchMode] = useState<'idle' | 'asking_topic' | 'searching' | 'results'>('idle');
+    const [researchResults, setResearchResults] = useState<any[]>([]);
+
     // Auto-scroll
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -126,6 +131,109 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
             study_set_id: studySetId,
             user_id: 'system'
         }]);
+    };
+
+    const startResearchFlow = () => {
+        setResearchMode('asking_topic');
+        setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            role: 'assistant',
+            content: `🔍 ¡Entendido! Puedo investigar temas nuevos por ti. ¿Qué te gustaría que busque en internet hoy?`,
+            created_at: new Date().toISOString(),
+            study_set_id: studySetId,
+            user_id: 'system'
+        }]);
+    };
+
+    const handlePerformResearch = async (topic: string) => {
+        setResearchMode('searching');
+        const loadingMsgId = Date.now().toString();
+
+        setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            role: 'user',
+            content: topic,
+            created_at: new Date().toISOString(),
+            study_set_id: studySetId,
+            user_id: 'me',
+            session_id: currentSessionId || 'temp'
+        }]);
+
+        setMessages(prev => [...prev, {
+            id: loadingMsgId,
+            role: 'assistant',
+            content: '🌐 Buscando los mejores recursos en internet para ti... Esto tomará un momento.',
+            created_at: new Date().toISOString(),
+            study_set_id: studySetId,
+            user_id: 'system'
+        }]);
+
+        try {
+            const results = await searchInternet(topic);
+            setResearchResults(results);
+            setResearchMode('results');
+
+            setMessages(prev => prev.filter(m => m.id !== loadingMsgId).concat({
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: `✅ He encontrado ${results.length} recursos de alta calidad sobre "${topic}". Revísalos abajo y dime cuál quieres añadir a tus materiales.`,
+                created_at: new Date().toISOString(),
+                study_set_id: studySetId,
+                user_id: 'system'
+            }));
+        } catch (error) {
+            console.error(error);
+            setMessages(prev => prev.filter(m => m.id !== loadingMsgId).concat({
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: '❌ No pude completar la investigación en este momento. Intenta de nuevo.',
+                created_at: new Date().toISOString(),
+                study_set_id: studySetId,
+                user_id: 'system'
+            }));
+            setResearchMode('idle');
+        }
+    };
+
+    const handleAddResourceAsMaterial = async (resource: any) => {
+        setLoading(true);
+        try {
+            // 1. Generate some initial flashcards from the snippet/title
+            const initialCards = await generateFlashcardsFromText(
+                `Título: ${resource.title}\nDescripción: ${resource.snippet}`,
+                resource.title, // Use title as topic
+                3 // Generate 3 initial cards
+            ) || [];
+
+            // 2. This is a specialized material addition for URL
+            await createMaterialWithFlashcards({
+                study_set_id: studySetId,
+                name: resource.title,
+                type: 'url',
+                file_url: resource.url,
+                summary: resource.snippet,
+                content_text: `Fuente externa: ${resource.url}\n\n${resource.snippet}`,
+                flashcards: initialCards.map(c => ({ ...c, is_ai_generated: true }))
+            });
+
+            setMessages(prev => [...prev, {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: `📖 ¡He añadido "${resource.title}" a tus materiales! Se están generando flashcards automáticamente.`,
+                created_at: new Date().toISOString(),
+                study_set_id: studySetId,
+                user_id: 'system'
+            }]);
+
+            // Optional: Auto-refresh list after a bit
+            setTimeout(() => window.location.reload(), 2000);
+
+        } catch (error) {
+            console.error('Error adding resource:', error);
+            alert('Error al añadir material');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleGenerateFlashcards = async (topic: string) => {
@@ -231,6 +339,12 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
         if (fcMode === 'asking_topic') {
             setInput('');
             handleGenerateFlashcards(userText);
+            return;
+        }
+
+        if (researchMode === 'asking_topic') {
+            setInput('');
+            handlePerformResearch(userText);
             return;
         }
 
@@ -387,6 +501,14 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                                     <span className="material-symbols-outlined">style</span>
                                 </button>
                                 <button
+                                    onClick={startResearchFlow}
+                                    className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-cyan-400 transition-colors"
+                                    title="Investigar Tema"
+                                    disabled={loading || researchMode !== 'idle'}
+                                >
+                                    <span className="material-symbols-outlined">search</span>
+                                </button>
+                                <button
                                     onClick={handleNewChat}
                                     className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-cyan-400 transition-colors"
                                     title="Nuevo Chat"
@@ -477,7 +599,48 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                                 </div>
                             )}
 
-                            {/* Suggestions */}
+                            {/* Research Results Preview */}
+                            {researchMode === 'results' && researchResults.length > 0 && (
+                                <div className="space-y-3 pl-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="bg-slate-800 border border-cyan-500/30 rounded-2xl p-4 shadow-lg shadow-cyan-900/10">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h5 className="text-cyan-400 font-bold text-sm flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-lg">travel_explore</span>
+                                                Resultados de Investigación ({researchResults.length})
+                                            </h5>
+                                            <button
+                                                onClick={() => { setResearchMode('idle'); setResearchResults([]); }}
+                                                className="text-slate-400 hover:text-white"
+                                            >
+                                                <span className="material-symbols-outlined text-sm">close</span>
+                                            </button>
+                                        </div>
+                                        <div className="space-y-2 max-h-60 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-600 mb-3">
+                                            {researchResults.map((res, i) => (
+                                                <div key={i} className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50 hover:border-cyan-500/30 transition-all group">
+                                                    <div className="flex justify-between items-start gap-2 mb-1">
+                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${res.type === 'youtube' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                                                            {res.type}
+                                                        </span>
+                                                        <a href={res.url} target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-cyan-400">
+                                                            <span className="material-symbols-outlined text-sm">open_in_new</span>
+                                                        </a>
+                                                    </div>
+                                                    <p className="font-bold text-slate-200 text-xs mb-1 line-clamp-1">{res.title}</p>
+                                                    <p className="text-slate-400 text-[11px] mb-2 line-clamp-2">{res.snippet}</p>
+                                                    <button
+                                                        onClick={() => handleAddResourceAsMaterial(res)}
+                                                        className="w-full py-1.5 bg-slate-700 hover:bg-cyan-600 text-white rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[14px]">add</span>
+                                                        Añadir a Materiales
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             {!loading && suggestions.length > 0 && (
                                 <div className="pl-2 space-y-2 animate-in slide-in-from-left-2 fade-in duration-300">
                                     <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider ml-1 mb-1">Sugerencias Inteligentes</p>
