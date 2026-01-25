@@ -412,7 +412,15 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
           )}
 
           {/* Main Paper Container */}
-          <div className="max-w-5xl mx-auto mt-6 mb-32 bg-transparent min-h-[calc(100vh-10rem)] relative px-4 md:px-12">
+          <div
+            className="max-w-5xl mx-auto mt-6 mb-32 bg-transparent min-h-[calc(100vh-10rem)] relative px-4 md:px-12 cursor-text"
+            onClick={(e) => {
+              // Only focus if clicking the empty background, not the content itself
+              if (e.target === e.currentTarget) {
+                editor?.commands.focus('end');
+              }
+            }}
+          >
 
             {/* Document Content Area */}
             <div
@@ -436,7 +444,6 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
                 [&_input[type='checkbox']]:text-indigo-600
                 [&_input[type='checkbox']]:focus:ring-indigo-500
                 "
-              onClick={() => editor?.commands.focus()}
             >
               {editor && (
                 <BubbleMenu editor={editor} tippyOptions={{ duration: 100, maxWidth: 400 }} className="flex items-center bg-slate-800 text-white rounded-full shadow-2xl py-1 px-2 gap-1 animate-in zoom-in-95 duration-100">
