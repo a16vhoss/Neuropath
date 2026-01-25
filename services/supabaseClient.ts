@@ -775,7 +775,7 @@ export const getStudySetWithDetails = async (studySetId: string) => {
     // 1. Fetch Flashcards (Robustly)
     let flashcardsQuery = supabase
         .from('flashcards')
-        .select('id, question, answer, category, study_set_id, material_id');
+        .select('id, question, answer, category, study_set_id, material_id, is_ai_generated');
 
     if (studySet.source_material_id) {
         flashcardsQuery = flashcardsQuery.or(`study_set_id.eq.${studySetId},material_id.eq.${studySet.source_material_id}`);

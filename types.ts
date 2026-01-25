@@ -39,4 +39,6 @@ export interface Flashcard {
   question: string;
   answer: string;
   category: string;
+  is_ai_generated?: boolean;
+  source_name?: string;
 }
