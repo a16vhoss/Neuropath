@@ -51,14 +51,16 @@ BEGIN
             material_id,
             question,
             answer,
-            category
+            category,
+            is_ai_generated
         )
         SELECT 
             p_study_set_id,
             v_material_id,
             (item->>'question')::text,
             (item->>'answer')::text,
-            (item->>'category')::text
+            (item->>'category')::text,
+            COALESCE((item->>'is_ai_generated')::boolean, TRUE)
         FROM jsonb_array_elements(p_flashcards) AS item;
     END IF;
 

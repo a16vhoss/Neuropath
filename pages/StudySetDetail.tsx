@@ -469,7 +469,8 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
             if (newFlashcards && newFlashcards.length > 0) {
                 await addFlashcardsBatch(newFlashcards.map(fc => ({
                     ...fc,
-                    study_set_id: studySet.id
+                    study_set_id: studySet.id,
+                    is_ai_generated: true
                 })));
                 loadStudySet();
                 setRefreshReports(prev => prev + 1);
@@ -574,7 +575,8 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                 const flashcardsPayload = flashcards.map(fc => ({
                     question: fc.question,
                     answer: fc.answer,
-                    category: fc.category || 'General'
+                    category: fc.category || 'General',
+                    is_ai_generated: true
                 }));
 
                 await createMaterialWithFlashcards({
@@ -630,7 +632,8 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                 const flashcardsPayload = flashcards.map(fc => ({
                     question: fc.question,
                     answer: fc.answer,
-                    category: fc.category || 'General'
+                    category: fc.category || 'General',
+                    is_ai_generated: true
                 }));
 
                 await createMaterialWithFlashcards({
@@ -684,7 +687,8 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                 const flashcardsPayload = youtubeResult.flashcards.map(fc => ({
                     question: fc.question,
                     answer: fc.answer,
-                    category: fc.category || 'General'
+                    category: fc.category || 'General',
+                    is_ai_generated: true
                 }));
 
                 await createMaterialWithFlashcards({
@@ -710,7 +714,8 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                 const flashcardsPayload = webResult.flashcards.map(fc => ({
                     question: fc.question,
                     answer: fc.answer,
-                    category: fc.category || 'General'
+                    category: fc.category || 'General',
+                    is_ai_generated: true
                 }));
 
                 await createMaterialWithFlashcards({
