@@ -313,6 +313,11 @@ export const confirmNotebookSave = async (
   newContentDiff: string,
   flashcards: FlashcardPreview[]
 ): Promise<{ saveId: string; flashcardIds: string[] }> => {
+  console.log('[Notebook] confirmNotebookSave starting...');
+  console.log('[Notebook] notebookId:', notebookId);
+  console.log('[Notebook] studySetId:', studySetId);
+  console.log('[Notebook] flashcards count:', flashcards.length);
+
   // 1. Insertar flashcards
   const flashcardInserts = flashcards.map(fc => ({
     study_set_id: studySetId,
@@ -320,19 +325,25 @@ export const confirmNotebookSave = async (
     answer: fc.answer,
     category: fc.category || 'Nota',
     is_ai_generated: true,
-    source_name: `Cuaderno`,
+    source_name: 'Cuaderno',
   }));
 
+  console.log('[Notebook] Inserting flashcards...');
   const { data: insertedFlashcards, error: flashcardsError } = await supabase
     .from('flashcards')
     .insert(flashcardInserts)
     .select('id');
 
-  if (flashcardsError) throw flashcardsError;
+  if (flashcardsError) {
+    console.error('[Notebook] Error inserting flashcards:', flashcardsError);
+    throw flashcardsError;
+  }
+  console.log('[Notebook] Flashcards inserted:', insertedFlashcards?.length);
 
   const flashcardIds = (insertedFlashcards || []).map(f => f.id);
 
   // 2. Crear notebook_save
+  console.log('[Notebook] Creating notebook_save...');
   const { data: save, error: saveError } = await supabase
     .from('notebook_saves')
     .insert({
@@ -344,10 +355,15 @@ export const confirmNotebookSave = async (
     .select()
     .single();
 
-  if (saveError) throw saveError;
+  if (saveError) {
+    console.error('[Notebook] Error creating save:', saveError);
+    throw saveError;
+  }
+  console.log('[Notebook] Save created:', save?.id);
 
   // 3. Crear links entre save y flashcards
   if (flashcardIds.length > 0) {
+    console.log('[Notebook] Creating flashcard links...');
     const links = flashcardIds.map(fcId => ({
       notebook_save_id: save.id,
       flashcard_id: fcId,
@@ -357,29 +373,38 @@ export const confirmNotebookSave = async (
       .from('notebook_flashcard_links')
       .insert(links);
 
-    if (linksError) throw linksError;
+    if (linksError) {
+      console.error('[Notebook] Error creating links:', linksError);
+      throw linksError;
+    }
+    console.log('[Notebook] Links created');
   }
 
-  // 4. Actualizar notebook
+  // 4. Obtener el notebook actual para incrementar el contador
+  console.log('[Notebook] Updating notebook...');
+  const { data: currentNotebook } = await supabase
+    .from('notebooks')
+    .select('flashcards_generated')
+    .eq('id', notebookId)
+    .single();
+
+  const currentCount = currentNotebook?.flashcards_generated || 0;
+
   const { error: updateError } = await supabase
     .from('notebooks')
     .update({
       content: currentContent,
       last_saved_content: currentContent,
       last_saved_at: new Date().toISOString(),
-      flashcards_generated: supabase.rpc ? undefined : flashcardIds.length, // Increment would be better
+      flashcards_generated: currentCount + flashcardIds.length,
     })
     .eq('id', notebookId);
 
-  if (updateError) throw updateError;
-
-  // Incrementar contador de flashcards
-  await supabase.rpc('increment_notebook_flashcards', {
-    notebook_id: notebookId,
-    count: flashcardIds.length,
-  }).catch(() => {
-    // Si la funcion no existe, ignorar
-  });
+  if (updateError) {
+    console.error('[Notebook] Error updating notebook:', updateError);
+    throw updateError;
+  }
+  console.log('[Notebook] Notebook updated successfully');
 
   return { saveId: save.id, flashcardIds };
 };
