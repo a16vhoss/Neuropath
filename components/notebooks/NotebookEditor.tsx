@@ -327,49 +327,27 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
   return (
     <div className="flex flex-col h-full bg-slate-50/50">
       {/* Header Minimalista */}
-      <div className="flex items-center justify-between px-6 py-4 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-slate-100 transition-all">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleBack}
-            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-all"
-          >
-            <span className="material-symbols-outlined">arrow_back</span>
-          </button>
-          <div className="flex flex-col">
-            {/* Breadcrumb-like context */}
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-0.5">
-              {studySetName}
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-indigo-500">book_2</span>
-              <h2 className="font-bold text-slate-800 text-lg tracking-tight">{notebook.title}</h2>
-            </div>
-          </div>
+      {/* Header (Scrollable Document Title) */
+      /* Made scrollable to allow for Big Title feeling. Navigation moved to toolbar for persistent access. */}
+      <div className="flex flex-col gap-2 px-8 pt-8 pb-4 bg-transparent border-b-0 transition-all">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          <span className="cursor-pointer hover:text-indigo-600 transition" onClick={handleBack}>{studySetName}</span>
+          <span>/</span>
+          <span className="text-indigo-500">Nota</span>
         </div>
-
-        <div className="flex items-center gap-3">
-          {/* Status Indicators */}
-          <div className="flex items-center gap-3 mr-4">
-            {hasUnsavedChanges && (
-              <span className="text-xs font-medium text-amber-500 bg-amber-50 px-2 py-1 rounded-full flex items-center gap-1 animate-in fade-in">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                Editando
-              </span>
-            )}
-            {saveMessage && (
-              <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full animate-in fade-in slide-in-from-top-1">
-                {saveMessage}
-              </span>
-            )}
-          </div>
-
-          <button
-            onClick={() => setShowHistoryPanel(true)}
-            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all"
-            title="Historial de versiones"
-          >
-            <span className="material-symbols-outlined">history</span>
-          </button>
+        <h1 className="font-black text-slate-900 text-4xl tracking-tight leading-tight">{notebook.title}</h1>
+        <div className="flex items-center gap-3 mt-2">
+          {hasUnsavedChanges && (
+            <span className="text-xs font-bold text-amber-500 bg-amber-50 px-2 py-1 rounded-full flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              Editando
+            </span>
+          )}
+          {saveMessage && (
+            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+              {saveMessage}
+            </span>
+          )}
         </div>
       </div>
 
@@ -384,6 +362,11 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
             /* Adjusted top-24 md:top-28 to flush with tabs. Solid bg-white to prevent text bleed-through. */}
           <div className={`sticky top-28 md:top-28 z-30 transition-all duration-300 -mx-4 md:-mx-12 mb-6 border-b border-slate-200 bg-white shadow-sm`}>
             <div className="max-w-3xl mx-auto flex items-center justify-center gap-1 p-2 overflow-x-auto no-scrollbar">
+
+              <div className="flex items-center border-r border-slate-100 pr-2 mr-2 gap-1">
+                <ToolbarButton onClick={onBack} icon="arrow_back" title="Volver al Set" />
+                <ToolbarButton onClick={() => setShowHistoryPanel(true)} icon="history" title="Historial" />
+              </div>
 
               <ToolbarButton
                 onClick={() => editor.chain().focus().toggleBold().run()}
