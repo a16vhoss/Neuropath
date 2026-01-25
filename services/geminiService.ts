@@ -683,3 +683,126 @@ export const generatePodcastScript = async (context: string) => {
     return [];
   }
 };
+
+/**
+ * Generate Flashcards from Notebook Content (Incremental)
+ *
+ * Sistema inteligente que genera flashcards SOLO del contenido nuevo
+ * mientras usa el contexto previo para coherencia y evita duplicados.
+ */
+export const generateFlashcardsFromNotebook = async (params: {
+  newContent: string;
+  previousContent: string;
+  existingFlashcards: string;
+  studySetName: string;
+  notebookTitle: string;
+  count: number;
+}): Promise<{ question: string; answer: string; category: string }[]> => {
+  const { newContent, previousContent, existingFlashcards, studySetName, notebookTitle, count } = params;
+
+  if (!newContent || newContent.trim().length < 20) {
+    return [];
+  }
+
+  const genAI = getGeminiSDK();
+  if (!genAI) {
+    console.warn('No Gemini SDK available');
+    return [];
+  }
+
+  try {
+    const modelName = await getBestGeminiModel('pro');
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: SchemaType.OBJECT,
+          properties: {
+            flashcards: {
+              type: SchemaType.ARRAY,
+              items: {
+                type: SchemaType.OBJECT,
+                properties: {
+                  question: { type: SchemaType.STRING },
+                  answer: { type: SchemaType.STRING },
+                  category: { type: SchemaType.STRING },
+                },
+                required: ["question", "answer", "category"],
+              },
+            },
+          },
+          required: ["flashcards"],
+        },
+        temperature: 0.7,
+        maxOutputTokens: 4000,
+      },
+    });
+
+    const prompt = `
+Eres un experto creador de material de estudio con amplia experiencia en pedagogia.
+
+TAREA: Genera exactamente ${count} flashcards de ALTA CALIDAD basadas en el NUEVO CONTENIDO.
+
+CUADERNO: "${notebookTitle}" (parte del set de estudio "${studySetName}")
+
+NUEVO CONTENIDO (genera flashcards UNICAMENTE de esto):
+---
+${newContent.slice(0, 25000)}
+---
+
+${previousContent ? `
+CONTEXTO PREVIO (usa para entender relaciones y terminologia, pero NO generes flashcards de aqui):
+---
+${previousContent.slice(0, 15000)}
+---
+` : ''}
+
+${existingFlashcards ? `
+FLASHCARDS EXISTENTES (evita preguntas similares o duplicadas):
+${existingFlashcards.slice(0, 3000)}
+` : ''}
+
+REGLAS ESTRICTAS:
+1. Las flashcards deben venir UNICAMENTE del nuevo contenido
+2. Usa el contexto previo para:
+   - Entender terminologia ya definida
+   - Crear conexiones con conceptos anteriores si es relevante
+   - Mantener consistencia en el nivel de detalle
+3. Evita preguntas que ya existen o son muy similares
+4. Cada flashcard debe ser autocontenida (entendible sin ver las notas)
+5. Prioriza en este orden: definiciones > conceptos clave > relaciones > ejemplos > detalles
+6. Categoriza cada tarjeta con una de estas categorias: Definicion, Concepto, Relacion, Ejemplo, Importante, Proceso, Formula
+
+FORMATO DE RESPUESTA:
+{
+  "flashcards": [
+    {
+      "question": "pregunta clara y directa",
+      "answer": "respuesta concisa pero completa",
+      "category": "categoria apropiada"
+    }
+  ]
+}
+
+Idioma: Espanol.
+Genera EXACTAMENTE ${count} flashcards de alta calidad.
+`;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    const parsed = JSON.parse(text);
+
+    return parsed.flashcards || [];
+
+  } catch (error) {
+    console.error("Error generating flashcards from notebook:", error);
+
+    // Fallback: generar flashcards basicas
+    return [{
+      question: `¿Cuales son los puntos clave de las notas sobre ${notebookTitle}?`,
+      answer: newContent.slice(0, 200) + '...',
+      category: 'Resumen'
+    }];
+  }
+};

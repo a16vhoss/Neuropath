@@ -22,6 +22,13 @@ import CumulativeReportsCard from '../components/CumulativeReportsCard';
 import VisualProgressionMap from '../components/VisualProgressionMap';
 import StudyGuideRenderer from '../components/StudyGuideRenderer';
 import ZpBotChat from '../components/ZpBotChat';
+import { NotebookList, NotebookEditor } from '../components/notebooks';
+import { Notebook } from '../types';
+import {
+    createNotebook,
+    getNotebooksForStudySet,
+    deleteNotebook,
+} from '../services/notebookService';
 
 interface Flashcard {
     id: string;
@@ -81,7 +88,7 @@ interface RankingMember {
     ranking_score: number;
 }
 
-type TabType = 'overview' | 'flashcards' | 'materials' | 'reports' | 'people';
+type TabType = 'overview' | 'flashcards' | 'materials' | 'notebooks' | 'reports' | 'people';
 
 interface StudySetDetailProps {
     studySetId?: string;
@@ -177,13 +184,52 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
     const [rankingData, setRankingData] = useState<RankingMember[]>([]);
     const [loadingRanking, setLoadingRanking] = useState(false);
 
+    // Notebooks state
+    const [notebooks, setNotebooks] = useState<Notebook[]>([]);
+    const [loadingNotebooks, setLoadingNotebooks] = useState(false);
+    const [selectedNotebook, setSelectedNotebook] = useState<Notebook | null>(null);
+
     useEffect(() => {
         if (activeTab === 'people') {
             // If class-based, we might fetch members, but we prefer ranking now
             if (studySet?.class_id) fetchClassMembers();
             fetchRanking();
         }
+        if (activeTab === 'notebooks') {
+            fetchNotebooks();
+        }
     }, [activeTab, studySet]);
+
+    // Fetch notebooks
+    const fetchNotebooks = async () => {
+        if (!studySetId) return;
+        setLoadingNotebooks(true);
+        try {
+            const data = await getNotebooksForStudySet(studySetId);
+            setNotebooks(data || []);
+        } catch (error) {
+            console.error('Error fetching notebooks:', error);
+        } finally {
+            setLoadingNotebooks(false);
+        }
+    };
+
+    // Create notebook
+    const handleCreateNotebook = async (title: string, description: string) => {
+        if (!studySetId) return;
+        const newNotebook = await createNotebook(studySetId, title, description);
+        setNotebooks(prev => [newNotebook, ...prev]);
+        setSelectedNotebook(newNotebook);
+    };
+
+    // Delete notebook
+    const handleDeleteNotebook = async (notebookId: string) => {
+        await deleteNotebook(notebookId);
+        setNotebooks(prev => prev.filter(n => n.id !== notebookId));
+        if (selectedNotebook?.id === notebookId) {
+            setSelectedNotebook(null);
+        }
+    };
 
     const fetchRanking = async () => {
         if (!studySetId) return;
@@ -899,7 +945,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
 
                     {/* Tabs */}
                     <div className="flex gap-6 mt-4 border-t border-slate-100 pt-4">
-                        {(['overview', 'flashcards', 'materials', 'reports', 'people'] as TabType[]).map((tab) => (
+                        {(['overview', 'flashcards', 'materials', 'notebooks', 'reports', 'people'] as TabType[]).map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
@@ -911,6 +957,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                 {tab === 'overview' && 'Resumen'}
                                 {tab === 'flashcards' && `Flashcards (${studySet.flashcard_count})`}
                                 {tab === 'materials' && `Materiales (${studySet.material_count})`}
+                                {tab === 'notebooks' && `Cuadernos (${notebooks.length})`}
                                 {tab === 'reports' && 'Reportes'}
                                 {tab === 'people' && 'Personas'}
                             </button>
@@ -921,6 +968,42 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
 
             {/* Content */}
             <main className="max-w-5xl mx-auto px-2 md:px-4 py-4 md:py-6">
+                {/* Notebooks Tab */}
+                {activeTab === 'notebooks' && (
+                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {selectedNotebook ? (
+                            <NotebookEditor
+                                notebook={selectedNotebook}
+                                studySetId={studySetId!}
+                                studySetName={studySet.name}
+                                canEdit={canEdit}
+                                onBack={() => {
+                                    setSelectedNotebook(null);
+                                    fetchNotebooks();
+                                }}
+                                onSaveComplete={() => {
+                                    fetchNotebooks();
+                                    // Refresh flashcards count
+                                    if (studySetId) {
+                                        getStudySetWithDetails(studySetId).then(data => {
+                                            if (data) setStudySet(data);
+                                        });
+                                    }
+                                }}
+                            />
+                        ) : (
+                            <NotebookList
+                                notebooks={notebooks}
+                                loading={loadingNotebooks}
+                                canEdit={canEdit}
+                                onCreateNotebook={handleCreateNotebook}
+                                onSelectNotebook={setSelectedNotebook}
+                                onDeleteNotebook={handleDeleteNotebook}
+                            />
+                        )}
+                    </div>
+                )}
+
                 {/* People Tab (Ranking) */}
                 {activeTab === 'people' && (
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 animate-in fade-in slide-in-from-bottom-2 duration-300">

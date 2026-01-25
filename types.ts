@@ -42,3 +42,50 @@ export interface Flashcard {
   is_ai_generated?: boolean;
   source_name?: string;
 }
+
+// ============================================
+// Notebooks (Cuadernos de notas)
+// ============================================
+
+export interface Notebook {
+  id: string;
+  study_set_id: string;
+  title: string;
+  description?: string;
+  content: string;
+  last_saved_content?: string;
+  last_saved_at?: string;
+  flashcards_generated: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotebookSave {
+  id: string;
+  notebook_id: string;
+  content_snapshot: string;
+  new_content_diff?: string;
+  flashcards_generated: number;
+  saved_at: string;
+}
+
+export interface NotebookFlashcardLink {
+  id: string;
+  notebook_save_id: string;
+  flashcard_id: string;
+  created_at: string;
+}
+
+export interface FlashcardPreview {
+  question: string;
+  answer: string;
+  category: string;
+  tempId?: string; // Para edicion en preview
+}
+
+export interface NotebookSaveResult {
+  hasNewContent: boolean;
+  newContentDiff: string;
+  flashcardPreviews: FlashcardPreview[];
+  suggestedCount: number;
+}
