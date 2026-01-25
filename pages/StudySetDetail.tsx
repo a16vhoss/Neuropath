@@ -919,17 +919,18 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={() => navigate(`/student/study-set/${studySet.id}?mode=flashcards`)}
-                                className="bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold px-6 py-2 rounded-xl hover:opacity-90 transition flex items-center gap-2"
+                                className="bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold px-3 md:px-6 py-2 rounded-xl hover:opacity-90 transition flex items-center gap-2 text-sm md:text-base"
                             >
-                                <span className="material-symbols-outlined">auto_awesome</span>
-                                Estudiar (Adaptativo)
+                                <span className="material-symbols-outlined text-lg">auto_awesome</span>
+                                <span className="hidden md:inline">Estudiar (Adaptativo)</span>
+                                <span className="md:hidden">Estudiar</span>
                             </button>
                             <button
                                 onClick={() => navigate(`/student/study-set/${studySet.id}?mode=exam`)}
-                                className="bg-white text-slate-700 border border-slate-200 font-bold px-6 py-2 rounded-xl hover:bg-slate-50 transition flex items-center gap-2"
+                                className="bg-white text-slate-700 border border-slate-200 font-bold px-3 md:px-6 py-2 rounded-xl hover:bg-slate-50 transition flex items-center gap-2 text-sm md:text-base"
                             >
-                                <span className="material-symbols-outlined">timer</span>
-                                Simulacro
+                                <span className="material-symbols-outlined text-lg">timer</span>
+                                <span className="hidden md:inline">Simulacro</span>
                             </button>
                             {!readOnly && isOwner && (
                                 <button
@@ -944,12 +945,12 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                     </div>
 
                     {/* Tabs */}
-                    <div className="flex gap-6 mt-4 border-t border-slate-100 pt-4">
+                    <div className="flex gap-6 mt-4 border-t border-slate-100 pt-4 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
                         {(['overview', 'flashcards', 'materials', 'notebooks', 'reports', 'people'] as TabType[]).map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
-                                className={`pb-2 font-medium transition ${activeTab === tab
+                                className={`pb-2 font-medium transition whitespace-nowrap ${activeTab === tab
                                     ? 'text-primary border-b-2 border-primary'
                                     : 'text-slate-500 hover:text-slate-700'
                                     }`}
