@@ -1463,86 +1463,89 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                {studySet.flashcards.map((card, index) => (
-                                    <div key={card.id} className={`bg-white rounded-xl p-4 border transition ${card.is_ai_generated || card.category?.includes('AI') ? 'border-emerald-100 border-l-4 border-l-emerald-500 shadow-sm shadow-emerald-50' : 'border-slate-100 hover:shadow-md'}`}>
-                                        <div className="flex justify-between items-start">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded">#{index + 1}</span>
-                                                    {card.category && (
-                                                        <span className="bg-violet-100 text-violet-600 text-xs font-medium px-2 py-1 rounded">{card.category}</span>
-                                                    )}
-                                                    {/* Mastery Stats */}
+                                {studySet.flashcards.map((card, index) => {
+                                    const isAIGenerated = card.is_ai_generated || !!card.material_id || card.category?.toLowerCase().includes('ai');
+                                    return (
+                                        <div key={card.id} className={`bg-white rounded-xl p-4 border transition ${isAIGenerated ? 'border-emerald-100 border-l-4 border-l-emerald-500 shadow-sm shadow-emerald-50' : 'border-slate-100 hover:shadow-md'}`}>
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded">#{index + 1}</span>
+                                                        {card.category && (
+                                                            <span className="bg-violet-100 text-violet-600 text-xs font-medium px-2 py-1 rounded">{card.category}</span>
+                                                        )}
+                                                        {/* Mastery Stats */}
+                                                        {flashcardProgress.get(card.id) && (
+                                                            <span className={`text-xs font-medium px-2 py-1 rounded ${(flashcardProgress.get(card.id)?.difficulty_level || 0) >= 3
+                                                                ? 'bg-emerald-100 text-emerald-700'
+                                                                : (flashcardProgress.get(card.id)?.difficulty_level || 0) >= 2
+                                                                    ? 'bg-blue-100 text-blue-700'
+                                                                    : 'bg-amber-100 text-amber-700'
+                                                                }`}>
+                                                                {'⭐'.repeat(flashcardProgress.get(card.id)?.difficulty_level || 1)} Nv.{flashcardProgress.get(card.id)?.difficulty_level || 1}
+                                                            </span>
+                                                        )}
+                                                        {isAIGenerated && (
+                                                            <span className="bg-emerald-500 text-white text-[10px] font-black px-2 py-1 rounded-full flex items-center gap-1 shadow-sm ring-1 ring-emerald-600/20" title="Potenciado con IA">
+                                                                <span className="material-symbols-outlined text-[12px]">auto_awesome</span>
+                                                                AI BOT
+                                                            </span>
+                                                        )}
+                                                        {card.source_name && (
+                                                            <span className="bg-slate-50 text-slate-500 text-xs font-medium px-2 py-1 rounded border border-slate-100 flex items-center gap-1">
+                                                                <span className="material-symbols-outlined text-sm">description</span>
+                                                                {card.source_name}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="font-medium text-slate-900 mb-1">{card.question}</p>
+                                                    <p className="text-sm text-slate-500">{card.answer}</p>
+                                                    {/* Progress bar */}
                                                     {flashcardProgress.get(card.id) && (
-                                                        <span className={`text-xs font-medium px-2 py-1 rounded ${(flashcardProgress.get(card.id)?.difficulty_level || 0) >= 3
-                                                            ? 'bg-emerald-100 text-emerald-700'
-                                                            : (flashcardProgress.get(card.id)?.difficulty_level || 0) >= 2
-                                                                ? 'bg-blue-100 text-blue-700'
-                                                                : 'bg-amber-100 text-amber-700'
-                                                            }`}>
-                                                            {'⭐'.repeat(flashcardProgress.get(card.id)?.difficulty_level || 1)} Nv.{flashcardProgress.get(card.id)?.difficulty_level || 1}
-                                                        </span>
-                                                    )}
-                                                    {(card.is_ai_generated || card.category?.includes('AI')) && (
-                                                        <span className="bg-emerald-500 text-white text-[10px] font-black px-2 py-1 rounded-full flex items-center gap-1 shadow-sm ring-1 ring-emerald-600/20" title="Potenciado con IA">
-                                                            <span className="material-symbols-outlined text-[12px]">auto_awesome</span>
-                                                            AI BOT
-                                                        </span>
-                                                    )}
-                                                    {card.source_name && (
-                                                        <span className="bg-slate-50 text-slate-500 text-xs font-medium px-2 py-1 rounded border border-slate-100 flex items-center gap-1">
-                                                            <span className="material-symbols-outlined text-sm">description</span>
-                                                            {card.source_name}
-                                                        </span>
+                                                        <div className="mt-2 flex items-center gap-2">
+                                                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                                <div
+                                                                    className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all"
+                                                                    style={{ width: `${flashcardProgress.get(card.id)?.mastery_percent || 0}%` }}
+                                                                />
+                                                            </div>
+                                                            <span className="text-xs text-slate-500">
+                                                                {flashcardProgress.get(card.id)?.mastery_percent || 0}%
+                                                            </span>
+                                                        </div>
                                                     )}
                                                 </div>
-                                                <p className="font-medium text-slate-900 mb-1">{card.question}</p>
-                                                <p className="text-sm text-slate-500">{card.answer}</p>
-                                                {/* Progress bar */}
-                                                {flashcardProgress.get(card.id) && (
-                                                    <div className="mt-2 flex items-center gap-2">
-                                                        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                                            <div
-                                                                className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all"
-                                                                style={{ width: `${flashcardProgress.get(card.id)?.mastery_percent || 0}%` }}
-                                                            />
-                                                        </div>
-                                                        <span className="text-xs text-slate-500">
-                                                            {flashcardProgress.get(card.id)?.mastery_percent || 0}%
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => setViewingStatsFlashcard(card)}
-                                                    className="p-2 text-slate-400 hover:text-violet-500 hover:bg-violet-50 rounded-lg transition"
-                                                    title="Ver estadísticas"
-                                                >
-                                                    <span className="material-symbols-outlined text-sm">bar_chart</span>
-                                                </button>
-                                                {canEdit && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => setEditingFlashcard(card)}
-                                                            className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition"
-                                                            title="Editar"
-                                                        >
-                                                            <span className="material-symbols-outlined text-sm">edit</span>
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteFlashcard(card.id)}
-                                                            className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition"
-                                                            title="Eliminar"
-                                                        >
-                                                            <span className="material-symbols-outlined text-sm">delete</span>
-                                                        </button>
-                                                    </>
-                                                )}
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => setViewingStatsFlashcard(card)}
+                                                        className="p-2 text-slate-400 hover:text-violet-500 hover:bg-violet-50 rounded-lg transition"
+                                                        title="Ver estadísticas"
+                                                    >
+                                                        <span className="material-symbols-outlined text-sm">bar_chart</span>
+                                                    </button>
+                                                    {canEdit && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => setEditingFlashcard(card)}
+                                                                className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition"
+                                                                title="Editar"
+                                                            >
+                                                                <span className="material-symbols-outlined text-sm">edit</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteFlashcard(card.id)}
+                                                                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                                                                title="Eliminar"
+                                                            >
+                                                                <span className="material-symbols-outlined text-sm">delete</span>
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
