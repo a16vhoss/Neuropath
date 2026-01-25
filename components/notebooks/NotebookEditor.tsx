@@ -411,15 +411,6 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
             </div>
           )}
 
-  // Toolbar button component already defined above or will be used from props if external.
-          // Actually, we should use the one defined inside or clean it up. The previous duplicate was at the top level.
-          // I will just use the internal definition logic if needed, but usually it's better to extract.
-          // For now, I'll keep the internal interaction logic if it relies on closures, but the duplicate at top was unused or shadowed.
-          // Wait, the top one (lines 31-41) was `const ToolbarButton`. The internal one (257) is also `const ToolbarButton`.
-          // I will remove the internal definition if I can, or just keep it and ignore the top one. 
-          // However, `replace_file_content` targeting the body section (Cover/Title) won't see the top level one.
-          // I will target the container and body.
-
           {/* Main Paper Container */}
           <div className="max-w-5xl mx-auto mt-6 mb-32 bg-transparent min-h-[calc(100vh-10rem)] relative px-4 md:px-12">
 
