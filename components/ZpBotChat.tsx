@@ -38,24 +38,18 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, contextText }) => {
         }
     }, [studySetId, isOpen]);
 
-    // When session changes, load messages
-    useEffect(() => {
-        if (currentSessionId) {
-            loadMessages(currentSessionId);
-        } else {
-            // New Chat State
-            setMessages([]);
-            setSuggestions(["¿De qué trata este Study Set?", "¿Puedes hacerme un resumen?", "¿Qué es lo más importante?"]);
-        }
-    }, [currentSessionId]);
+    // OMITTED: useEffect on currentSessionId to prevent race conditions.
+    // We will call loadMessages explicitly when selecting a session.
 
     const loadSessions = async () => {
         const list = await getChatSessions(studySetId);
         setSessions(list);
 
-        // Auto-select most recent if exists
+        // Auto-select most recent if exists AND we are just opening
         if (list.length > 0 && !currentSessionId) {
-            setCurrentSessionId(list[0].id);
+            const mostRecent = list[0];
+            setCurrentSessionId(mostRecent.id);
+            loadMessages(mostRecent.id); // Explicit load
         }
     };
 
@@ -74,11 +68,14 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, contextText }) => {
 
     const handleNewChat = () => {
         setCurrentSessionId(null); // Reset to "New Chat" state
+        setMessages([]);
+        setSuggestions(["¿De qué trata este Study Set?", "¿Puedes hacerme un resumen?", "¿Qué es lo más importante?"]);
         setIsSidebarOpen(false); // Close sidebar on mobile/small view if needed
     };
 
     const handleSelectSession = (sessionId: string) => {
         setCurrentSessionId(sessionId);
+        loadMessages(sessionId); // Explicit load
         setIsSidebarOpen(false);
     };
 
@@ -93,8 +90,13 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, contextText }) => {
         setSessions(updated);
 
         if (currentSessionId === sessionId) {
-            if (updated.length > 0) setCurrentSessionId(updated[0].id);
-            else setCurrentSessionId(null);
+            if (updated.length > 0) {
+                const next = updated[0];
+                setCurrentSessionId(next.id);
+                loadMessages(next.id);
+            } else {
+                handleNewChat();
+            }
         }
     };
 
