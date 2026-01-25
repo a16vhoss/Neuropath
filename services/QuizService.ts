@@ -11,7 +11,9 @@
 import { supabase } from './supabaseClient';
 import { generateQuizQuestions, generateAdvancedQuiz } from './geminiService';
 
-export type QuestionType = 'true_false' | 'multiple_choice' | 'analysis' | 'design' | 'practical';
+export type QuestionType = 'true_false' | 'multiple_choice' | 'analysis' | 'design' | 'practical' | 'ordering' | 'matching' | 'fill_blank' | 'identify_error';
+export type QuizGameMode = 'classic' | 'survival' | 'time_attack';
+export type QuizPersona = 'standard' | 'socratic' | 'strict' | 'friendly';
 
 export interface QuizQuestion {
     id: string;
@@ -25,6 +27,13 @@ export interface QuizQuestion {
     designPrompt?: string;   // For design questions - what to design/solve
     evaluationCriteria?: string[]; // For design questions - rubric for AI evaluation
     realWorldExample?: string;  // For practical questions - real-world application example
+
+    // New fields for advanced types
+    orderingItems?: string[]; // For ordering: Items in CORRECT sequence.
+    matchingPairs?: { left: string; right: string }[]; // For matching: Key-Value pairs.
+    fillBlankText?: string; // For cloze: "The [blank] is blue."
+    fillBlankAnswers?: string[]; // Correct words for blanks.
+    errorText?: string; // For Identify Error: Text containing the error.
 }
 
 export interface QuizResult {
@@ -103,14 +112,17 @@ export async function getUserMasteryLevel(
  * Independent of user level - all quizzes get a variety of types
  */
 function getQuestionTypeDistribution(totalQuestions: number): Record<QuestionType, number> {
-    // Balanced distribution for all quizzes:
-    // ~15% True/False, ~30% Multiple Choice, ~20% Analysis, ~15% Design, ~20% Practical
+    // Balanced "God Mode" distribution:
     const distribution = {
-        true_false: 0.15,
-        multiple_choice: 0.30,
-        analysis: 0.20,
-        design: 0.15,
-        practical: 0.20,  // Real-world application examples
+        true_false: 0.10,
+        multiple_choice: 0.20,
+        analysis: 0.15,
+        design: 0.10,
+        practical: 0.15,
+        ordering: 0.10,
+        matching: 0.10,
+        fill_blank: 0.05,
+        identify_error: 0.05
     };
 
     // Calculate counts
@@ -120,13 +132,16 @@ function getQuestionTypeDistribution(totalQuestions: number): Record<QuestionTyp
         analysis: Math.round(totalQuestions * distribution.analysis),
         design: Math.round(totalQuestions * distribution.design),
         practical: Math.round(totalQuestions * distribution.practical),
+        ordering: Math.round(totalQuestions * distribution.ordering),
+        matching: Math.round(totalQuestions * distribution.matching),
+        fill_blank: Math.round(totalQuestions * distribution.fill_blank),
+        identify_error: Math.round(totalQuestions * distribution.identify_error),
     };
 
-    // Ensure we have at least 1 of each main type for quizzes with 5+ questions
-    if (totalQuestions >= 5) {
-        if (counts.true_false === 0) counts.true_false = 1;
-        if (counts.analysis === 0) counts.analysis = 1;
-        if (counts.practical === 0) counts.practical = 1;
+    // Ensure variety for larger quizzes
+    if (totalQuestions >= 10) {
+        if (counts.ordering === 0) counts.ordering = 1;
+        if (counts.matching === 0) counts.matching = 1;
     }
 
     return counts;
@@ -143,6 +158,8 @@ export interface QuizConfig {
     selectedTopics?: string[]; // if specific_topics
     timeLimitPerQuestion?: number; // seconds, 0 for none
     immediateFeedback: boolean;
+    gameMode?: QuizGameMode;
+    persona?: QuizPersona;
 }
 
 /**
@@ -277,7 +294,51 @@ QUESTION TYPE FORMATS:
    - correctIndex: 0-3
    - The example should make the abstract concept tangible and memorable`;
 
+        // Persona Injection
+        let personaInstruction = "";
+        if (config?.persona) {
+            switch (config.persona) {
+                case 'socratic':
+                    personaInstruction = "ROLE: You are Socrates. Never give the answer directly in the explanation. Ask leading questions and guide the student to the truth. Use a philosophical tone.";
+                    break;
+                case 'strict':
+                    personaInstruction = "ROLE: You are Drill Sergeant Hartman. Be extremely strict, precise, and demanding. Tolerate no ambiguity. If they are wrong, tell them why they are weak. Use military discipline tone.";
+                    break;
+                case 'friendly':
+                    personaInstruction = "ROLE: You are Maya, a super supportive study buddy. Be encouraging, use emojis, and celebrate every attempt. Make learning feel like a party.";
+                    break;
+                // standard is default
+            }
+        }
+
+        const typeDetails = `
+6. ORDERING TYPE:
+   - Provide a list of items to sequence chronologically or logically.
+   - "orderingItems": ["Step 1", "Step 2", "Step 3"] (The CORRECT order)
+   - The user will have to drag and drop them.
+   - "question": "Order the following steps of..."
+
+7. MATCHING TYPE:
+   - Match concepts to definitions.
+   - "matchingPairs": [{"left": "Term A", "right": "Def A"}, {"left": "Term B", "right": "Def B"}] (Max 4 pairs)
+   - "question": "Match the concepts..."
+
+8. FILL_BLANK (Cloze):
+   - A sentence with ONE missing key term represented by "[blank]".
+   - "fillBlankText": "The [blank] is the powerhouse of the cell."
+   - "fillBlankAnswers": ["mitochondria", "mitochondrion"] (Acceptable correct answers)
+   - "question": "Complete the sentence."
+
+9. IDENTIFY_ERROR:
+   - A short text or code snippet that contains a factual or logical error.
+   - "errorText": "The heart pumps oxygenated blood to the lungs."
+   - "correctIndex": 0 (Irrelevant here, but keep schema consistent)
+   - "explanation": "Actually, the heart pumps deoxygenated blood to the lungs."
+   - "question": "Find the error in this statement."
+`;
+
         const prompt = `Based on this study material, generate a quiz with ${questionCount} questions.
+${personaInstruction}
 
 STUDENT LEVEL: ${userLevel}/4 (${['Básico', 'Intermedio', 'Avanzado', 'Experto'][userLevel - 1]})
 
@@ -287,19 +348,25 @@ ${scopeInstruction}
 ${avoidContext}
 
 ${typeInstructions}
+${typeDetails}
 
-Return as JSON array. IMPORTANT: Include "type" field for each question:
+Return as JSON array. IMPORTANT: Include specific fields for each type:
 [{
-  "type": "true_false" | "multiple_choice" | "analysis" | "design" | "practical",
+  "type": "true_false" | "multiple_choice" | "analysis" | "design" | "practical" | "ordering" | "matching" | "fill_blank" | "identify_error",
   "question": "...",
   "options": [...],
   "correctIndex": 0,
   "explanation": "...",
   "topic": "...",
-  "scenario": "..." (only for analysis type),
-  "designPrompt": "..." (only for design type),
-  "evaluationCriteria": ["...", "...", "..."] (only for design type),
-  "realWorldExample": "..." (only for practical type - concrete real-world application)
+  "scenario": "...",
+  "designPrompt": "...",
+  "evaluationCriteria": [],
+  "realWorldExample": "...",
+  "orderingItems": ["Item 1", "Item 2"...] (correct sequence),
+  "matchingPairs": [{"left": "A", "right": "B"}...],
+  "fillBlankText": "Text with [blank]...",
+  "fillBlankAnswers": ["word1", "word2"],
+  "errorText": "Text with error..."
 }]`;
 
         // 7. Generate questions with Gemini
@@ -318,6 +385,12 @@ Return as JSON array. IMPORTANT: Include "type" field for each question:
                 designPrompt: q.designPrompt,
                 evaluationCriteria: q.evaluationCriteria,
                 realWorldExample: q.realWorldExample,
+                // Map new fields
+                orderingItems: q.orderingItems,
+                matchingPairs: q.matchingPairs,
+                fillBlankText: q.fillBlankText,
+                fillBlankAnswers: q.fillBlankAnswers,
+                errorText: q.errorText
             }));
         }
 

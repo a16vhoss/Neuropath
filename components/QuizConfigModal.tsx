@@ -24,6 +24,10 @@ const QuizConfigModal: React.FC<QuizConfigModalProps> = ({ studySetId, userId, o
     const [timeLimitEnabled, setTimeLimitEnabled] = useState<boolean>(false);
     const [immediateFeedback, setImmediateFeedback] = useState<boolean>(true);
 
+    // God Mode States
+    const [gameMode, setGameMode] = useState<'classic' | 'survival' | 'time_attack'>('classic');
+    const [persona, setPersona] = useState<'standard' | 'socratic' | 'strict' | 'friendly'>('standard');
+
     const [loadingInfo, setLoadingInfo] = useState(true);
 
     // Initial data fetch
@@ -88,10 +92,12 @@ const QuizConfigModal: React.FC<QuizConfigModalProps> = ({ studySetId, userId, o
             difficultyLevel: difficultyOverride ? selectedDifficulty : undefined,
             contentScope,
             selectedTopics: contentScope === 'specific_topics' ? selectedTopics : undefined,
-            startWithTimeLimit: timeLimitEnabled, // Note: This prop needs to be handled in StudySession logic
+            startWithTimeLimit: timeLimitEnabled,
             immediateFeedback,
-            timeLimitPerQuestion: timeLimitEnabled ? 60 : 0 // Default 60s if enabled, can be refined
-        } as any; // Cast as any because timeLimit logic might vary slightly in interface match
+            timeLimitPerQuestion: timeLimitEnabled ? 60 : 0,
+            gameMode,
+            persona
+        } as any;
 
         onStart(config);
     };
@@ -130,189 +136,246 @@ const QuizConfigModal: React.FC<QuizConfigModalProps> = ({ studySetId, userId, o
                         </div>
                     </div>
 
-                    {/* 2. Tipos de Pregunta */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {[
+                            { id: 'true_false', label: 'Verdadero / Falso', icon: 'check_circle' },
+                            { id: 'multiple_choice', label: 'Opción Múltiple', icon: 'list_alt' },
+                            { id: 'analysis', label: 'Análisis', icon: 'psychology' },
+                            { id: 'design', label: 'Diseño', icon: 'draw' },
+                            { id: 'practical', label: 'Práctica Real', icon: 'science' },
+                            { id: 'ordering', label: 'Ordenar Secuencia', icon: 'sort' },
+                            { id: 'matching', label: 'Relacionar', icon: 'join_inner' },
+                            { id: 'fill_blank', label: 'Completar', icon: 'edit_square' },
+                            { id: 'identify_error', label: 'Detectar Error', icon: 'bug_report' },
+                        ].map((type) => (
+                            <button
+                                key={type.id}
+                                onClick={() => handleTypeToggle(type.id as QuestionType)}
+                                className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${selectedTypes.includes(type.id as QuestionType)
+                                    ? 'bg-purple-500/20 border-purple-500 text-white'
+                                    : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                                    }`}
+                            >
+                                <span className="material-symbols-outlined text-xl">{type.icon}</span>
+                                <span className="font-medium text-sm">{type.label}</span>
+                                {selectedTypes.includes(type.id as QuestionType) && (
+                                    <span className="material-symbols-outlined ml-auto text-purple-400 text-sm">check</span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* New: Game Mode & Persona */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Game Mode */}
                     <div className="space-y-3">
-                        <label className="text-sm font-bold uppercase tracking-wider text-purple-400">Tipos de Pregunta</label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <label className="text-sm font-bold uppercase tracking-wider text-purple-400">Modo de Juego</label>
+                        <div className="space-y-2">
                             {[
-                                { id: 'true_false', label: 'Verdadero / Falso', icon: 'check_circle' },
-                                { id: 'multiple_choice', label: 'Opción Múltiple', icon: 'list_alt' },
-                                { id: 'analysis', label: 'Análisis de Escenarios', icon: 'psychology' },
-                                { id: 'design', label: 'Diseño / Creativo', icon: 'draw' },
-                                { id: 'practical', label: 'Aplicación Práctica', icon: 'science' },
-                            ].map((type) => (
+                                { id: 'classic', label: 'Clásico', desc: 'Sin presión extra', icon: 'school' },
+                                { id: 'survival', label: 'Supervivencia', desc: '1 error = Game Over', icon: 'skull' },
+                                { id: 'time_attack', label: 'Contra Reloj', desc: 'Máximas preguntas en 2 min', icon: 'timer' },
+                            ].map((m) => (
                                 <button
-                                    key={type.id}
-                                    onClick={() => handleTypeToggle(type.id as QuestionType)}
-                                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${selectedTypes.includes(type.id as QuestionType)
-                                            ? 'bg-purple-500/20 border-purple-500 text-white'
-                                            : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
-                                        }`}
+                                    key={m.id}
+                                    onClick={() => setGameMode(m.id as any)}
+                                    className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${gameMode === m.id
+                                        ? 'bg-gradient-to-r from-purple-900/50 to-blue-900/50 border-purple-500 text-white'
+                                        : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
                                 >
-                                    <span className="material-symbols-outlined text-xl">{type.icon}</span>
-                                    <span className="font-medium">{type.label}</span>
-                                    {selectedTypes.includes(type.id as QuestionType) && (
-                                        <span className="material-symbols-outlined ml-auto text-purple-400">check</span>
-                                    )}
+                                    <span className={`material-symbols-outlined p-2 rounded-lg ${gameMode === m.id ? 'bg-purple-500 text-white' : 'bg-white/10'}`}>{m.icon}</span>
+                                    <div>
+                                        <p className="font-bold">{m.label}</p>
+                                        <p className="text-xs opacity-70">{m.desc}</p>
+                                    </div>
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    {/* 3. Dificultad */}
+                    {/* Persona */}
                     <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                            <label className="text-sm font-bold uppercase tracking-wider text-purple-400">Nivel de Dificultad</label>
+                        <label className="text-sm font-bold uppercase tracking-wider text-purple-400">Examinador (IA)</label>
+                        <div className="space-y-2">
+                            {[
+                                { id: 'standard', label: 'Estándar', desc: 'Neutral y objetivo', icon: 'smart_toy' },
+                                { id: 'socratic', label: 'Sócrates', desc: 'Te guía con preguntas', icon: 'lightbulb' },
+                                { id: 'strict', label: 'Sargento', desc: 'Estricto y directo', icon: 'military_tech' },
+                                { id: 'friendly', label: 'Maya', desc: 'Amable y motivadora', icon: 'favorite' },
+                            ].map((p) => (
+                                <button
+                                    key={p.id}
+                                    onClick={() => setPersona(p.id as any)}
+                                    className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${persona === p.id
+                                        ? 'bg-gradient-to-r from-emerald-900/50 to-teal-900/50 border-emerald-500 text-white'
+                                        : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+                                >
+                                    <span className={`material-symbols-outlined p-2 rounded-lg ${persona === p.id ? 'bg-emerald-500 text-white' : 'bg-white/10'}`}>{p.icon}</span>
+                                    <div>
+                                        <p className="font-bold">{p.label}</p>
+                                        <p className="text-xs opacity-70">{p.desc}</p>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* 3. Dificultad */}
+                <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                        <label className="text-sm font-bold uppercase tracking-wider text-purple-400">Nivel de Dificultad</label>
+                        <button
+                            onClick={() => setDifficultyOverride(!difficultyOverride)}
+                            className={`text-xs px-3 py-1 rounded-full transition-colors ${difficultyOverride ? 'bg-purple-500 text-white' : 'bg-gray-700 text-gray-400'}`}
+                        >
+                            {difficultyOverride ? 'Manual' : 'Automático'}
+                        </button>
+                    </div>
+
+                    {!difficultyOverride ? (
+                        <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl flex items-center gap-3 text-blue-200">
+                            <span className="material-symbols-outlined">auto_awesome</span>
+                            <div>
+                                <p className="font-semibold">Modo Adaptativo Activo</p>
+                                <p className="text-sm opacity-80">El sistema detectó tu nivel como: <span className="font-bold text-white">{['Básico', 'Intermedio', 'Avanzado', 'Experto'][userLevel - 1]}</span></p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex gap-2 bg-black/20 p-1 rounded-xl">
+                            {[
+                                { lvl: 1, label: 'Básico' },
+                                { lvl: 2, label: 'Intermedio' },
+                                { lvl: 3, label: 'Avanzado' },
+                                { lvl: 4, label: 'Experto' }
+                            ].map((l) => (
+                                <button
+                                    key={l.lvl}
+                                    onClick={() => setSelectedDifficulty(l.lvl)}
+                                    className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${selectedDifficulty === l.lvl
+                                        ? 'bg-purple-600 text-white shadow-lg'
+                                        : 'text-gray-400 hover:bg-white/5'
+                                        }`}
+                                >
+                                    {l.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* 4. Enfoque de Contenido */}
+                <div className="space-y-3">
+                    <label className="text-sm font-bold uppercase tracking-wider text-purple-400">Enfoque del Quiz</label>
+                    <div className="grid grid-cols-1 gap-2">
+                        <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${contentScope === 'all' ? 'bg-purple-500/20 border-purple-500' : 'bg-white/5 border-white/10'}`}>
+                            <input type="radio" name="scope" className="hidden" checked={contentScope === 'all'} onChange={() => setContentScope('all')} />
+                            <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${contentScope === 'all' ? 'border-purple-500' : 'border-gray-500'}`}>
+                                {contentScope === 'all' && <div className="w-3 h-3 bg-purple-500 rounded-full" />}
+                            </div>
+                            <div>
+                                <p className="font-bold">Todo el Contenido</p>
+                                <p className="text-xs opacity-70">Mezcla aleatoria de todos los temas</p>
+                            </div>
+                        </label>
+
+                        <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${contentScope === 'weak_topics' ? 'bg-purple-500/20 border-purple-500' : 'bg-white/5 border-white/10'}`}>
+                            <input type="radio" name="scope" className="hidden" checked={contentScope === 'weak_topics'} onChange={() => setContentScope('weak_topics')} />
+                            <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${contentScope === 'weak_topics' ? 'border-purple-500' : 'border-gray-500'}`}>
+                                {contentScope === 'weak_topics' && <div className="w-3 h-3 bg-purple-500 rounded-full" />}
+                            </div>
+                            <div>
+                                <p className="font-bold">Repaso Inteligente</p>
+                                <p className="text-xs opacity-70">Priorizar temas donde he fallado antes</p>
+                            </div>
+                        </label>
+
+                        <label className={`flex flex-col gap-3 p-3 rounded-lg border cursor-pointer transition-all ${contentScope === 'specific_topics' ? 'bg-purple-500/20 border-purple-500' : 'bg-white/5 border-white/10'}`}>
+                            <div className="flex items-center gap-3" onClick={() => setContentScope('specific_topics')}>
+                                <input type="radio" name="scope" className="hidden" checked={contentScope === 'specific_topics'} readOnly />
+                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${contentScope === 'specific_topics' ? 'border-purple-500' : 'border-gray-500'}`}>
+                                    {contentScope === 'specific_topics' && <div className="w-3 h-3 bg-purple-500 rounded-full" />}
+                                </div>
+                                <div>
+                                    <p className="font-bold">Temas Específicos</p>
+                                    <p className="text-xs opacity-70">Seleccionar manualmente</p>
+                                </div>
+                            </div>
+                            {contentScope === 'specific_topics' && (
+                                <div className="pl-8 pt-2 grid grid-cols-2 gap-2 animate-fadeIn">
+                                    {availableTopics.map(topic => (
+                                        <button
+                                            key={topic}
+                                            onClick={(e) => { e.preventDefault(); handleTopicToggle(topic); }}
+                                            className={`text-xs px-2 py-1.5 rounded border text-left truncate ${selectedTopics.includes(topic) ? 'bg-purple-500 text-white border-purple-400' : 'bg-black/30 text-gray-400 border-white/10'}`}
+                                        >
+                                            {topic}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </label>
+                    </div>
+                </div>
+
+                {/* 5. Configuración de Examen */}
+                <div className="space-y-3">
+                    <label className="text-sm font-bold uppercase tracking-wider text-purple-400">Modo de Examen</label>
+                    <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+                            <div className="flex items-center gap-3">
+                                <span className="material-symbols-outlined text-yellow-400">timer</span>
+                                <div>
+                                    <p className="font-bold">Límite de Tiempo</p>
+                                    <p className="text-xs text-gray-400">Presión extra para simular examen real</p>
+                                </div>
+                            </div>
                             <button
-                                onClick={() => setDifficultyOverride(!difficultyOverride)}
-                                className={`text-xs px-3 py-1 rounded-full transition-colors ${difficultyOverride ? 'bg-purple-500 text-white' : 'bg-gray-700 text-gray-400'}`}
+                                onClick={() => setTimeLimitEnabled(!timeLimitEnabled)}
+                                className={`w-12 h-6 rounded-full transition-colors relative ${timeLimitEnabled ? 'bg-green-500' : 'bg-gray-700'}`}
                             >
-                                {difficultyOverride ? 'Manual' : 'Automático'}
+                                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${timeLimitEnabled ? 'left-7' : 'left-1'}`} />
                             </button>
                         </div>
 
-                        {!difficultyOverride ? (
-                            <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl flex items-center gap-3 text-blue-200">
-                                <span className="material-symbols-outlined">auto_awesome</span>
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+                            <div className="flex items-center gap-3">
+                                <span className="material-symbols-outlined text-blue-400">visibility</span>
                                 <div>
-                                    <p className="font-semibold">Modo Adaptativo Activo</p>
-                                    <p className="text-sm opacity-80">El sistema detectó tu nivel como: <span className="font-bold text-white">{['Básico', 'Intermedio', 'Avanzado', 'Experto'][userLevel - 1]}</span></p>
+                                    <p className="font-bold">Corrección Inmediata</p>
+                                    <p className="text-xs text-gray-400">{immediateFeedback ? 'Ver resultado al responder cada pregunta' : 'Ver resultados al finalizar todo el quiz'}</p>
                                 </div>
                             </div>
-                        ) : (
-                            <div className="flex gap-2 bg-black/20 p-1 rounded-xl">
-                                {[
-                                    { lvl: 1, label: 'Básico' },
-                                    { lvl: 2, label: 'Intermedio' },
-                                    { lvl: 3, label: 'Avanzado' },
-                                    { lvl: 4, label: 'Experto' }
-                                ].map((l) => (
-                                    <button
-                                        key={l.lvl}
-                                        onClick={() => setSelectedDifficulty(l.lvl)}
-                                        className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${selectedDifficulty === l.lvl
-                                                ? 'bg-purple-600 text-white shadow-lg'
-                                                : 'text-gray-400 hover:bg-white/5'
-                                            }`}
-                                    >
-                                        {l.label}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* 4. Enfoque de Contenido */}
-                    <div className="space-y-3">
-                        <label className="text-sm font-bold uppercase tracking-wider text-purple-400">Enfoque del Quiz</label>
-                        <div className="grid grid-cols-1 gap-2">
-                            <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${contentScope === 'all' ? 'bg-purple-500/20 border-purple-500' : 'bg-white/5 border-white/10'}`}>
-                                <input type="radio" name="scope" className="hidden" checked={contentScope === 'all'} onChange={() => setContentScope('all')} />
-                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${contentScope === 'all' ? 'border-purple-500' : 'border-gray-500'}`}>
-                                    {contentScope === 'all' && <div className="w-3 h-3 bg-purple-500 rounded-full" />}
-                                </div>
-                                <div>
-                                    <p className="font-bold">Todo el Contenido</p>
-                                    <p className="text-xs opacity-70">Mezcla aleatoria de todos los temas</p>
-                                </div>
-                            </label>
-
-                            <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${contentScope === 'weak_topics' ? 'bg-purple-500/20 border-purple-500' : 'bg-white/5 border-white/10'}`}>
-                                <input type="radio" name="scope" className="hidden" checked={contentScope === 'weak_topics'} onChange={() => setContentScope('weak_topics')} />
-                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${contentScope === 'weak_topics' ? 'border-purple-500' : 'border-gray-500'}`}>
-                                    {contentScope === 'weak_topics' && <div className="w-3 h-3 bg-purple-500 rounded-full" />}
-                                </div>
-                                <div>
-                                    <p className="font-bold">Repaso Inteligente</p>
-                                    <p className="text-xs opacity-70">Priorizar temas donde he fallado antes</p>
-                                </div>
-                            </label>
-
-                            <label className={`flex flex-col gap-3 p-3 rounded-lg border cursor-pointer transition-all ${contentScope === 'specific_topics' ? 'bg-purple-500/20 border-purple-500' : 'bg-white/5 border-white/10'}`}>
-                                <div className="flex items-center gap-3" onClick={() => setContentScope('specific_topics')}>
-                                    <input type="radio" name="scope" className="hidden" checked={contentScope === 'specific_topics'} readOnly />
-                                    <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${contentScope === 'specific_topics' ? 'border-purple-500' : 'border-gray-500'}`}>
-                                        {contentScope === 'specific_topics' && <div className="w-3 h-3 bg-purple-500 rounded-full" />}
-                                    </div>
-                                    <div>
-                                        <p className="font-bold">Temas Específicos</p>
-                                        <p className="text-xs opacity-70">Seleccionar manualmente</p>
-                                    </div>
-                                </div>
-                                {contentScope === 'specific_topics' && (
-                                    <div className="pl-8 pt-2 grid grid-cols-2 gap-2 animate-fadeIn">
-                                        {availableTopics.map(topic => (
-                                            <button
-                                                key={topic}
-                                                onClick={(e) => { e.preventDefault(); handleTopicToggle(topic); }}
-                                                className={`text-xs px-2 py-1.5 rounded border text-left truncate ${selectedTopics.includes(topic) ? 'bg-purple-500 text-white border-purple-400' : 'bg-black/30 text-gray-400 border-white/10'}`}
-                                            >
-                                                {topic}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </label>
+                            <button
+                                onClick={() => setImmediateFeedback(!immediateFeedback)}
+                                className={`w-12 h-6 rounded-full transition-colors relative ${immediateFeedback ? 'bg-green-500' : 'bg-gray-700'}`}
+                            >
+                                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${immediateFeedback ? 'left-7' : 'left-1'}`} />
+                            </button>
                         </div>
                     </div>
-
-                    {/* 5. Configuración de Examen */}
-                    <div className="space-y-3">
-                        <label className="text-sm font-bold uppercase tracking-wider text-purple-400">Modo de Examen</label>
-                        <div className="flex flex-col gap-3">
-                            <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
-                                <div className="flex items-center gap-3">
-                                    <span className="material-symbols-outlined text-yellow-400">timer</span>
-                                    <div>
-                                        <p className="font-bold">Límite de Tiempo</p>
-                                        <p className="text-xs text-gray-400">Presión extra para simular examen real</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setTimeLimitEnabled(!timeLimitEnabled)}
-                                    className={`w-12 h-6 rounded-full transition-colors relative ${timeLimitEnabled ? 'bg-green-500' : 'bg-gray-700'}`}
-                                >
-                                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${timeLimitEnabled ? 'left-7' : 'left-1'}`} />
-                                </button>
-                            </div>
-
-                            <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
-                                <div className="flex items-center gap-3">
-                                    <span className="material-symbols-outlined text-blue-400">visibility</span>
-                                    <div>
-                                        <p className="font-bold">Corrección Inmediata</p>
-                                        <p className="text-xs text-gray-400">{immediateFeedback ? 'Ver resultado al responder cada pregunta' : 'Ver resultados al finalizar todo el quiz'}</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setImmediateFeedback(!immediateFeedback)}
-                                    className={`w-12 h-6 rounded-full transition-colors relative ${immediateFeedback ? 'bg-green-500' : 'bg-gray-700'}`}
-                                >
-                                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${immediateFeedback ? 'left-7' : 'left-1'}`} />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
                 </div>
 
-                <div className="p-6 border-t border-white/10 bg-slate-900/50 sticky bottom-0 backdrop-blur-md flex justify-end gap-4">
-                    <button
-                        onClick={onCancel}
-                        className="px-6 py-3 rounded-xl font-bold text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-                    >
-                        Cancelar
-                    </button>
-                    <button
-                        onClick={handleStart}
-                        className="px-8 py-3 rounded-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg shadow-purple-500/20 transform hover:scale-[1.02] transition-all flex items-center gap-2"
-                    >
-                        <span>Comenzar Quiz</span>
-                        <span className="material-symbols-outlined">arrow_forward</span>
-                    </button>
-                </div>
+            </div>
+
+            <div className="p-6 border-t border-white/10 bg-slate-900/50 sticky bottom-0 backdrop-blur-md flex justify-end gap-4">
+                <button
+                    onClick={onCancel}
+                    className="px-6 py-3 rounded-xl font-bold text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                    Cancelar
+                </button>
+                <button
+                    onClick={handleStart}
+                    className="px-8 py-3 rounded-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg shadow-purple-500/20 transform hover:scale-[1.02] transition-all flex items-center gap-2"
+                >
+                    <span>Comenzar Quiz</span>
+                    <span className="material-symbols-outlined">arrow_forward</span>
+                </button>
             </div>
         </div>
+    </div >
     );
 };
 

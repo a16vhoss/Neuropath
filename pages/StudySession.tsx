@@ -13,7 +13,7 @@ import SRSRatingButtons from '../components/SRSRatingButtons';
 import { updateCardAfterReview, Rating, getRatingLabel, getCardsForSession, FlashcardWithSRS } from '../services/AdaptiveLearningService';
 import { handleSessionComplete, handleStrugglingSession, updateConsecutiveCorrect, DIFFICULTY_TIERS } from '../services/DynamicContentService';
 import StudySetStatistics from '../components/StudySetStatistics';
-import { generateAdaptiveQuiz, saveQuizSession, QuizQuestion as AdaptiveQuizQuestion, QuizResult, QuizReport, QuestionType, QuizConfig } from '../services/QuizService';
+import { generateAdaptiveQuiz, saveQuizSession, QuizQuestion as AdaptiveQuizQuestion, QuizResult, QuizReport, QuestionType, QuizConfig, QuizGameMode, QuizPersona } from '../services/QuizService';
 import QuizConfigModal from '../components/QuizConfigModal';
 
 type StudyMode = 'flashcards' | 'quiz' | 'cramming' | 'podcast' | 'daily';
@@ -37,6 +37,13 @@ interface QuizQuestion {
   designPrompt?: string;   // For design questions
   evaluationCriteria?: string[]; // For design questions
   realWorldExample?: string; // For practical questions - real-world application
+
+  // New fields for advanced types
+  orderingItems?: string[];
+  matchingPairs?: { left: string; right: string }[];
+  fillBlankText?: string;
+  fillBlankAnswers?: string[];
+  errorText?: string;
 }
 
 const mockFlashcards: Flashcard[] = [
@@ -95,6 +102,15 @@ const StudySession: React.FC = () => {
   const [quizLoading, setQuizLoading] = useState(false);
   const [quizStartTime, setQuizStartTime] = useState<number>(Date.now());
   const [designAnswer, setDesignAnswer] = useState<string>(''); // For design type questions
+
+  // God Mode States
+  const [gameMode, setGameMode] = useState<QuizGameMode>('classic');
+  const [persona, setPersona] = useState<QuizPersona>('standard');
+  const [timeRemaining, setTimeRemaining] = useState<number>(0); // For Time Attack or per-question
+  const [orderingState, setOrderingState] = useState<string[]>([]);
+  const [matchingState, setMatchingState] = useState<Record<string, string>>({}); // Left -> Right
+  const [fillBlankAnswer, setFillBlankAnswer] = useState<string>('');
+  const [selectedErrorOption, setSelectedErrorOption] = useState<number | null>(null);
 
   // Custom Quiz Configuration
   const [showQuizConfig, setShowQuizConfig] = useState(false);
@@ -305,6 +321,66 @@ const StudySession: React.FC = () => {
     }
   }, [flashcards, quizGenerated, mode, quizConfig, showQuizConfig, loadingSource, quizLoading]);
 
+  // EFFECT: Initialize Question State when index changes
+  useEffect(() => {
+    if (quizQuestions.length > 0) {
+      const currentQ = quizQuestions[currentQuizIndex];
+
+      // Ordering: Shuffle items initially
+      if (currentQ.type === 'ordering' && currentQ.orderingItems) {
+        // Simple shuffle
+        const shuffled = [...currentQ.orderingItems].sort(() => Math.random() - 0.5);
+        setOrderingState(shuffled);
+      }
+
+      // Matching: Clear selection
+      if (currentQ.type === 'matching') {
+        setMatchingState({}); // Reset pairs
+      }
+
+      // Fill Blank: Clear
+      if (currentQ.type === 'fill_blank') {
+        setFillBlankAnswer('');
+      }
+
+      // Error ID: Clear
+      if (currentQ.type === 'identify_error') {
+        setSelectedErrorOption(null);
+      }
+    }
+  }, [currentQuizIndex, quizQuestions]);
+
+  // EFFECT: Time Attack & Survival Timer
+  useEffect(() => {
+    // If result is shown, pause timer
+    if (showResult) return;
+    if (quizComplete) return;
+
+    if ((gameMode === 'time_attack' || quizConfig?.timeLimitPerQuestion) && questionTimer > 0) {
+      const interval = setInterval(() => {
+        setQuestionTimer(prev => {
+          if (prev <= 1) {
+            clearInterval(interval);
+
+            if (gameMode === 'time_attack') {
+              // Time Attack Over!
+              setQuizComplete(true);
+              setQuestionTimeExpired(true);
+              return 0;
+            } else {
+              // Standard Question Timeout
+              setQuestionTimeExpired(true);
+              if (quizConfig?.immediateFeedback) setShowResult(true);
+              return 0;
+            }
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [gameMode, quizConfig, showResult, quizComplete, questionTimer]);
+
   // Actual Generation when Config is ready (or if we want to support auto-start later)
   const generateCustomQuiz = async (config: QuizConfig) => {
     if (!user || !studySetId) return;
@@ -327,11 +403,31 @@ const StudySession: React.FC = () => {
           scenario: q.scenario,
           designPrompt: q.designPrompt,
           evaluationCriteria: q.evaluationCriteria,
-          realWorldExample: q.realWorldExample
+          realWorldExample: q.realWorldExample,
+          // God Mode Mappings
+          orderingItems: q.orderingItems,
+          matchingPairs: q.matchingPairs,
+          fillBlankText: q.fillBlankText,
+          fillBlankAnswers: q.fillBlankAnswers,
+          errorText: q.errorText
         }));
 
         setQuizQuestions(mappedQuestions);
         setQuizGenerated(true);
+        setQuizConfig(config); // Save for timer logic
+
+        // Initialize God Mode States
+        if (config.gameMode) setGameMode(config.gameMode);
+        if (config.persona) setPersona(config.persona);
+
+        // Initialize Time Attack
+        if (config.gameMode === 'time_attack') {
+          const timeLimit = 120; // 2 minutes for time attack? Should be configurable or fixed
+          setTimeRemaining(timeLimit);
+          setQuestionTimer(timeLimit); // Reuse question timer variable for simplicity
+        } else if (config.timeLimitPerQuestion) {
+          setTimeRemaining(config.timeLimitPerQuestion);
+        }
         setQuizStartTime(Date.now());
         setQuizResults([]);
         setQuizConfig(config);
@@ -538,32 +634,15 @@ const StudySession: React.FC = () => {
   };
 
   // Timer Effect
+  // Timer Effect handled in new effect block
+  /* 
   useEffect(() => {
-    if (questionTimer > 0 && !questionTimeExpired) {
-      const timeout = setTimeout(() => {
-        setQuestionTimer(prev => prev - 1);
-      }, 1000);
-      return () => clearTimeout(timeout);
-    } else if (questionTimer === 0 && !questionTimeExpired && quizConfig?.timeLimitPerQuestion) {
-      // Time expired for this question
-      setQuestionTimeExpired(true);
-      // If immediate feedback is on, show result. If not, auto-advance??
-      // Ideally: Mark as incorrect (or unanswered) and show result if immediate feedback
-      if (quizConfig.immediateFeedback) {
-        // Mock wrong answer selection to trigger reveal
-        // OR just show result with no selection
-        setShowResult(true);
-        // Maybe auto-mark as wrong?
-      } else {
-        // Just move next? Or record as skipped?
-        // Let's record as skipped/wrong and move next
-        handleQuizAnswer(-1, undefined, true); // -1 indicating timeout
-      }
-    }
-  }, [questionTimer, questionTimeExpired, quizConfig]);
+    ...
+  }, ...);
+  */
 
 
-  const handleQuizAnswer = (optionIndex: number, textAnswer?: string, isTimeout: boolean = false) => {
+  const handleQuizAnswer = (optionIndex: number, textAnswer?: string, isTimeout: boolean = false, isCorrectOverride?: boolean) => {
     // Prevent answer if result is already shown (unless it's a timeout forcing it)
     if (showResult && !isTimeout) return;
 
@@ -582,10 +661,11 @@ const StudySession: React.FC = () => {
     }
 
     const currentQ = quizQuestions[currentQuizIndex];
-    // ... rest of logic ...
     // Note: correctIndex check
     let isCorrect = false;
-    if (!isTimeout && optionIndex !== -1) {
+    if (isCorrectOverride !== undefined) {
+      isCorrect = isCorrectOverride;
+    } else if (!isTimeout && optionIndex !== -1) {
       isCorrect = optionIndex === currentQ.correctIndex;
     }
 
@@ -627,9 +707,13 @@ const StudySession: React.FC = () => {
       setSelectedAnswer(null);
       setShowResult(false);
       setDesignAnswer(''); // Reset design answer
+      setFillBlankAnswer('');
+      setOrderingState([]);
+      setMatchingState({});
+      setSelectedErrorOption(null);
 
       // Reset Timer
-      if (quizConfig?.timeLimitPerQuestion) {
+      if (gameMode !== 'time_attack' && quizConfig?.timeLimitPerQuestion) {
         setQuestionTimer(quizConfig.timeLimitPerQuestion);
         setQuestionTimeExpired(false);
       }
@@ -1201,21 +1285,41 @@ const StudySession: React.FC = () => {
               ) : (
                 <div className="bg-white rounded-3xl shadow-2xl p-8">
                   {/* Question header with type badge */}
-                  <div className="mb-6 flex items-center gap-2">
-                    <span className="bg-violet-100 text-violet-600 text-xs font-bold px-3 py-1 rounded-full">
-                      Pregunta {currentQuizIndex + 1}/{quizQuestions.length}
-                    </span>
-                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${quizQuestions[currentQuizIndex]?.type === 'true_false' ? 'bg-emerald-100 text-emerald-600' :
-                      quizQuestions[currentQuizIndex]?.type === 'analysis' ? 'bg-amber-100 text-amber-600' :
-                        (quizQuestions[currentQuizIndex]?.type === 'design' || quizQuestions[currentQuizIndex]?.options?.[0]?.includes('solución')) ? 'bg-purple-100 text-purple-600' :
-                          quizQuestions[currentQuizIndex]?.type === 'practical' ? 'bg-cyan-100 text-cyan-600' :
-                            'bg-blue-100 text-blue-600'
-                      }`}>
-                      {quizQuestions[currentQuizIndex]?.type === 'true_false' ? '✓✗ V/F' :
-                        quizQuestions[currentQuizIndex]?.type === 'analysis' ? '🔍 Análisis' :
-                          (quizQuestions[currentQuizIndex]?.type === 'design' || quizQuestions[currentQuizIndex]?.options?.[0]?.includes('solución')) ? '✏️ Diseño' :
-                            quizQuestions[currentQuizIndex]?.type === 'practical' ? '🚀 Aplicación' : '📝 Opción Múltiple'}
-                    </span>
+                  <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-violet-100 text-violet-600 text-xs font-bold px-3 py-1 rounded-full">
+                        Pregunta {currentQuizIndex + 1}/{quizQuestions.length}
+                      </span>
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full ${quizQuestions[currentQuizIndex]?.type === 'true_false' ? 'bg-emerald-100 text-emerald-600' :
+                        quizQuestions[currentQuizIndex]?.type === 'analysis' ? 'bg-amber-100 text-amber-600' :
+                          (quizQuestions[currentQuizIndex]?.type === 'design' || quizQuestions[currentQuizIndex]?.options?.[0]?.includes('solución')) ? 'bg-purple-100 text-purple-600' :
+                            quizQuestions[currentQuizIndex]?.type === 'practical' ? 'bg-cyan-100 text-cyan-600' :
+                              'bg-blue-100 text-blue-600'
+                        }`}>
+                        {quizQuestions[currentQuizIndex]?.type === 'true_false' ? '✓✗ V/F' :
+                          quizQuestions[currentQuizIndex]?.type === 'analysis' ? '🔍 Análisis' :
+                            (quizQuestions[currentQuizIndex]?.type === 'design' || quizQuestions[currentQuizIndex]?.options?.[0]?.includes('solución')) ? '✏️ Diseño' :
+                              quizQuestions[currentQuizIndex]?.type === 'ordering' ? '⚡ Ordenar' :
+                                quizQuestions[currentQuizIndex]?.type === 'matching' ? '🔗 Relacionar' :
+                                  quizQuestions[currentQuizIndex]?.type === 'fill_blank' ? '✍️ Completar' :
+                                    quizQuestions[currentQuizIndex]?.type === 'identify_error' ? '🚫 Error' :
+                                      quizQuestions[currentQuizIndex]?.type === 'practical' ? '🚀 Aplicación' : '📝 Opción Múltiple'}
+                      </span>
+                    </div>
+
+                    {/* TIMER Display */}
+                    {(gameMode === 'time_attack' || quizConfig?.timeLimitPerQuestion) && (
+                      <div className={`flex items-center gap-2 px-3 py-1 rounded-full font-mono font-bold ${questionTimer < 10 ? 'bg-red-100 text-red-600 animate-pulse' :
+                          'bg-slate-100 text-slate-600'
+                        }`}>
+                        <span className="material-symbols-outlined text-sm">timer</span>
+                        {gameMode === 'time_attack' ? (
+                          <span>{Math.floor(questionTimer / 60)}:{(questionTimer % 60).toString().padStart(2, '0')}</span>
+                        ) : (
+                          <span>{questionTimer}s</span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Scenario for analysis questions */}
@@ -1268,6 +1372,194 @@ const StudySession: React.FC = () => {
                           {option}
                         </button>
                       ))}
+                    </div>
+                  ) : quizQuestions[currentQuizIndex]?.type === 'ordering' ? (
+                    <div className="space-y-4">
+                      <div className="space-y-2 bg-slate-50 p-4 rounded-xl border-2 border-dashed border-slate-200">
+                        {orderingState.map((item, i) => (
+                          <div key={i} className="flex items-center gap-3 p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all animate-fade-in">
+                            <div className="flex flex-col gap-1 text-slate-400">
+                              <button
+                                onClick={() => {
+                                  if (i === 0 || showResult) return;
+                                  const newOrder = [...orderingState];
+                                  [newOrder[i], newOrder[i - 1]] = [newOrder[i - 1], newOrder[i]];
+                                  setOrderingState(newOrder);
+                                }}
+                                disabled={i === 0 || showResult}
+                                className="hover:text-violet-600 disabled:opacity-30"
+                              >
+                                <span className="material-symbols-outlined text-sm">keyboard_arrow_up</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (i === orderingState.length - 1 || showResult) return;
+                                  const newOrder = [...orderingState];
+                                  [newOrder[i], newOrder[i + 1]] = [newOrder[i + 1], newOrder[i]];
+                                  setOrderingState(newOrder);
+                                }}
+                                disabled={i === orderingState.length - 1 || showResult}
+                                className="hover:text-violet-600 disabled:opacity-30"
+                              >
+                                <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                              </button>
+                            </div>
+                            <span className="font-bold text-slate-500 mr-2">#{i + 1}</span>
+                            <span className="text-slate-800 font-medium">{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {!showResult && (
+                        <button
+                          onClick={() => {
+                            const currentQ = quizQuestions[currentQuizIndex];
+                            const isCorrect = JSON.stringify(orderingState) === JSON.stringify(currentQ.orderingItems);
+                            handleQuizAnswer(isCorrect ? currentQ.correctIndex : -1, orderingState.join(', '), false, isCorrect);
+                          }}
+                          className="w-full py-4 bg-violet-600 text-white font-bold rounded-xl hover:bg-violet-700 shadow-lg"
+                        >
+                          Confirmar Orden
+                        </button>
+                      )}
+                    </div>
+                  ) : quizQuestions[currentQuizIndex]?.type === 'matching' ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4 md:gap-8">
+                        {/* Left Side */}
+                        <div className="space-y-2">
+                          {(quizQuestions[currentQuizIndex].matchingPairs || []).map((pair, i) => (
+                            <div key={i} className="h-24 flex items-center p-3 bg-white border-2 border-slate-100 rounded-xl font-medium text-sm md:text-base shadow-sm">
+                              <div className="w-6 h-6 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center mr-2 text-xs font-bold border border-violet-200">
+                                {i + 1}
+                              </div>
+                              {pair.left}
+                            </div>
+                          ))}
+                        </div>
+                        {/* Right Side - Selectors */}
+                        <div className="space-y-2">
+                          {(quizQuestions[currentQuizIndex].matchingPairs || []).map((pair, i) => (
+                            <div key={i} className="h-24 relative">
+                              <select
+                                value={matchingState[pair.left] || ''}
+                                onChange={(e) => setMatchingState({ ...matchingState, [pair.left]: e.target.value })}
+                                disabled={showResult}
+                                className={`w-full h-full p-3 rounded-xl border-2 appearance-none cursor-pointer transition-all ${showResult
+                                  ? matchingState[pair.left] === pair.right
+                                    ? 'bg-emerald-100 border-emerald-500 text-emerald-800' // Correct
+                                    : 'bg-rose-100 border-rose-500 text-rose-800' // Wrong
+                                  : matchingState[pair.left]
+                                    ? 'bg-violet-50 border-violet-500 text-violet-900'
+                                    : 'bg-slate-50 border-slate-200 hover:border-violet-300'
+                                  } text-sm md:text-base font-medium focus:ring-4 ring-violet-100`}
+                              >
+                                <option value="">Seleccionar...</option>
+                                {/* We need all RIGHT options here. Since we can't shuffle easily in inline render, we map from the pairs but show all available rights */}
+                                {(quizQuestions[currentQuizIndex].matchingPairs || []).map(p => p.right).sort().map(r => (
+                                  <option key={r} value={r}>{r}</option>
+                                ))}
+                              </select>
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <span className="material-symbols-outlined text-slate-400">unfold_more</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      {!showResult && (
+                        <button
+                          onClick={() => {
+                            const currentQ = quizQuestions[currentQuizIndex];
+                            const allCorrect = (currentQ.matchingPairs || []).every(p => matchingState[p.left] === p.right);
+                            handleQuizAnswer(allCorrect ? currentQ.correctIndex : -1, JSON.stringify(matchingState), false, allCorrect);
+                          }}
+                          disabled={Object.keys(matchingState).length < (quizQuestions[currentQuizIndex].matchingPairs?.length || 0)}
+                          className="w-full py-4 bg-violet-600 text-white font-bold rounded-xl hover:bg-violet-700 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Confirmar Parejas
+                        </button>
+                      )}
+                    </div>
+                  ) : quizQuestions[currentQuizIndex]?.type === 'fill_blank' ? (
+                    <div className="space-y-6 py-6">
+                      <div className="text-xl md:text-2xl leading-relaxed font-medium text-slate-800 text-center">
+                        {quizQuestions[currentQuizIndex].fillBlankText?.split('[blank]').map((part, i, arr) => (
+                          <React.Fragment key={i}>
+                            {part}
+                            {i < arr.length - 1 && (
+                              <input
+                                type="text"
+                                value={fillBlankAnswer}
+                                onChange={(e) => setFillBlankAnswer(e.target.value)}
+                                disabled={showResult}
+                                placeholder="?"
+                                className={`mx-2 bg-transparent border-b-2 font-bold px-2 py-1 w-40 text-center focus:outline-none transition-all ${showResult
+                                  ? (quizQuestions[currentQuizIndex].fillBlankAnswers || []).map(a => a.toLowerCase().trim()).includes(fillBlankAnswer.toLowerCase().trim())
+                                    ? 'border-emerald-500 text-emerald-600 bg-emerald-50 rounded'
+                                    : 'border-rose-500 text-rose-600 bg-rose-50 rounded'
+                                  : 'border-slate-300 focus:border-violet-500 focus:bg-violet-50 text-violet-700'
+                                  }`}
+                              />
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </div>
+
+                      {showResult && (
+                        <div className="mt-4 p-3 bg-emerald-50 rounded-lg text-emerald-700 text-center font-bold">
+                          Respuesta Correcta: {(quizQuestions[currentQuizIndex].fillBlankAnswers || []).join(' o ')}
+                        </div>
+                      )}
+
+                      {!showResult && (
+                        <button
+                          onClick={() => {
+                            const currentQ = quizQuestions[currentQuizIndex];
+                            const isCorrect = (currentQ.fillBlankAnswers || []).map(a => a.toLowerCase().trim()).includes(fillBlankAnswer.toLowerCase().trim());
+                            handleQuizAnswer(isCorrect ? currentQ.correctIndex : -1, fillBlankAnswer, false, isCorrect);
+                          }}
+                          disabled={!fillBlankAnswer.trim()}
+                          className="w-full py-4 bg-violet-600 text-white font-bold rounded-xl hover:bg-violet-700 shadow-lg disabled:opacity-50"
+                        >
+                          Comprobar
+                        </button>
+                      )}
+                    </div>
+                  ) : quizQuestions[currentQuizIndex]?.type === 'identify_error' ? (
+                    <div className="space-y-4">
+                      <div className={`p-6 rounded-xl border-2 relative overflow-hidden group transition-all ${showResult ? 'bg-slate-50 border-slate-200' : 'bg-white border-slate-200 hover:border-violet-300'}`}>
+                        <div className="absolute top-0 right-0 p-2 bg-rose-100 text-rose-600 rounded-bl-xl text-xs font-bold flex items-center gap-1">
+                          <span className="material-symbols-outlined text-sm">bug_report</span>
+                          Encuentra el error
+                        </div>
+                        <p className="text-lg md:text-xl font-mono text-slate-700 leading-relaxed">
+                          {quizQuestions[currentQuizIndex].errorText}
+                        </p>
+                      </div>
+
+                      {/* Reuse Options for Error ID if provided in options, otherwise text input? prompt usually includes options for "Where is the error" */}
+                      {quizQuestions[currentQuizIndex].options && quizQuestions[currentQuizIndex].options.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {quizQuestions[currentQuizIndex].options.map((option, i) => (
+                            <button
+                              key={i}
+                              onClick={() => handleQuizAnswer(i)}
+                              disabled={showResult}
+                              className={`p-4 rounded-xl text-left border-2 transition-all ${showResult
+                                ? i === quizQuestions[currentQuizIndex].correctIndex
+                                  ? 'bg-emerald-100 border-emerald-500 text-emerald-800'
+                                  : selectedAnswer === i ? 'bg-rose-100 border-rose-500 text-rose-800' : 'bg-slate-50 border-slate-100 text-slate-400'
+                                : 'bg-white border-slate-100 hover:border-violet-500 hover:bg-violet-50'
+                                }`}
+                            >
+                              {option}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        // Fallback if no options -> simple button "I spotted it" revealed in explanation
+                        <button onClick={() => handleQuizAnswer(0)} className="w-full p-4 bg-violet-600 text-white rounded-xl">Ver Respuesta</button>
+                      )}
                     </div>
                   ) : (quizQuestions[currentQuizIndex]?.type === 'design' || quizQuestions[currentQuizIndex]?.options?.[0]?.includes('solución')) ? (
                     /* DESIGN TYPE - Text area for open response */
@@ -1344,8 +1636,29 @@ const StudySession: React.FC = () => {
                   )}
 
                   {showResult && (
-                    <div className="mt-6 p-4 bg-blue-50 rounded-xl text-sm text-blue-700">
-                      <strong>Explicación:</strong> {quizQuestions[currentQuizIndex].explanation}
+                    <div className={`mt-6 p-4 rounded-xl text-sm relative overflow-hidden transition-all animate-fade-in ${persona === 'strict' ? 'bg-slate-800 text-slate-200 border-l-4 border-red-500' :
+                        persona === 'socratic' ? 'bg-amber-50 text-amber-800 border-l-4 border-amber-500' :
+                          persona === 'friendly' ? 'bg-pink-50 text-pink-800 border-l-4 border-pink-400' :
+                            'bg-blue-50 text-blue-700 border-l-4 border-blue-400'
+                      }`}>
+                      <div className="flex items-start gap-4">
+                        <div className={`w-12 h-12 rounded-full shrink-0 flex items-center justify-center text-2xl shadow-sm ${persona === 'strict' ? 'bg-slate-700 text-red-500' :
+                            persona === 'socratic' ? 'bg-amber-100 text-amber-600' :
+                              persona === 'friendly' ? 'bg-pink-100 text-pink-500' :
+                                'bg-blue-100 text-blue-600'
+                          }`}>
+                          {persona === 'strict' ? '👮‍♂️' : persona === 'socratic' ? '🦉' : persona === 'friendly' ? '🎉' : '🤖'}
+                        </div>
+                        <div>
+                          <p className="font-bold mb-1 opacity-90 text-xs uppercase tracking-wider">
+                            {persona === 'strict' ? 'Sargento Hartman dice:' :
+                              persona === 'socratic' ? 'Reflexión Socrática:' :
+                                persona === 'friendly' ? 'Maya dice:' :
+                                  'Explicación:'}
+                          </p>
+                          <p className="leading-relaxed text-base">{quizQuestions[currentQuizIndex].explanation}</p>
+                        </div>
+                      </div>
                     </div>
                   )}
 
