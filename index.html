@@ -109,35 +109,59 @@
       outline: none;
     }
 
-    /* RemNote-style Indentation Guides */
-    /* Target nested lists */
+    /* RemNote-style Indentation Guides & Spacing */
+
+    /* 1. Reset standard prose margins for list items to make them tighter */
+    .ProseMirror li>p {
+      margin-top: 0.2em;
+      margin-bottom: 0.2em;
+    }
+
+    .ProseMirror li {
+      margin-top: 0.1em;
+      margin-bottom: 0.1em;
+    }
+
+    /* 2. Vertical Thread Lines */
     .ProseMirror ul ul,
     .ProseMirror ol ol,
     .ProseMirror ul ol,
     .ProseMirror ol ul {
-      border-left: 2px solid #E5E7EB;
-      /* gray-200 */
+      border-left: 1px solid #E5E7EB;
+      /* Thin, subtle gray-200 line */
       margin-left: -1rem;
-      /* Pull back to align under parent bullet */
-      padding-left: 1rem;
-      /* Push content back */
+      /* Adjust based on parent */
+      padding-left: 1.25rem;
+      /* Space between line and content */
       position: relative;
     }
 
-    /* Specific adjustment for ordered lists which are wider */
-    .ProseMirror ol ol,
-    .ProseMirror ul ol {
-      margin-left: -1.2rem;
-    }
-
-    /* Thread Hover Effect */
+    /* 3. Refined interactions */
     .ProseMirror ul ul:hover,
     .ProseMirror ol ol:hover,
     .ProseMirror ul ol:hover,
     .ProseMirror ol ul:hover {
-      border-left-color: #9CA3AF;
-      /* gray-400 */
-      transition: border-color 0.2s ease;
+      border-left-color: #94A3B8;
+      /* Darker slate-400 on hover */
+      transition: border-color 0.15s ease-in-out;
+    }
+
+    /* 4. Ordered List Number Positioning */
+    /* Ensure numbers don't overlap with the line */
+    .ProseMirror ol {
+      padding-left: 1.6em;
+      /* Ensure space for numbers */
+    }
+
+    .ProseMirror ol li::marker {
+      color: #9CA3AF;
+      /* Subtle numbers */
+      font-weight: 500;
+    }
+
+    .ProseMirror ul li::marker {
+      color: #CBD5E1;
+      /* Subtle bullets */
     }
   </style>
 
