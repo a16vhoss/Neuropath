@@ -20,7 +20,7 @@ import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromM
 import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL, autoCategorizeFlashcards } from '../services/geminiService';
 import CumulativeReportsCard from '../components/CumulativeReportsCard';
 import VisualProgressionMap from '../components/VisualProgressionMap';
-import StudyGuideRenderer from '../components/StudyGuideRenderer';
+import StudyGuideRenderer from '../components/StudyGuideRenderer/index';
 import ZpBotChat from '../components/ZpBotChat';
 import { NotebookList, NotebookEditor } from '../components/notebooks';
 import { Notebook } from '../types';
@@ -1373,7 +1373,14 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                     ) : (
                                         <div className="max-w-none">
                                             {studySet.description ? (
-                                                <StudyGuideRenderer content={studySet.description} />
+                                                <StudyGuideRenderer
+                                                    content={studySet.description}
+                                                    studySetId={studySet.id}
+                                                    studySetName={studySet.name}
+                                                    showTOC={true}
+                                                    showMindMap={false}
+                                                    defaultCollapsed={true}
+                                                />
                                             ) : (
                                                 <EmptyAIBox
                                                     icon="magic_button"
@@ -1391,7 +1398,13 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                 {activeGuideTab === 'infographic' && (
                                     <div className="max-w-none">
                                         {studySet.infographic ? (
-                                            <StudyGuideRenderer content={studySet.infographic} />
+                                            <StudyGuideRenderer
+                                                content={studySet.infographic}
+                                                studySetId={studySet.id}
+                                                studySetName={studySet.name}
+                                                showTOC={false}
+                                                defaultCollapsed={false}
+                                            />
                                         ) : (
                                             <EmptyAIBox
                                                 icon="leaderboard"
@@ -1440,7 +1453,13 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                 {activeGuideTab === 'presentation' && (
                                     <div className="max-w-none">
                                         {studySet.presentation ? (
-                                            <StudyGuideRenderer content={studySet.presentation} />
+                                            <StudyGuideRenderer
+                                                content={studySet.presentation}
+                                                studySetId={studySet.id}
+                                                studySetName={studySet.name}
+                                                showTOC={false}
+                                                defaultCollapsed={false}
+                                            />
                                         ) : (
                                             <EmptyAIBox
                                                 icon="slideshow"

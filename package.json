@@ -21,6 +21,7 @@
     "@tiptap/react": "^2.10.3",
     "@tiptap/starter-kit": "^2.10.3",
     "@tiptap/suggestion": "^2.27.2",
+    "@xyflow/react": "^12.10.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router-dom": "^7.12.0",
