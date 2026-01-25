@@ -28,6 +28,18 @@ interface NotebookEditorProps {
   onSaveComplete: () => void;
 }
 
+const ToolbarButton = ({ onClick, isActive, icon, title, disabled, className }: any) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className={`p-1.5 rounded-lg transition-all text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed ${isActive ? 'bg-indigo-100 text-indigo-700 shadow-sm ring-1 ring-indigo-200' : ''
+      } ${className}`}
+    title={title}
+  >
+    <span className="material-symbols-outlined text-[20px]">{icon}</span>
+  </button>
+);
+
 const NotebookEditor: React.FC<NotebookEditorProps> = ({
   notebook,
   studySetId,
@@ -60,9 +72,7 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
       TaskItem.configure({
         nested: true,
       }),
-      Highlight.configure({
-        multiline: true,
-      }),
+      Highlight,
       Underline,
       SlashCommand.configure({
         suggestion,
@@ -251,255 +261,243 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
   );
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+    <div className="flex flex-col h-full bg-slate-50/50">
+      {/* Header Minimalista */}
+      <div className="flex items-center justify-between px-6 py-4 bg-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-slate-100 transition-all">
         <div className="flex items-center gap-3">
           <button
             onClick={handleBack}
-            className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition"
+            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-all"
           >
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
-          <div>
-            <h2 className="font-bold text-slate-900 text-lg">{notebook.title}</h2>
-            {notebook.description && (
-              <p className="text-sm text-slate-500">{notebook.description}</p>
-            )}
+          <div className="flex flex-col">
+            {/* Breadcrumb-like context */}
+            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-0.5">
+              {studySetName}
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-indigo-500">book_2</span>
+              <h2 className="font-bold text-slate-800 text-lg tracking-tight">{notebook.title}</h2>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Unsaved changes indicator */}
-          {hasUnsavedChanges && (
-            <span className="text-sm text-amber-600 flex items-center gap-1">
-              <span className="material-symbols-outlined text-base">edit</span>
-              Sin guardar
-            </span>
-          )}
+        <div className="flex items-center gap-3">
+          {/* Status Indicators */}
+          <div className="flex items-center gap-3 mr-4">
+            {hasUnsavedChanges && (
+              <span className="text-xs font-medium text-amber-500 bg-amber-50 px-2 py-1 rounded-full flex items-center gap-1 animate-in fade-in">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                Editando
+              </span>
+            )}
+            {saveMessage && (
+              <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full animate-in fade-in slide-in-from-top-1">
+                {saveMessage}
+              </span>
+            )}
+          </div>
 
-          {/* Save message */}
-          {saveMessage && (
-            <span className="text-sm text-green-600 flex items-center gap-1">
-              <span className="material-symbols-outlined text-base">check_circle</span>
-              {saveMessage}
-            </span>
-          )}
-
-          {/* History button */}
           <button
             onClick={() => setShowHistoryPanel(true)}
-            className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition"
-            title="Ver historial"
+            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all"
+            title="Historial de versiones"
           >
             <span className="material-symbols-outlined">history</span>
           </button>
         </div>
       </div>
 
-      {/* Editor Container */}
-      <div className="flex-1 bg-white rounded-2xl border border-slate-100 overflow-hidden flex flex-col relative group">
-        {/* Toolbar */}
-        {canEdit && editor && (
-          <div className="flex items-center gap-1 p-2 border-b border-slate-100 bg-slate-50 flex-wrap sticky top-0 z-10">
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleBold().run()}
-              isActive={editor.isActive('bold')}
-              icon="format_bold"
-              title="Negrita (Ctrl+B)"
-            />
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleItalic().run()}
-              isActive={editor.isActive('italic')}
-              icon="format_italic"
-              title="Cursiva (Ctrl+I)"
-            />
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleUnderline().run()}
-              isActive={editor.isActive('underline')}
-              icon="format_underlined"
-              title="Subrayado (Ctrl+U)"
-            />
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleStrike().run()}
-              isActive={editor.isActive('strike')}
-              icon="strikethrough_s"
-              title="Tachado"
-            />
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleHighlight().run()}
-              isActive={editor.isActive('highlight')}
-              icon="ink_highlighter"
-              title="Resaltar"
-              className={editor.isActive('highlight') ? 'text-amber-500 bg-amber-50' : ''}
-            />
+      {/* Main Scrollable Canvas */}
+      <div className="flex-1 overflow-auto bg-white/40 custom-scrollbar">
+        <div className="max-w-4xl mx-auto my-8 bg-white min-h-[85vh] shadow-sm rounded-xl border border-slate-100/50 relative flex flex-col transition-shadow hover:shadow-md duration-500">
 
-            <div className="w-px h-6 bg-slate-200 mx-1" />
+          {/* Floating/Sticky Toolbar inside the page */}
+          {canEdit && editor && (
+            <div className="sticky top-0 z-10 px-4 py-3 bg-white/95 backdrop-blur-sm border-b border-slate-100 flex items-center gap-1 flex-wrap justify-center rounded-t-xl transition-all">
+              <div className="flex items-center bg-slate-100/50 p-1 rounded-lg gap-0.5">
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().toggleBold().run()}
+                  isActive={editor.isActive('bold')}
+                  icon="format_bold"
+                  title="Negrita"
+                />
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().toggleItalic().run()}
+                  isActive={editor.isActive('italic')}
+                  icon="format_italic"
+                  title="Cursiva"
+                />
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().toggleUnderline().run()}
+                  isActive={editor.isActive('underline')}
+                  icon="format_underlined"
+                  title="Subrayado"
+                />
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().toggleHighlight().run()}
+                  isActive={editor.isActive('highlight')}
+                  icon="ink_highlighter"
+                  title="Resaltar"
+                  className={editor.isActive('highlight') ? 'text-amber-500 bg-amber-100' : ''}
+                />
+              </div>
 
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-              isActive={editor.isActive('heading', { level: 1 })}
-              icon="format_h1"
-              title="Titulo 1"
-            />
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-              isActive={editor.isActive('heading', { level: 2 })}
-              icon="format_h2"
-              title="Titulo 2"
-            />
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-              isActive={editor.isActive('heading', { level: 3 })}
-              icon="format_h3"
-              title="Titulo 3"
-            />
+              <div className="w-px h-5 bg-slate-200 mx-2" />
 
-            <div className="w-px h-6 bg-slate-200 mx-1" />
+              <div className="flex items-center bg-slate-100/50 p-1 rounded-lg gap-0.5">
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+                  isActive={editor.isActive('heading', { level: 1 })}
+                  icon="format_h1"
+                  title="Título Grande"
+                />
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+                  isActive={editor.isActive('heading', { level: 2 })}
+                  icon="format_h2"
+                  title="Subtítulo"
+                />
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+                  isActive={editor.isActive('heading', { level: 3 })}
+                  icon="format_h3"
+                  title="Título Pequeño"
+                />
+              </div>
 
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleBulletList().run()}
-              isActive={editor.isActive('bulletList')}
-              icon="format_list_bulleted"
-              title="Lista con viñetas"
-            />
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleOrderedList().run()}
-              isActive={editor.isActive('orderedList')}
-              icon="format_list_numbered"
-              title="Lista numerada"
-            />
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleTaskList().run()}
-              isActive={editor.isActive('taskList')}
-              icon="check_box"
-              title="Lista de tareas"
-            />
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleBlockquote().run()}
-              isActive={editor.isActive('blockquote')}
-              icon="format_quote"
-              title="Cita"
-            />
-            <ToolbarButton
-              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-              isActive={editor.isActive('codeBlock')}
-              icon="code"
-              title="Bloque de código"
-            />
+              <div className="w-px h-5 bg-slate-200 mx-2" />
 
-            <div className="w-px h-6 bg-slate-200 mx-1" />
+              <div className="flex items-center bg-slate-100/50 p-1 rounded-lg gap-0.5">
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().toggleBulletList().run()}
+                  isActive={editor.isActive('bulletList')}
+                  icon="format_list_bulleted"
+                  title="Viñetas"
+                />
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                  isActive={editor.isActive('orderedList')}
+                  icon="format_list_numbered"
+                  title="Numeración"
+                />
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().toggleTaskList().run()}
+                  isActive={editor.isActive('taskList')}
+                  icon="check_box"
+                  title="Checklist"
+                />
+              </div>
 
-            <ToolbarButton
-              onClick={() => editor.chain().focus().undo().run()}
-              disabled={!editor.can().undo()}
-              icon="undo"
-              title="Deshacer (Ctrl+Z)"
-            />
-            <ToolbarButton
-              onClick={() => editor.chain().focus().redo().run()}
-              disabled={!editor.can().redo()}
-              icon="redo"
-              title="Rehacer (Ctrl+Y)"
-            />
-          </div>
-        )}
+              <div className="w-px h-5 bg-slate-200 mx-2" />
 
-        {/* Editor Content with Bubble Menu */}
-        <div className="flex-1 overflow-auto p-6 relative">
-          {editor && (
-            <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }} className="flex bg-slate-900 text-white rounded-lg shadow-xl overflow-hidden p-1 gap-1">
-              <button
-                onClick={() => editor.chain().focus().toggleBold().run()}
-                className={`p-1.5 rounded hover:bg-slate-700 transition ${editor.isActive('bold') ? 'bg-primary text-white' : 'text-slate-300'}`}
-              >
-                <span className="material-symbols-outlined text-lg">format_bold</span>
-              </button>
-              <button
-                onClick={() => editor.chain().focus().toggleItalic().run()}
-                className={`p-1.5 rounded hover:bg-slate-700 transition ${editor.isActive('italic') ? 'bg-primary text-white' : 'text-slate-300'}`}
-              >
-                <span className="material-symbols-outlined text-lg">format_italic</span>
-              </button>
-              <button
-                onClick={() => editor.chain().focus().toggleUnderline().run()}
-                className={`p-1.5 rounded hover:bg-slate-700 transition ${editor.isActive('underline') ? 'bg-primary text-white' : 'text-slate-300'}`}
-              >
-                <span className="material-symbols-outlined text-lg">format_underlined</span>
-              </button>
-              <button
-                onClick={() => editor.chain().focus().toggleHighlight().run()}
-                className={`p-1.5 rounded hover:bg-slate-700 transition ${editor.isActive('highlight') ? 'bg-amber-500 text-white' : 'text-slate-300'}`}
-              >
-                <span className="material-symbols-outlined text-lg">ink_highlighter</span>
-              </button>
-            </BubbleMenu>
+              <div className="flex items-center bg-slate-100/50 p-1 rounded-lg gap-0.5">
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().undo().run()}
+                  disabled={!editor.can().undo()}
+                  icon="undo"
+                  title="Deshacer"
+                />
+                <ToolbarButton
+                  onClick={() => editor.chain().focus().redo().run()}
+                  disabled={!editor.can().redo()}
+                  icon="redo"
+                  title="Rehacer"
+                />
+              </div>
+            </div>
           )}
 
-          <EditorContent
-            editor={editor}
-            className="prose prose-slate max-w-none min-h-[400px] focus:outline-none
-              [&_.ProseMirror]:min-h-[400px]
-              [&_.ProseMirror]:focus:outline-none
-              [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]
-              [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-slate-400
-              [&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left
-              [&_.ProseMirror_p.is-editor-empty:first-child::before]:h-0
-              [&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none
-              /* Task List Styles */
-              [&_ul[data-type='taskList']]:list-none
-              [&_ul[data-type='taskList']]:p-0
-              [&_li[data-type='taskItem']]:flex
-              [&_li[data-type='taskItem']]:items-start
-              [&_li[data-type='taskItem']]:gap-2
-              [&_li[data-type='taskItem']]:my-1
-              [&_input[type='checkbox']]:mt-1.5
-              [&_input[type='checkbox']]:cursor-pointer
-              [&_input[type='checkbox']]:accent-primary
-              "
-          />
+          {/* Document Content Area */}
+          <div className="flex-1 px-12 py-8 md:px-16 md:py-12 cursor-text" onClick={() => editor?.commands.focus()}>
+            {editor && (
+              <BubbleMenu editor={editor} tippyOptions={{ duration: 100, maxWidth: 400 }} className="flex items-center bg-slate-800 text-white rounded-full shadow-2xl py-1 px-2 gap-1 animate-in zoom-in-95 duration-100">
+                <button onClick={() => editor.chain().focus().toggleBold().run()} className={`p-1.5 rounded-full hover:bg-white/20 transition ${editor.isActive('bold') ? 'text-indigo-300' : 'text-slate-300'}`}><span className="material-symbols-outlined text-[18px]">format_bold</span></button>
+                <button onClick={() => editor.chain().focus().toggleItalic().run()} className={`p-1.5 rounded-full hover:bg-white/20 transition ${editor.isActive('italic') ? 'text-indigo-300' : 'text-slate-300'}`}><span className="material-symbols-outlined text-[18px]">format_italic</span></button>
+                <button onClick={() => editor.chain().focus().toggleHighlight().run()} className={`p-1.5 rounded-full hover:bg-white/20 transition ${editor.isActive('highlight') ? 'text-amber-400' : 'text-slate-300'}`}><span className="material-symbols-outlined text-[18px]">ink_highlighter</span></button>
+                <div className="w-px h-4 bg-white/20 mx-1"></div>
+                <button onClick={() => { window.dispatchEvent(new CustomEvent('notebook-ai-command', { detail: { action: 'expand' } })) }} className="flex items-center gap-1 pl-1 pr-2 py-0.5 rounded-full hover:bg-indigo-600 transition text-xs font-medium bg-indigo-500/50 text-indigo-100">
+                  <span className="material-symbols-outlined text-[14px]">auto_awesome</span> Expandir
+                </button>
+              </BubbleMenu>
+            )}
+
+            <EditorContent
+              editor={editor}
+              className="prose prose-lg prose-slate max-w-none focus:outline-none
+                prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-slate-800
+                prose-p:text-slate-600 prose-p:leading-relaxed
+                prose-a:text-indigo-600 prose-a:no-underline hover:prose-a:underline
+                prose-blockquote:border-l-4 prose-blockquote:border-indigo-400 prose-blockquote:bg-slate-50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:not-italic prose-blockquote:rounded-r-lg
+                prose-li:marker:text-slate-400
+                [&_.ProseMirror]:min-h-[500px]
+                [&_.ProseMirror]:focus:outline-none
+                [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]
+                [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-slate-300
+                [&_.ProseMirror_p.is-editor-empty:first-child::before]:font-light
+                [&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left
+                [&_.ProseMirror_p.is-editor-empty:first-child::before]:h-0
+                [&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none
+                /* Task List Styles */
+                [&_ul[data-type='taskList']]:list-none
+                [&_ul[data-type='taskList']]:p-0
+                [&_li[data-type='taskItem']]:flex
+                [&_li[data-type='taskItem']]:items-start
+                [&_li[data-type='taskItem']]:gap-3
+                [&_li[data-type='taskItem']]:my-2
+                [&_input[type='checkbox']]:mt-1.5
+                [&_input[type='checkbox']]:w-4
+                [&_input[type='checkbox']]:h-4
+                [&_input[type='checkbox']]:rounded-md
+                [&_input[type='checkbox']]:border-slate-300
+                [&_input[type='checkbox']]:text-indigo-600
+                [&_input[type='checkbox']]:focus:ring-indigo-500
+                "
+            />
+          </div>
         </div>
+        <div className="h-20"></div> {/* Bottom spacer */}
       </div>
 
-      {/* Bottom Action Bar */}
+      {/* Floating Action Bar (Bottom Right) */}
       {canEdit && (
-        <div className="flex items-center justify-between mt-4 p-4 bg-white rounded-xl border border-slate-100">
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <span className="material-symbols-outlined text-base">info</span>
-            Al guardar se generarán flashcards del contenido nuevo
-          </div>
+        <div className="fixed bottom-8 right-8 flex flex-col gap-3 z-30">
+          {/* Quick Draft Button */}
+          <button
+            onClick={handleQuickSave}
+            disabled={isSaving || !hasUnsavedChanges}
+            className={`p-4 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center group ${hasUnsavedChanges ? 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200' : 'bg-white/0 text-transparent shadow-none pointer-events-none'
+              }`}
+            title="Guardar borrador"
+          >
+            <span className="material-symbols-outlined group-hover:scale-110 transition-transform">save_as</span>
+          </button>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleQuickSave}
-              disabled={isSaving || !hasUnsavedChanges}
-              className="px-4 py-2 text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Guardar borrador
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={isSaving || isGenerating}
-              className="flex items-center gap-2 px-6 py-2 bg-primary text-white rounded-xl hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isGenerating ? (
-                <>
-                  <span className="material-symbols-outlined animate-spin text-xl">sync</span>
-                  Generando...
-                </>
-              ) : isSaving ? (
-                <>
-                  <span className="material-symbols-outlined animate-spin text-xl">sync</span>
-                  Guardando...
-                </>
+
+          {/* Main Save Button */}
+          <button
+            onClick={handleSave}
+            disabled={isSaving || isGenerating}
+            className={`group flex items-center gap-3 pl-5 pr-2 py-2 rounded-full shadow-xl transition-all duration-300 ${isGenerating ? 'bg-indigo-600 cursor-wait' : 'bg-indigo-600 hover:bg-indigo-700 hover:scale-105 hover:shadow-2xl'
+              } text-white`}
+          >
+            <div className="flex flex-col items-start min-w-[100px]">
+              <span className="font-bold text-sm">
+                {isGenerating ? 'Generando...' : (isSaving ? 'Guardando...' : 'Guardar Todo')}
+              </span>
+              <span className="text-[10px] opacity-80 font-medium">
+                {isGenerating ? 'Creando Flashcards' : '+ Generar Flashcards'}
+              </span>
+            </div>
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center group-hover:rotate-12 transition-transform">
+              {isGenerating || isSaving ? (
+                <span className="material-symbols-outlined animate-spin">sync</span>
               ) : (
-                <>
-                  <span className="material-symbols-outlined text-xl">save</span>
-                  Guardar y Generar Flashcards
-                </>
+                <span className="material-symbols-outlined">auto_awesome</span>
               )}
-            </button>
-          </div>
+            </div>
+          </button>
         </div>
       )}
 
