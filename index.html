@@ -108,6 +108,37 @@
     .ProseMirror:focus {
       outline: none;
     }
+
+    /* RemNote-style Indentation Guides */
+    /* Target nested lists */
+    .ProseMirror ul ul,
+    .ProseMirror ol ol,
+    .ProseMirror ul ol,
+    .ProseMirror ol ul {
+      border-left: 2px solid #E5E7EB;
+      /* gray-200 */
+      margin-left: -1rem;
+      /* Pull back to align under parent bullet */
+      padding-left: 1rem;
+      /* Push content back */
+      position: relative;
+    }
+
+    /* Specific adjustment for ordered lists which are wider */
+    .ProseMirror ol ol,
+    .ProseMirror ul ol {
+      margin-left: -1.2rem;
+    }
+
+    /* Thread Hover Effect */
+    .ProseMirror ul ul:hover,
+    .ProseMirror ol ol:hover,
+    .ProseMirror ul ol:hover,
+    .ProseMirror ol ul:hover {
+      border-left-color: #9CA3AF;
+      /* gray-400 */
+      transition: border-color 0.2s ease;
+    }
   </style>
 
   <link rel="stylesheet" href="/index.css">
