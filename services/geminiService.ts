@@ -828,15 +828,15 @@ FLASHCARDS EXISTENTES (evita duplicados):
 ${existingFlashcards.slice(0, 3000)}
 ` : ''}
 
-REGLAS ESTRICTAS DE COBERTURA:
-1. NO HAY LÍMITE DE CANTIDAD. Genera tantas tarjetas como conceptos existan en el texto.
+31. REGLAS ESTRICTAS DE COBERTURA:
+1. CANTIDAD OBJETIVO: Genera aproximadamente ${count} flashcards. Si hay suficiente información, cumple este objetivo.
 2. Si hay una lista, intenta crear una tarjeta sobre el concepto general y otras específicas si son importantes.
 3. Prioriza la CALIDAD pero sin sacrificar la COBERTURA. Si está en el texto y es relevante, haz una tarjeta.
 4. Cada flashcard debe ser autocontenida.
 5. Categoriza inteligentemente.
 
 Idioma: Español.
-Genera el JSON array con TODAS las tarjetas.
+Genera el JSON array con las tarjetas.
 `;
 
     const result = await generateContent(prompt, {

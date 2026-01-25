@@ -218,15 +218,20 @@ export const calculateOptimalFlashcardCount = (newContent: string): number => {
     keyTerms * 0.8 +
     questions * 0.3;
 
-  // 4. Formula base: 1 flashcard por cada 60-80 palabras
-  let baseCount = Math.ceil(wordCount / 70);
+  // 4. Formula base: 1 flashcard por cada 40 palabras (antes 70) para mayor granularidad
+  let baseCount = Math.ceil(wordCount / 40);
 
-  // 5. Ajustar por densidad (contenido denso = mas flashcards)
-  const densityMultiplier = 1 + Math.min(densityScore / 10, 0.5);
+  // 5. Ajustar por densidad (contenido denso = mas flashcards). Listas = 1 card por item aprox.
+  const densityMultiplier = 1 + Math.min(densityScore / 5, 2.0); // Allow up to 3x multiplier
   let adjustedCount = Math.round(baseCount * densityMultiplier);
 
-  // 6. Limites: minimo 1, maximo 15 por guardado
-  return Math.max(1, Math.min(15, adjustedCount));
+  // Ensure minimum count if we have structured data
+  if ((bulletPoints + numberedLists) > 2) {
+    adjustedCount = Math.max(adjustedCount, Math.ceil((bulletPoints + numberedLists) * 0.8));
+  }
+
+  // 6. Limites: minimo 1, maximo 20 por guardado
+  return Math.max(1, Math.min(20, adjustedCount));
 };
 
 // ============================================
