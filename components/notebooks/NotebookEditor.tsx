@@ -380,95 +380,94 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
       >
         <div className="max-w-5xl mx-auto my-0 bg-transparent min-h-screen relative flex flex-col">
 
-          {/* Toolbar - Sticky & Glassmorphic */}
-          {canEdit && editor && (
-            <div className={`sticky top-4 z-20 transition-all duration-300 ${scrolled ? 'translate-y-0' : 'translate-y-2'}`}>
-              <div className="mx-auto max-w-3xl bg-white/80 backdrop-blur-xl border border-white/40 shadow-sm rounded-2xl p-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar ring-1 ring-slate-900/5 support-touch-scroll">
+          {/* Toolbar - Docked Sub-header (Clean & Professional) */
+            /* Removed the floating behavior to avoid visual clutter. Now it docks cleanly at the top of the content. */}
+          <div className={`sticky top-0 z-10 transition-all duration-300 -mx-4 md:-mx-12 mb-6 border-b border-slate-200/50 bg-white/60 backdrop-blur-md ${scrolled ? 'shadow-sm bg-white/90' : ''}`}>
+            <div className="max-w-3xl mx-auto flex items-center justify-center gap-1 p-2 overflow-x-auto no-scrollbar">
 
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().toggleBold().run()}
-                  disabled={!editor.can().chain().focus().toggleBold().run()}
-                  isActive={editor.isActive('bold')}
-                  icon="format_bold"
-                  title="Negrita (Cmd+B)"
-                />
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().toggleItalic().run()}
-                  disabled={!editor.can().chain().focus().toggleItalic().run()}
-                  isActive={editor.isActive('italic')}
-                  icon="format_italic"
-                  title="Cursiva (Cmd+I)"
-                />
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().toggleUnderline().run()}
-                  disabled={!editor.can().chain().focus().toggleUnderline().run()}
-                  isActive={editor.isActive('underline')}
-                  icon="format_underlined"
-                  title="Subrayado (Cmd+U)"
-                />
-                <div className="w-px h-5 bg-slate-300/50 mx-1 flex-shrink-0" />
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-                  isActive={editor.isActive('heading', { level: 1 })}
-                  icon="format_h1"
-                  title="Título 1"
-                />
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-                  isActive={editor.isActive('heading', { level: 2 })}
-                  icon="format_h2"
-                  title="Título 2"
-                />
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-                  isActive={editor.isActive('heading', { level: 3 })}
-                  icon="format_h3"
-                  title="Título 3"
-                />
-                <div className="w-px h-5 bg-slate-300/50 mx-1 flex-shrink-0" />
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().toggleBulletList().run()}
-                  isActive={editor.isActive('bulletList')}
-                  icon="format_list_bulleted"
-                  title="Lista con viñetas"
-                />
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().toggleOrderedList().run()}
-                  isActive={editor.isActive('orderedList')}
-                  icon="format_list_numbered"
-                  title="Lista numerada"
-                />
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().toggleTaskList().run()}
-                  isActive={editor.isActive('taskList')}
-                  icon="check_box"
-                  title="Lista de tareas"
-                />
-                <div className="w-px h-5 bg-slate-300/50 mx-1 flex-shrink-0" />
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().toggleHighlight().run()}
-                  isActive={editor.isActive('highlight')}
-                  icon="ink_highlighter"
-                  title="Resaltar"
-                  className="text-amber-500 hover:bg-amber-50 hover:text-amber-600"
-                />
+              <ToolbarButton
+                onClick={() => editor.chain().focus().toggleBold().run()}
+                disabled={!editor.can().chain().focus().toggleBold().run()}
+                isActive={editor.isActive('bold')}
+                icon="format_bold"
+                title="Negrita (Cmd+B)"
+              />
+              <ToolbarButton
+                onClick={() => editor.chain().focus().toggleItalic().run()}
+                disabled={!editor.can().chain().focus().toggleItalic().run()}
+                isActive={editor.isActive('italic')}
+                icon="format_italic"
+                title="Cursiva (Cmd+I)"
+              />
+              <ToolbarButton
+                onClick={() => editor.chain().focus().toggleUnderline().run()}
+                disabled={!editor.can().chain().focus().toggleUnderline().run()}
+                isActive={editor.isActive('underline')}
+                icon="format_underlined"
+                title="Subrayado (Cmd+U)"
+              />
+              <div className="w-px h-5 bg-slate-300/50 mx-2 flex-shrink-0" />
+              <ToolbarButton
+                onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+                isActive={editor.isActive('heading', { level: 1 })}
+                icon="format_h1"
+                title="Título 1"
+              />
+              <ToolbarButton
+                onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+                isActive={editor.isActive('heading', { level: 2 })}
+                icon="format_h2"
+                title="Título 2"
+              />
+              <ToolbarButton
+                onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+                isActive={editor.isActive('heading', { level: 3 })}
+                icon="format_h3"
+                title="Título 3"
+              />
+              <div className="w-px h-5 bg-slate-300/50 mx-2 flex-shrink-0" />
+              <ToolbarButton
+                onClick={() => editor.chain().focus().toggleBulletList().run()}
+                isActive={editor.isActive('bulletList')}
+                icon="format_list_bulleted"
+                title="Lista con viñetas"
+              />
+              <ToolbarButton
+                onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                isActive={editor.isActive('orderedList')}
+                icon="format_list_numbered"
+                title="Lista numerada"
+              />
+              <ToolbarButton
+                onClick={() => editor.chain().focus().toggleTaskList().run()}
+                isActive={editor.isActive('taskList')}
+                icon="check_box"
+                title="Lista de tareas"
+              />
+              <div className="w-px h-5 bg-slate-300/50 mx-2 flex-shrink-0" />
+              <ToolbarButton
+                onClick={() => editor.chain().focus().toggleHighlight().run()}
+                isActive={editor.isActive('highlight')}
+                icon="ink_highlighter"
+                title="Resaltar"
+                className="text-amber-500 hover:bg-amber-50 hover:text-amber-600"
+              />
 
-                <div className="w-px h-5 bg-slate-300/50 mx-1 flex-shrink-0" />
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().undo().run()}
-                  disabled={!editor.can().chain().focus().undo().run()}
-                  icon="undo"
-                  title="Deshacer (Cmd+Z)"
-                />
-                <ToolbarButton
-                  onClick={() => editor.chain().focus().redo().run()}
-                  disabled={!editor.can().chain().focus().redo().run()}
-                  icon="redo"
-                  title="Rehacer (Cmd+Shift+Z)"
-                />
-              </div>
+              <div className="w-px h-5 bg-slate-300/50 mx-2 flex-shrink-0" />
+              <ToolbarButton
+                onClick={() => editor.chain().focus().undo().run()}
+                disabled={!editor.can().chain().focus().undo().run()}
+                icon="undo"
+                title="Deshacer (Cmd+Z)"
+              />
+              <ToolbarButton
+                onClick={() => editor.chain().focus().redo().run()}
+                disabled={!editor.can().chain().focus().redo().run()}
+                icon="redo"
+                title="Rehacer (Cmd+Shift+Z)"
+              />
             </div>
-          )}
+          </div>
 
           {/* Main Paper Container */}
           <div
