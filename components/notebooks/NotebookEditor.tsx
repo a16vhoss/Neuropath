@@ -131,8 +131,9 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
 
       if (!prompt) return;
 
-      const loadingId = `loading-${Date.now()}`;
-      editor.commands.insertContent(`<p class="text-slate-400 italic">✨ ZpBot pensando...</p>`);
+      const loadingId = `ai-loading-${Date.now()}`;
+      // Insert a placeholder with a unique attribute we can find later
+      editor.commands.insertContent(`<p data-loading-id="${loadingId}" class="text-slate-400 italic">✨ ZpBot pensando...</p>`);
 
       try {
         const generatedHtml = await generateUnstructuredNoteContent(
@@ -141,16 +142,74 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
           studySetName
         );
 
-        // Remove the "Thinking..." text by deleting the last line or undoing? 
-        // Simplest: The generated content is appended. 
-        // User can delete the "Thinking...". 
-        // Better: Select the "Thinking..." node and replace. 
-        // For MVP, just append.
+        // Find the loading node key/pos to delete it?
+        // Since we just inserted it, it's at the cursor?
+        // Better: Replace the entire "thinking" line.
+        // Tiptap way: chain().focus().deleteRange... or deleteNode?
+        // Let's try to delete the last node if it matches our ID, or just undo?
+        // Undoing is risky if user typed.
+        // The safest way without complex node search is to rely on Tiptap's selection if we haven't moved.
+        // BUT, generating takes time. User might move.
+        // Ideally we search for the node with data-loading-id.
+        // For now, let's try a simple "delete last line" heuristic if we assume it's at end,
+        // OR, just appending is fine IF we didn't insert the text.
+        // User asked to REMOVE it.
+
+        // Refined approach:
+        // We will execute a command that finds the node with the attribute and replaces it.
+        // Since we can't easily query DOM in commands without extension, let's use a simpler heuristic for now:
+        // We will insert the content REPLACE the selection? No.
+
+        // Let's use `editor.commands.deleteNode('paragraph')` if it's the current one?
+        // Let's try traversing the JSON content? Too slow.
+
+        // Practical solution:
+        // We won't insert a persistent node. We will show a toast? No, user wants inline.
+        // We will insert it, then when done, we look for the text "✨ ZpBot pensando..." and delete that range.
+
+        const { doc } = editor.state;
+        let pos = -1;
+        doc.descendants((node, position) => {
+          if (node.isText && node.text === '✨ ZpBot pensando...') {
+            pos = position;
+            return false; // Stop
+          }
+        });
+
+        if (pos >= 0) {
+          // Delete the paragraph containing this text. The text node is inside a paragraph.
+          // pos is the start of text. Parent is pos - 1.
+          // We want to delete the whole paragraph block.
+          // Check if parent is paragraph?
+          // Let's just delete the range of the text + 1 for now, or the block.
+          const from = pos;
+          const to = pos + '✨ ZpBot pensando...'.length;
+          // Delete the parent paragraph if it only contains this text?
+          // Let's just delete the text range + parent block padding?
+          // Safe bet: Delete the range [pos-1, to+1] to kill the paragraph wrapper if empty?
+          // Let's just delete the text content.
+          editor.commands.deleteRange({ from: pos - 1, to: to + 1 }); // Delete paragraph wrapper roughly
+        }
 
         editor.commands.insertContent(generatedHtml);
 
       } catch (err) {
         console.error("AI command failed", err);
+        // Clean up loading text on error too
+        const { doc } = editor.state;
+        let pos = -1;
+        doc.descendants((node, position) => {
+          if (node.isText && node.text === '✨ ZpBot pensando...') {
+            pos = position;
+            return false;
+          }
+        });
+
+        if (pos >= 0) {
+          const to = pos + '✨ ZpBot pensando...'.length;
+          editor.commands.deleteRange({ from: pos - 1, to: to + 1 });
+        }
+
         editor.commands.insertContent('<p class="text-red-400">Error al generar.</p>');
       }
     };
