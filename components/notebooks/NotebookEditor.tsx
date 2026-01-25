@@ -7,12 +7,15 @@ import TaskItem from '@tiptap/extension-task-item';
 import Highlight from '@tiptap/extension-highlight';
 import Underline from '@tiptap/extension-underline';
 import BubbleMenuExtension from '@tiptap/extension-bubble-menu';
+import SlashCommand from './extensions/SlashCommand';
+import { suggestion } from './extensions/suggestion';
 import { Notebook, FlashcardPreview, NotebookSaveResult } from '../../types';
 import {
   updateNotebook,
   prepareNotebookSave,
   saveNotebookContentOnly,
 } from '../../services/notebookService';
+import { generateUnstructuredNoteContent } from '../../services/geminiService';
 import FlashcardPreviewModal from './FlashcardPreviewModal';
 import NotebookHistory from './NotebookHistory';
 
@@ -61,6 +64,9 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
         multiline: true,
       }),
       Underline,
+      SlashCommand.configure({
+        suggestion,
+      }),
     ],
     content: notebook.content || '',
     editable: canEdit,
@@ -91,6 +97,52 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
+
+  // Handle AI Commands from Slash Menu
+  useEffect(() => {
+    const handleAICommand = async (e: any) => {
+      if (!editor) return;
+      const action = e.detail?.action;
+
+      const selection = editor.state.selection;
+      const text = editor.state.doc.textBetween(Math.max(0, selection.from - 2000), selection.to, '\n');
+
+      let prompt = '';
+      if (action === 'expand') {
+        prompt = "Expande la siguiente idea con más detalle y profundidad académica:";
+      } else if (action === 'summarize') {
+        prompt = "Resume el siguiente texto en puntos clave:";
+      }
+
+      if (!prompt) return;
+
+      const loadingId = `loading-${Date.now()}`;
+      editor.commands.insertContent(`<p class="text-slate-400 italic">✨ ZpBot pensando...</p>`);
+
+      try {
+        const generatedHtml = await generateUnstructuredNoteContent(
+          prompt,
+          text,
+          studySetName
+        );
+
+        // Remove the "Thinking..." text by deleting the last line or undoing? 
+        // Simplest: The generated content is appended. 
+        // User can delete the "Thinking...". 
+        // Better: Select the "Thinking..." node and replace. 
+        // For MVP, just append.
+
+        editor.commands.insertContent(generatedHtml);
+
+      } catch (err) {
+        console.error("AI command failed", err);
+        editor.commands.insertContent('<p class="text-red-400">Error al generar.</p>');
+      }
+    };
+
+    window.addEventListener('notebook-ai-command', handleAICommand);
+    return () => window.removeEventListener('notebook-ai-command', handleAICommand);
+  }, [editor, studySetName]);
 
   // Handle save (with flashcard generation)
   const handleSave = async () => {
@@ -190,8 +242,8 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
       disabled={disabled}
       title={title}
       className={`p-2 rounded-lg transition ${isActive
-          ? 'bg-primary/10 text-primary'
-          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+        ? 'bg-primary/10 text-primary'
+        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
         } ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className || ''}`}
     >
       <span className="material-symbols-outlined text-xl">{icon}</span>

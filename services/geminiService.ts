@@ -858,3 +858,52 @@ Genera EXACTAMENTE ${count} flashcards de alta calidad.
     }];
   }
 };
+
+/**
+ * Notebook AI: Generate or expand content for unstructured notes
+ */
+export const generateUnstructuredNoteContent = async (
+  prompt: string,
+  previousContext: string,
+  studySetContext: string
+): Promise<string> => {
+  const genAI = getGeminiSDK();
+  if (!genAI) return '';
+
+  try {
+    const modelName = await getBestGeminiModel('pro');
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        maxOutputTokens: 1000,
+        temperature: 0.7, // Higher creativity for drafting
+      }
+    });
+
+    const systemPrompt = `
+      Eres un experto asistente de redacción académica. Ayuda al estudiante a completar sus notas.
+      
+      CONTEXTO DE LA NOTA ACTUAL (último fragmento):
+      ${previousContext.slice(-1000)}
+      
+      CONTEXTO DE MATERIAL DE ESTUDIO (Referencia):
+      ${studySetContext.slice(0, 3000)}
+      
+      SOLICITUD:
+      "${prompt}"
+      
+      FORMATO DE SALIDA:
+      - Devuelve HTML crudo para insertar en el editor Tiptap.
+      - Usa etiquetas semánticas: <p>, <ul>, <li>, <strong>, <blockquote>.
+      - NO uses markdown ticks (\`\`\`). Solo el HTML.
+      - Sé directo y útil.
+    `;
+
+    const result = await model.generateContent(systemPrompt);
+    return result.response.text();
+
+  } catch (error) {
+    console.error("Error in AI Notebook Gen:", error);
+    return '<p><em>Error generando contenido AI. Intenta de nuevo.</em></p>';
+  }
+};

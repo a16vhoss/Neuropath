@@ -20,10 +20,12 @@
     "@tiptap/pm": "^2.10.3",
     "@tiptap/react": "^2.10.3",
     "@tiptap/starter-kit": "^2.10.3",
+    "@tiptap/suggestion": "^2.27.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router-dom": "^7.12.0",
     "recharts": "^3.6.0",
+    "tippy.js": "^6.3.7",
     "vercel": "^50.4.9",
     "youtube-transcript": "^1.2.1"
   },
