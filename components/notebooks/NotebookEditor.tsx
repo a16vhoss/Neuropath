@@ -359,8 +359,8 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
         <div className="max-w-5xl mx-auto my-0 bg-transparent min-h-screen relative flex flex-col">
 
           {/* Toolbar - Docked Sub-header (Fixed Visibility) */
-            /* Adjusted top-24 md:top-28 to flush with tabs. Solid bg-white to prevent text bleed-through. */}
-          <div className={`sticky top-28 md:top-28 z-30 transition-all duration-300 -mx-4 md:-mx-12 mb-6 border-b border-slate-200 bg-white shadow-sm`}>
+            /* Reset to top-0 because we are in an overflow-auto container. The external header handles the top spacing. */}
+          <div className={`sticky top-0 z-30 transition-all duration-300 -mx-4 md:-mx-12 mb-6 border-b border-slate-200 bg-white shadow-sm`}>
             <div className="max-w-3xl mx-auto flex items-center justify-center gap-1 p-2 overflow-x-auto no-scrollbar">
 
               <div className="flex items-center border-r border-slate-100 pr-2 mr-2 gap-1">
