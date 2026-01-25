@@ -60,7 +60,7 @@ BEGIN
             (item->>'question')::text,
             (item->>'answer')::text,
             (item->>'category')::text,
-            COALESCE((item->>'is_ai_generated')::boolean, TRUE)
+            COALESCE((item->>'is_ai_generated')::boolean, FALSE)
         FROM jsonb_array_elements(p_flashcards) AS item;
     END IF;
 
