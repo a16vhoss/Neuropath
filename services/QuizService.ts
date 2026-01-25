@@ -9,7 +9,7 @@
  */
 
 import { supabase } from './supabaseClient';
-import { generateQuizQuestions } from './geminiService';
+import { generateQuizQuestions, generateAdvancedQuiz } from './geminiService';
 
 export type QuestionType = 'true_false' | 'multiple_choice' | 'analysis' | 'design' | 'practical';
 
@@ -303,7 +303,7 @@ Return as JSON array. IMPORTANT: Include "type" field for each question:
 }]`;
 
         // 7. Generate questions with Gemini
-        const generatedQuestions = await generateQuizQuestions(prompt);
+        const generatedQuestions = await generateAdvancedQuiz(prompt);
 
         if (generatedQuestions && generatedQuestions.length > 0) {
             return generatedQuestions.map((q: any, i: number) => ({

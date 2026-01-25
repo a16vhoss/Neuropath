@@ -324,6 +324,52 @@ export const generateQuizQuestions = async (text: string, count: number = 5): Pr
 };
 
 /**
+ * Generate Advanced Adaptive Quiz (for QuizService)
+ * Supports custom schema with correctIndex and question types
+ */
+export const generateAdvancedQuiz = async (prompt: string): Promise<any[]> => {
+  const genAI = getGeminiSDK();
+  if (!genAI) return [];
+
+  try {
+    const modelName = await getBestGeminiModel();
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              type: { type: SchemaType.STRING },
+              question: { type: SchemaType.STRING },
+              options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+              correctIndex: { type: SchemaType.NUMBER },
+              explanation: { type: SchemaType.STRING },
+              topic: { type: SchemaType.STRING },
+              scenario: { type: SchemaType.STRING },
+              designPrompt: { type: SchemaType.STRING },
+              evaluationCriteria: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+              realWorldExample: { type: SchemaType.STRING }
+            },
+            required: ["question", "options", "correctIndex", "explanation", "type"]
+          }
+        }
+      }
+    });
+
+    // The prompt is already fully formed by QuizService, so we pass it directly
+    const result = await model.generateContent(prompt);
+    return JSON.parse(result.response.text());
+
+  } catch (error) {
+    console.error("Error generating advanced quiz:", error);
+    return [];
+  }
+};
+
+/**
  * Generate Podcast Script from Context
  */
 export const generatePodcastScript = async (context: string) => {
