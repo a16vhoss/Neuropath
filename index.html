@@ -109,7 +109,7 @@
       outline: none;
     }
 
-    /* RemNote/Obsidian-style Indentation Guides & Spacing */
+    /* RemNote/Obsidian-style Indentation Guides & Spacing - FIX v2 */
 
     /* 1. Reset & Tighten Item Spacing */
     .ProseMirror li>p {
@@ -123,30 +123,41 @@
       position: relative;
     }
 
+    .ProseMirror ol,
+    .ProseMirror ul {
+      /* Ensure base lists have enough space */
+      padding-left: 1.5rem;
+    }
+
     /* 2. Vertical Thread Lines */
-    /* We use strictly positioned borders on the nested list containers */
+    /* Nested lists need specific handling */
     .ProseMirror ul ul,
     .ProseMirror ol ol,
     .ProseMirror ul ol,
     .ProseMirror ol ul {
       border-left: 1px solid #E2E8F0;
-      /* slate-200, crisp line */
-      margin-left: -1.25rem;
-      /* Align perfectly with parent text start */
-      padding-left: 1.25rem;
-      /* Push content back */
+      /* slate-200 */
       position: relative;
       transition: border-color 0.15s ease;
+
+      /* KEY FIX: 
+         - Pull the container left to align the border with parent text 
+         - Push internal content RIGHT so markers don't sit on the border 
+      */
+      margin-left: -1rem;
+      padding-left: 2rem;
+      /* Increased from 1.25rem to 2rem to give room for numbers */
     }
 
-    /* Specific adjustment for ordered (1. 2. 3.) to line up nicely */
+    /* Specific adjustment for Ordered Lists (Numbers are wider) */
     .ProseMirror ol ol,
     .ProseMirror ul ol {
-      margin-left: -1.4rem;
+      /* Give even MORE space for numbers (1., 10., etc.) */
+      padding-left: 2.2rem;
+      margin-left: -1rem;
     }
 
-    /* 3. Thread Hover Interaction (Focus Mode) */
-    /* When hovering a thread, darken the guide line */
+    /* 3. Thread Hover Interaction */
     .ProseMirror ul ul:hover,
     .ProseMirror ol ol:hover,
     .ProseMirror ul ol:hover,
@@ -155,17 +166,11 @@
       /* slate-400 */
     }
 
-    /* 4. Markers (Numbers/Bullets) Styling */
-    /* Make them distinct but not overpowering */
-    .ProseMirror ol {
-      padding-left: 1.6em;
-    }
-
+    /* 4. Markers Styling */
     .ProseMirror ol li::marker {
       color: #64748B;
-      /* slate-500 - Visible and professional */
+      /* slate-500 */
       font-weight: 600;
-      /* Slightly bolder */
       font-variant-numeric: tabular-nums;
     }
 
