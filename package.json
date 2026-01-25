@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
+    "@google/genai": "^1.38.0",
     "@supabase/supabase-js": "^2.90.1",
     "@tiptap/extension-placeholder": "^3.17.1",
     "@tiptap/pm": "^3.17.1",

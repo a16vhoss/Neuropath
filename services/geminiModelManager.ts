@@ -1,112 +1,53 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-let cachedModelName: string | null = null;
-let modelResolutionPromise: Promise<string> | null = null;
-
-// Priorities: Flash (Speed/Cost) > Pro (Power) > Others
-const PREFERRED_KEYWORDS = ['flash', 'pro', 'gemini-1.5'];
+let cachedSDK: GoogleGenAI | null = null;
 
 /**
- * Dynamically resolves the best available Gemini model.
- * Fetches the list of models from the API and picks the best one.
- * @param preferredTier Optional preference for 'pro' or 'flash'
+ * Get the Gemini SDK instance (new unified SDK)
  */
-export const getBestGeminiModel = async (preferredTier?: 'pro' | 'flash'): Promise<string> => {
-    // Return cached model if available
-    if (cachedModelName) return cachedModelName;
+export const getGeminiSDK = (): GoogleGenAI | null => {
+    if (!API_KEY || API_KEY === 'PLACEHOLDER_API_KEY') {
+        console.warn('No valid Gemini API key provided');
+        return null;
+    }
 
-    // If a request is already in progress, return that promise to avoid multiple fetches
-    if (modelResolutionPromise) return modelResolutionPromise;
+    if (!cachedSDK) {
+        cachedSDK = new GoogleGenAI({ apiKey: API_KEY });
+    }
 
-    modelResolutionPromise = (async () => {
-        if (!API_KEY) {
-            console.error("No API Key found for GeminiModelManager");
-            return "gemini-1.5-flash"; // Fallback default
-        }
-
-        try {
-            console.log("🔍 Resolving best Gemini model...");
-
-            // Add a timeout to the fetch call
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`, {
-                signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                console.error(`Failed to list models: ${response.status} ${response.statusText}`);
-                return "gemini-1.5-flash"; // Fallback
-            }
-
-            const data = await response.json();
-            const models = data.models || [];
-
-            // Filter for models that support 'generateContent'
-            const contentModels = models.filter((m: any) =>
-                m.supportedGenerationMethods &&
-                m.supportedGenerationMethods.includes("generateContent")
-            );
-
-            if (contentModels.length === 0) {
-                console.warn("No models found supporting generateContent. Using fallback.");
-                return "gemini-1.5-flash";
-            }
-
-            // Clean names (remove 'models/' prefix if present for logic, but keep it for usage if SDK needs it? 
-            // SDK usually accepts just the name or models/name. use EXACT name from API.)
-
-            // Sort/Find best based on preference
-            let bestModel;
-
-            if (preferredTier === 'pro') {
-                bestModel = contentModels.find((m: any) => m.name.includes("gemini-1.5-pro"));
-            } else if (preferredTier === 'flash') {
-                bestModel = contentModels.find((m: any) => m.name.includes("gemini-1.5-flash"));
-            }
-
-            if (!bestModel) {
-                bestModel = contentModels.find((m: any) => m.name.includes("gemini-1.5-flash"));
-            }
-
-            if (!bestModel) {
-                bestModel = contentModels.find((m: any) => m.name.includes("gemini-1.5-pro"));
-            }
-            if (!bestModel) {
-                bestModel = contentModels.find((m: any) => m.name.includes("gemini-pro"));
-            }
-
-            // Fallback to the first available if no preferences match
-            if (!bestModel) {
-                bestModel = contentModels[0];
-            }
-
-            // Remove 'models/' prefix because the SDK often adds it, or handle it consistent.
-            // The SDK `getGenerativeModel({ model: 'name' })` handles it, but safer to strip "models/" if strict.
-            // Actually, newer SDK versions might prefer just the ID. Let's try to strip it.
-            const modelName = bestModel.name.replace("models/", "");
-
-            console.log(`✅ Selected Gemini Model: ${modelName} (from ${bestModel.name})`);
-            cachedModelName = modelName;
-            return modelName;
-
-        } catch (error) {
-            console.error("Error resolving Gemini model:", error);
-            return "gemini-1.5-flash"; // Ultimate fallback
-        }
-    })();
-
-    return modelResolutionPromise;
+    return cachedSDK;
 };
 
 /**
- * Helper to get an initialized SDK instance using the global key
+ * Get the best available model name
+ * @param preferredTier Optional preference for 'pro', 'flash', or 'image'
  */
-export const getGeminiSDK = () => {
-    if (!API_KEY) return null;
-    return new GoogleGenerativeAI(API_KEY);
+export const getBestGeminiModel = async (preferredTier?: 'pro' | 'flash' | 'image'): Promise<string> => {
+    // Model selection based on preference
+    switch (preferredTier) {
+        case 'pro':
+            return 'gemini-2.0-flash'; // Pro-level capabilities
+        case 'flash':
+            return 'gemini-2.0-flash'; // Fast and efficient
+        case 'image':
+            return 'gemini-2.0-flash-exp'; // Supports image generation
+        default:
+            return 'gemini-2.0-flash'; // Default to flash for speed/cost
+    }
+};
+
+/**
+ * Model for image generation
+ */
+export const getImageModel = (): string => {
+    return 'gemini-2.0-flash-exp'; // Supports native image generation
+};
+
+/**
+ * Model for grounded search
+ */
+export const getSearchModel = (): string => {
+    return 'gemini-2.0-flash'; // Supports Google Search grounding
 };

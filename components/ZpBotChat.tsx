@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getZpBotResponse, generatePromptedFlashcards, searchInternet, generateResearchClarifications } from '../services/geminiService';
+import { getZpBotResponseStream, generatePromptedFlashcards, searchInternet, generateResearchClarifications, isSearchServiceAvailable } from '../services/geminiService';
 import { addFlashcardsBatch, createMaterialWithFlashcards } from '../services/supabaseClient';
-import { generateFlashcardsFromText, generateMaterialSummary } from '../services/pdfProcessingService';
+import { generateFlashcardsFromText } from '../services/pdfProcessingService';
+import { generateEducationalImage, shouldGenerateImage, isImageServiceAvailable } from '../services/imageGenerationService';
 import {
     saveChatMessage,
     ChatMessage,
@@ -9,8 +10,7 @@ import {
     getChatSessions,
     createChatSession,
     getSessionMessages,
-    deleteChatSession,
-    updateSessionTitle
+    deleteChatSession
 } from '../services/ChatService';
 
 interface ZpBotChatProps {
@@ -33,6 +33,14 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
     const [loading, setLoading] = useState(false);
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // Streaming State
+    const [isStreaming, setIsStreaming] = useState(false);
+    const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
+
+    // Image Generation State
+    const [messageImages, setMessageImages] = useState<Record<string, string>>({});
+    const [generatingImage, setGeneratingImage] = useState(false);
 
     // Initial load: Fetch sessions
     useEffect(() => {
@@ -114,7 +122,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
     // Auto-scroll
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isOpen, suggestions, fcMode, researchMode, researchResults]);
+    }, [messages, isOpen, suggestions, fcMode, researchMode, researchResults, isStreaming, messageImages, generatingImage]);
 
     const startFlashcardFlow = () => {
         setFcMode('asking_topic');
@@ -396,22 +404,60 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
             await saveChatMessage(studySetId, 'user', userText, activeSessionId || undefined);
 
             const historyForAI = messages.map(m => ({ role: m.role, content: m.content }));
-            const aiResponse = await getZpBotResponse(userText, contextText || '', historyForAI);
 
-            const savedAiMsg = await saveChatMessage(studySetId, 'assistant', aiResponse.text, activeSessionId || undefined);
+            // Create placeholder message for streaming
+            const aiMsgId = (Date.now() + 1).toString();
+            setStreamingMsgId(aiMsgId);
+            setIsStreaming(true);
+            setLoading(false); // Hide loading dots, show streaming cursor instead
 
-            const aiMsgDisplay = savedAiMsg || {
-                id: (Date.now() + 1).toString(),
+            const placeholderMsg: ChatMessage = {
+                id: aiMsgId,
                 role: 'assistant',
-                content: aiResponse.text,
+                content: '',
                 created_at: new Date().toISOString(),
                 study_set_id: studySetId,
                 user_id: 'system',
-                session_id: activeSessionId
+                session_id: activeSessionId || undefined
             };
+            setMessages(prev => [...prev, placeholderMsg]);
 
-            setMessages(prev => [...prev, aiMsgDisplay]);
-            setSuggestions(aiResponse.suggestions || []);
+            // Use streaming response
+            const finalText = await getZpBotResponseStream(
+                userText,
+                contextText || '',
+                historyForAI,
+                // onChunk - update message content in real-time
+                (accumulatedText) => {
+                    setMessages(prev => prev.map(m =>
+                        m.id === aiMsgId ? { ...m, content: accumulatedText } : m
+                    ));
+                },
+                // onComplete - handle suggestions
+                (newSuggestions) => {
+                    setIsStreaming(false);
+                    setStreamingMsgId(null);
+                    setSuggestions(newSuggestions);
+                }
+            );
+
+            // Save final message to DB
+            await saveChatMessage(studySetId, 'assistant', finalText, activeSessionId || undefined);
+
+            // Check if we should generate an image for this response
+            if (isImageServiceAvailable() && shouldGenerateImage(userText, finalText)) {
+                setGeneratingImage(true);
+                try {
+                    const imageResult = await generateEducationalImage(userText, contextText);
+                    if (imageResult?.url) {
+                        setMessageImages(prev => ({ ...prev, [aiMsgId]: imageResult.url }));
+                    }
+                } catch (imgError) {
+                    console.error('Image generation failed:', imgError);
+                } finally {
+                    setGeneratingImage(false);
+                }
+            }
 
         } catch (error) {
             console.error('Error in chat loop', error);
@@ -548,11 +594,32 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                                             }`}
                                     >
                                         {msg.content}
+                                        {/* Streaming cursor */}
+                                        {isStreaming && msg.id === streamingMsgId && (
+                                            <span className="inline-block w-2 h-4 ml-1 bg-cyan-400 animate-pulse rounded-sm" />
+                                        )}
+
+                                        {/* Generated image */}
+                                        {msg.role === 'assistant' && messageImages[msg.id] && (
+                                            <div className="mt-3 rounded-lg overflow-hidden border border-slate-600">
+                                                <img
+                                                    src={messageImages[msg.id]}
+                                                    alt="Ilustracion educativa"
+                                                    className="w-full h-auto"
+                                                    loading="lazy"
+                                                />
+                                                <div className="bg-slate-700/50 px-2 py-1 text-[10px] text-slate-400 flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-xs">auto_awesome</span>
+                                                    Imagen generada por IA
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))}
 
-                            {loading && (
+                            {/* Loading indicator (only when not streaming) */}
+                            {loading && !isStreaming && (
                                 <div className="flex justify-start">
                                     <div className="bg-slate-800 border border-slate-700 rounded-2xl rounded-tl-none p-4 shadow-sm">
                                         <div className="flex gap-1.5">
@@ -560,6 +627,16 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                                             <span className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce delay-100"></span>
                                             <span className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce delay-200"></span>
                                         </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Image generation indicator */}
+                            {generatingImage && (
+                                <div className="flex justify-start pl-4">
+                                    <div className="flex items-center gap-2 text-xs text-cyan-400 bg-slate-800/50 px-3 py-2 rounded-xl border border-cyan-500/20">
+                                        <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
+                                        Generando ilustracion...
                                     </div>
                                 </div>
                             )}
@@ -602,10 +679,19 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                                 <div className="space-y-3 pl-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="bg-slate-800 border border-cyan-500/30 rounded-2xl p-4 shadow-lg shadow-cyan-900/10">
                                         <div className="flex justify-between items-center mb-3">
-                                            <h5 className="text-cyan-400 font-bold text-sm flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-lg">travel_explore</span>
-                                                Resultados de Investigación ({researchResults.length})
-                                            </h5>
+                                            <div className="flex flex-col gap-1">
+                                                <h5 className="text-cyan-400 font-bold text-sm flex items-center gap-2">
+                                                    <span className="material-symbols-outlined text-lg">travel_explore</span>
+                                                    Resultados de Investigacion ({researchResults.length})
+                                                </h5>
+                                                {/* Real search badge */}
+                                                {isSearchServiceAvailable() && (
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[10px] text-green-400">verified</span>
+                                                        <span className="text-[10px] text-green-400 font-medium">URLs verificadas de internet</span>
+                                                    </div>
+                                                )}
+                                            </div>
                                             <button
                                                 onClick={() => { setResearchMode('idle'); setResearchResults([]); }}
                                                 className="text-slate-400 hover:text-white"

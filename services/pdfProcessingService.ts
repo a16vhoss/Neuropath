@@ -1,177 +1,170 @@
-import { SchemaType } from "@google/generative-ai";
+import { Type } from "@google/genai";
 import { getBestGeminiModel, getGeminiSDK } from "./geminiModelManager";
 
 /**
- * Call Gemini API using SDK with Dynamic Model Resolution
+ * Helper to generate content with the new SDK
  */
-const callGemini = async (prompt: string, pdfBase64?: string, options: { jsonMode?: boolean, responseSchema?: any } = {}): Promise<string | null> => {
-    const genAI = getGeminiSDK();
-    if (!genAI) return null;
+const generateContent = async (
+  prompt: string,
+  options?: {
+    model?: string;
+    jsonSchema?: any;
+    temperature?: number;
+    maxTokens?: number;
+    pdfBase64?: string;
+  }
+) => {
+  const ai = getGeminiSDK();
+  if (!ai) throw new Error("Gemini SDK not initialized");
 
-    try {
-        const modelName = await getBestGeminiModel();
+  const modelName = options?.model || await getBestGeminiModel();
 
-        const modelConfig: any = { model: modelName };
-        if (options.jsonMode) {
-            modelConfig.generationConfig = {
-                responseMimeType: "application/json",
-                responseSchema: options.responseSchema
-            };
-        }
+  const config: any = {};
 
-        const model = genAI.getGenerativeModel(modelConfig);
+  if (options?.jsonSchema) {
+    config.responseMimeType = "application/json";
+    config.responseSchema = options.jsonSchema;
+  }
 
-        let result;
-        if (pdfBase64) {
-            result = await model.generateContent([
-                { inlineData: { mimeType: "application/pdf", data: pdfBase64 } },
-                prompt
-            ]);
-        } else {
-            result = await model.generateContent(prompt);
-        }
-        return result.response.text();
-    } catch (error) {
-        console.error('Error calling Gemini:', error);
-        return null; // Model manager logs errors too
-    }
+  if (options?.temperature !== undefined) {
+    config.temperature = options.temperature;
+  }
+
+  if (options?.maxTokens) {
+    config.maxOutputTokens = options.maxTokens;
+  }
+
+  let contents: any = prompt;
+
+  if (options?.pdfBase64) {
+    contents = [
+      { inlineData: { mimeType: "application/pdf", data: options.pdfBase64 } },
+      prompt
+    ];
+  }
+
+  const response = await ai.models.generateContent({
+    model: modelName,
+    contents,
+    config: Object.keys(config).length > 0 ? config : undefined
+  });
+
+  return response.text || "";
 };
 
 /**
  * Extract text content from a PDF file using Gemini
  */
 export const extractTextFromPDF = async (pdfBase64: string): Promise<string | null> => {
-    const genAI = getGeminiSDK();
-    if (!genAI) return null;
-
+  try {
     const prompt = `Analiza este documento PDF y extrae TODO el texto legible. Mantén la estructura original. Devuelve SOLO texto plano.`;
-
-    try {
-        const modelName = await getBestGeminiModel();
-        const model = genAI.getGenerativeModel({ model: modelName });
-
-        const result = await model.generateContent([
-            { inlineData: { mimeType: "application/pdf", data: pdfBase64 } },
-            prompt
-        ]);
-        return result.response.text();
-    } catch (e: any) {
-        console.error('Error extracting PDF text:', e);
-        // Fallback or alert could go here, but Manager handles best-effort
-        return null;
-    }
+    return await generateContent(prompt, { pdfBase64 });
+  } catch (e: any) {
+    console.error('Error extracting PDF text:', e);
+    return null;
+  }
 };
 
 /**
  * Generate flashcards from extracted text using Gemini
  */
 export const generateFlashcardsFromText = async (
-    text: string,
-    topic: string,
-    count: number = 10
+  text: string,
+  topic: string,
+  count: number = 10
 ): Promise<{ question: string; answer: string; category: string }[] | null> => {
-    const genAI = getGeminiSDK();
-    if (!genAI) return null;
+  try {
+    const schema = {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          question: { type: Type.STRING },
+          answer: { type: Type.STRING },
+          category: { type: Type.STRING },
+          source_name: { type: Type.STRING }
+        },
+        required: ["question", "answer", "category", "source_name"]
+      }
+    };
 
     const prompt = `
-        OBJETIVO: Genera EXACTAMENTE ${count} flashcards de alta calidad sobre el tema "${topic}".
-        
-        INSTRUCCIONES DE COBERTURA Y FUENTES:
-        1. ESCANEO PROFUNDO: Lee el texto párrafo por párrafo.
-        2. EXTRACCIÓN DISTINTA: Identifica conceptos significativos.
-        3. COBERTURA TOTAL: Cubre todo el material.
-        4. NIVEL DE DETALLE: Entra en tecnicismos y ejemplos específicos.
-        5. CANTIDAD EXACTA: Genera EXACTAMENTE ${count} tarjetas.
-        6. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material de donde proviene en el campo "source_name". Si el texto tiene marcadores como "[MATERIAL: Nombre]", usa ese nombre.
-        7. IDIOMA: Español.
-        
-        TEXTO DE REFERENCIA (ESCANEAR TODO):
-        ${text.slice(0, 100000)}
+      OBJETIVO: Genera EXACTAMENTE ${count} flashcards de alta calidad sobre el tema "${topic}".
+
+      INSTRUCCIONES DE COBERTURA Y FUENTES:
+      1. ESCANEO PROFUNDO: Lee el texto párrafo por párrafo.
+      2. EXTRACCIÓN DISTINTA: Identifica conceptos significativos.
+      3. COBERTURA TOTAL: Cubre todo el material.
+      4. NIVEL DE DETALLE: Entra en tecnicismos y ejemplos específicos.
+      5. CANTIDAD EXACTA: Genera EXACTAMENTE ${count} tarjetas.
+      6. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material de donde proviene en el campo "source_name".
+      7. IDIOMA: Español.
+
+      TEXTO DE REFERENCIA (ESCANEAR TODO):
+      ${text.slice(0, 100000)}
     `;
 
-    try {
-        const modelName = await getBestGeminiModel('pro');
-        console.log(`Using model ${modelName} for ${count} flashcards`);
+    const result = await generateContent(prompt, {
+      jsonSchema: schema,
+      temperature: 0.7,
+      maxTokens: 8192
+    });
 
-        const model = genAI.getGenerativeModel({
-            model: modelName,
-            generationConfig: {
-                maxOutputTokens: 8192,
-                temperature: 0.7,
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: SchemaType.ARRAY,
-                    items: {
-                        type: SchemaType.OBJECT,
-                        properties: {
-                            question: { type: SchemaType.STRING },
-                            answer: { type: SchemaType.STRING },
-                            category: { type: SchemaType.STRING },
-                            source_name: { type: SchemaType.STRING }
-                        },
-                        required: ["question", "answer", "category", "source_name"]
-                    }
-                }
-            }
-        });
-        const result = await model.generateContent(prompt);
-        return JSON.parse(result.response.text());
-    } catch (error) {
-        console.error('Error generating flashcards:', error);
-        return null;
-    }
+    return JSON.parse(result);
+  } catch (error) {
+    console.error('Error generating flashcards:', error);
+    return null;
+  }
 };
 
 export const generateStudyGuideFromMaterials = async (materialsContent: string[], studySetName: string, currentGuide?: string): Promise<string | null> => {
-    if (materialsContent.length === 0) return null;
-    const genAI = getGeminiSDK();
-    if (!genAI) return null;
+  if (materialsContent.length === 0) return null;
 
-    const masterPrompt = `
-# 📚 PROMPT MAESTRO: GENERADOR DE GUÍAS DE ESTUDIO ADAPTATIVAS MULTIDISCIPLINARIAS
+  const masterPrompt = `
+# PROMPT MAESTRO: GENERADOR DE GUÍAS DE ESTUDIO ADAPTATIVAS MULTIDISCIPLINARIAS
 
-## 🎯 CONTEXT
-Eres un experto pedagógico universitario con más de 20 años de experiencia en diseño curricular, didáctica avanzada y síntesis de conocimiento multidisciplinario. Tu especialidad es transformar materiales diversos, complejos y a veces desorganizados en guías de estudio coherentes, profundas y perfectamente adaptadas a cada disciplina académica.
+## CONTEXT
+Eres un experto pedagógico universitario con más de 20 años de experiencia en diseño curricular, didáctica avanzada y síntesis de conocimiento multidisciplinario.
 
-## 👤 ROLE
-Asumes el rol de **Arquitecto Pedagógico Adaptativo**, con maestría en análisis y síntesis de información académica compleja y diseño instruccional basado en evidencia.
+## ROLE
+Asumes el rol de **Arquitecto Pedagógico Adaptativo**.
 
-## ⚙️ ACTION
+## ACTION
 ### PASO 1: ANÁLISIS PROFUNDO
 1. Lee y procesa todos los materiales proporcionados.
 2. Identifica automáticamente la(s) disciplina(s), nivel de profundidad, conceptos centrales y relaciones entre temas.
 
 ### PASO 2: ARQUITECTURA DE LA GUÍA
 Diseña una estructura que incluya las siguientes secciones:
-#### 📌 SECCIÓN 1: PANORAMA GENERAL
+#### SECCIÓN 1: PANORAMA GENERAL
 - Resumen ejecutivo y objetivos de aprendizaje.
 
-#### 📌 SECCIÓN 2: DESARROLLO CONCEPTUAL PROFUNDO
+#### SECCIÓN 2: DESARROLLO CONCEPTUAL PROFUNDO
 - Definiciones precisas con contexto académico.
-- Explicaciones detalladas adaptadas a la disciplina (STEM, Negocios, Derecho, Salud, IT, Sociales, Humanidades).
+- Explicaciones detalladas adaptadas a la disciplina.
 
-#### 📌 SECCIÓN 3: INTEGRACIÓN INTERDISCIPLINARIA
+#### SECCIÓN 3: INTEGRACIÓN INTERDISCIPLINARIA
 - Explica las conexiones entre diferentes materias si aplica.
 
-#### 📌 SECCIÓN 4: HERRAMIENTAS PEDAGÓGICAS
+#### SECCIÓN 4: HERRAMIENTAS PEDAGÓGICAS
 - Mnemotecnias, analogías, ejemplos del mundo real y mapas conceptuales textuales.
 
-#### 📌 SECCIÓN 5: PRÁCTICA Y APLICACIÓN
+#### SECCIÓN 5: PRÁCTICA Y APLICACIÓN
 - Banco de ejercicios clasificados por dificultad con resolución paso a paso.
 
-#### 📌 SECCIÓN 6: AUTOEVALUACIÓN
+#### SECCIÓN 6: AUTOEVALUACIÓN
 - Preguntas de comprensión, aplicación y síntesis con respuestas justificadas.
 
-#### 📌 SECCIÓN 7: PUNTOS CRÍTICOS Y ERRORES COMUNES
+#### SECCIÓN 7: PUNTOS CRÍTICOS Y ERRORES COMUNES
 - Conceptos confusos y advertencias importantes.
 
-## 📄 FORMAT
+## FORMAT
 - Usa jerarquía de encabezados (##, ###, ####).
 - **Negritas** para términos clave, *cursivas* para énfasis.
 - \`Código\` para elementos técnicos (fórmulas, sintaxis).
 - Listas y separadores visuales (---).
 
-## 🎓 TARGET AUDIENCE
+## TARGET AUDIENCE
 Estudiantes universitarios que buscan dominio profundo y preparación para exámenes de alto nivel.
 
 ---
@@ -182,38 +175,31 @@ ${materialsContent.map((t, i) => `[MATERIAL ${i + 1}]:\n${t.slice(0, 100000)}`).
 Genera la guía de estudio más completa, clara y efectiva posible basándote en los materiales anteriores.
 `;
 
-    const prompt = masterPrompt;
-
-    try {
-        const modelName = await getBestGeminiModel();
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(prompt);
-        return result.response.text();
-    } catch (error) {
-        console.error('Error generating study guide:', error);
-        return null;
-    }
+  try {
+    return await generateContent(masterPrompt);
+  } catch (error) {
+    console.error('Error generating study guide:', error);
+    return null;
+  }
 };
 
 export const generateInfographicFromMaterials = async (materialsContent: string[], studySetName: string): Promise<string | null> => {
-    if (materialsContent.length === 0) return null;
-    const genAI = getGeminiSDK();
-    if (!genAI) return null;
+  if (materialsContent.length === 0) return null;
 
-    const infographicPrompt = `
-# 🎨 ARQUITECTO DE INFOGRAFÍAS PEDAGÓGICAS
+  const infographicPrompt = `
+# ARQUITECTO DE INFOGRAFÍAS PEDAGÓGICAS
 Eres un experto en comunicación visual y síntesis de información. Tu objetivo es transformar materiales académicos en un "blueprint" de infografía de alto impacto.
 
-## 🎯 ESTRUCTURA REQUERIDA (MANTENER ESTOS ENCABEZADOS):
-### 🚀 TÍTULO IMPACTANTE: [Nombre del Tema]
-### 💡 IDEA CENTRAL: [Resumen en una frase]
-### 📊 DATOS/CONCEPTOS CLAVE:
+## ESTRUCTURA REQUERIDA (MANTENER ESTOS ENCABEZADOS):
+### TÍTULO IMPACTANTE: [Nombre del Tema]
+### IDEA CENTRAL: [Resumen en una frase]
+### DATOS/CONCEPTOS CLAVE:
 - [Concepto 1]: [Explicación breve + Icono sugerido]
 - [Concepto 2]: [Explicación breve + Icono sugerido]
-### 🔄 PROCESO O FLUJO:
+### PROCESO O FLUJO:
 - Paso 1: [Descripción]
 - Paso 2: [Descripción]
-### 📌 CONCLUSIÓN VISUAL:
+### CONCLUSIÓN VISUAL:
 - [Punto final clave]
 
 ---
@@ -224,40 +210,35 @@ ${materialsContent.map(t => t.slice(0, 10000)).join('\n\n')}
 Genera el contenido para la infografía más clara y visualmente estructurada posible.
 `;
 
-    try {
-        const modelName = await getBestGeminiModel();
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(infographicPrompt);
-        return result.response.text();
-    } catch (error) {
-        console.error('Error generating infographic:', error);
-        return null;
-    }
+  try {
+    return await generateContent(infographicPrompt);
+  } catch (error) {
+    console.error('Error generating infographic:', error);
+    return null;
+  }
 };
 
 export const generatePresentationFromMaterials = async (materialsContent: string[], studySetName: string): Promise<string | null> => {
-    if (materialsContent.length === 0) return null;
-    const genAI = getGeminiSDK();
-    if (!genAI) return null;
+  if (materialsContent.length === 0) return null;
 
-    const presentationPrompt = `
-# 📽️ DISEÑADOR DE PRESENTACIONES EJECUTIVAS
+  const presentationPrompt = `
+# DISEÑADOR DE PRESENTACIONES EJECUTIVAS
 Eres un experto en oratoria y diseño de presentaciones. Crea una estructura de diapositivas (slides) para una exposición de alto nivel.
 
-## 🎯 FORMATO REQUERIDA (MANTENER ESTO):
-### 🎬 SLIDE 1: PORTADA
+## FORMATO REQUERIDA (MANTENER ESTO):
+### SLIDE 1: PORTADA
 - Título: [Nombre]
 - Subtítulo: [Propósito]
 
-### 📝 SLIDE 2: AGENDA
+### SLIDE 2: AGENDA
 - Puntos que se tratarán.
 
-### 🖼️ SLIDE [N]: [TÍTULO DE LA DIAPOSITIVA]
+### SLIDE [N]: [TÍTULO DE LA DIAPOSITIVA]
 - [Punto clave 1]
 - [Punto clave 2]
 - **Nota del orador:** [Explicación para el presentador]
 
-### 🏁 SLIDE FINAL: CIERRE Y PREGUNTAS
+### SLIDE FINAL: CIERRE Y PREGUNTAS
 - Resumen final.
 
 ---
@@ -268,92 +249,67 @@ ${materialsContent.map(t => t.slice(0, 10000)).join('\n\n')}
 Genera una presentación de entre 8 y 12 slides.
 `;
 
-    try {
-        const modelName = await getBestGeminiModel();
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(presentationPrompt);
-        return result.response.text();
-    } catch (error) {
-        console.error('Error generating presentation:', error);
-        return null;
-    }
+  try {
+    return await generateContent(presentationPrompt);
+  } catch (error) {
+    console.error('Error generating presentation:', error);
+    return null;
+  }
 };
 
 export const generateMaterialSummary = async (content: string, type: 'pdf' | 'text' | 'url' | 'video'): Promise<string | null> => {
-    const genAI = getGeminiSDK();
-    if (!genAI || !content) return null;
+  if (!content) return null;
 
+  try {
     const summaryPrompt = `Resume esto (${type}): ${content.slice(0, 50000)}`;
-
-    try {
-        const modelName = await getBestGeminiModel();
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(summaryPrompt);
-        return result.response.text();
-    } catch (error) {
-        console.error('Error generating material summary:', error);
-        return null;
-    }
+    return await generateContent(summaryPrompt);
+  } catch (error) {
+    console.error('Error generating material summary:', error);
+    return null;
+  }
 };
 
 /**
  * Generate quiz questions with dynamic model
  */
 export const generateQuizFromText = async (
-    text: string,
-    topic: string,
-    count: number = 5
+  text: string,
+  topic: string,
+  count: number = 5
 ): Promise<{ question: string; options: string[]; correctIndex: number; explanation: string }[] | null> => {
-    const genAI = getGeminiSDK();
-    if (!genAI) return null;
+  try {
+    const schema = {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          question: { type: Type.STRING },
+          options: { type: Type.ARRAY, items: { type: Type.STRING } },
+          correctIndex: { type: Type.NUMBER },
+          explanation: { type: Type.STRING }
+        },
+        required: ["question", "options", "correctIndex", "explanation"]
+      }
+    };
 
     const prompt = `Genera ${count} preguntas de quiz sobre "${topic}". JSON.`;
-
-    try {
-        const modelName = await getBestGeminiModel();
-        const model = genAI.getGenerativeModel({
-            model: modelName,
-            generationConfig: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: SchemaType.ARRAY,
-                    items: {
-                        type: SchemaType.OBJECT,
-                        properties: {
-                            question: { type: SchemaType.STRING },
-                            options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-                            correctIndex: { type: SchemaType.NUMBER },
-                            explanation: { type: SchemaType.STRING }
-                        },
-                        required: ["question", "options", "correctIndex", "explanation"]
-                    }
-                }
-            }
-        });
-        const result = await model.generateContent(prompt);
-        return JSON.parse(result.response.text());
-    } catch (error) {
-        console.error('Error generating quiz:', error);
-        return null;
-    }
+    const result = await generateContent(prompt, { jsonSchema: schema });
+    return JSON.parse(result);
+  } catch (error) {
+    console.error('Error generating quiz:', error);
+    return null;
+  }
 };
 
 /**
  * Generate study summary with dynamic model
  */
 export const generateStudySummary = async (text: string, topic: string): Promise<string | null> => {
-    const genAI = getGeminiSDK();
-    if (!genAI) return null;
-
+  try {
     const prompt = `Resume esto: ${text.slice(0, 5000)}`;
-
-    try {
-        const modelName = await getBestGeminiModel();
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(prompt);
-        return result.response.text();
-    } catch (error) {
-        console.error('Error generating study summary:', error);
-        return null;
-    }
+    return await generateContent(prompt);
+  } catch (error) {
+    console.error('Error generating study summary:', error);
+    return null;
+  }
 };
