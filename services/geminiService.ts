@@ -872,13 +872,6 @@ export const generateUnstructuredNoteContent = async (
 
   try {
     const modelName = await getBestGeminiModel('pro');
-    const model = genAI.getGenerativeModel({
-      model: modelName,
-      generationConfig: {
-        maxOutputTokens: 1000,
-        temperature: 0.7, // Higher creativity for drafting
-      }
-    });
 
     const systemPrompt = `
       Eres un experto asistente de redacción académica. Ayuda al estudiante a completar sus notas.
@@ -899,8 +892,20 @@ export const generateUnstructuredNoteContent = async (
       - Sé directo y útil.
     `;
 
-    const result = await model.generateContent(systemPrompt);
-    return result.response.text();
+    const response = await genAI.models.generateContent({
+      model: modelName,
+      contents: systemPrompt,
+      config: {
+        maxOutputTokens: 1000,
+        temperature: 0.7,
+      }
+    });
+
+    // Handle potential markdown code block wrapping in the output
+    let text = response.text || '';
+    text = text.replace(/^```html\s*/i, '').replace(/\s*```$/, '');
+
+    return text;
 
   } catch (error) {
     console.error("Error in AI Notebook Gen:", error);
