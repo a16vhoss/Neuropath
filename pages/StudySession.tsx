@@ -393,24 +393,53 @@ const StudySession: React.FC = () => {
       const adaptiveQuestions = await generateAdaptiveQuiz(studySetId, user.id, config);
 
       if (adaptiveQuestions && adaptiveQuestions.length > 0) {
-        const mappedQuestions: QuizQuestion[] = adaptiveQuestions.map((q, i) => ({
-          id: q.id,
-          question: q.question,
-          options: q.options,
-          correctIndex: q.correctIndex,
-          explanation: q.explanation,
-          type: q.type as any, // Cast if needed
-          scenario: q.scenario,
-          designPrompt: q.designPrompt,
-          evaluationCriteria: q.evaluationCriteria,
-          realWorldExample: q.realWorldExample,
-          // God Mode Mappings
-          orderingItems: q.orderingItems,
-          matchingPairs: q.matchingPairs,
-          fillBlankText: q.fillBlankText,
-          fillBlankAnswers: q.fillBlankAnswers,
-          errorText: q.errorText
-        }));
+        const mappedQuestions: QuizQuestion[] = adaptiveQuestions.map((q, i) => {
+          // Validate special question types have required fields
+          let questionType = q.type as any;
+
+          // If ordering type but no items, convert to multiple_choice
+          if (questionType === 'ordering' && (!q.orderingItems || q.orderingItems.length === 0)) {
+            console.warn('[Quiz] Ordering question missing items, converting to multiple_choice');
+            questionType = 'multiple_choice';
+          }
+
+          // If matching type but no pairs, convert to multiple_choice
+          if (questionType === 'matching' && (!q.matchingPairs || q.matchingPairs.length === 0)) {
+            console.warn('[Quiz] Matching question missing pairs, converting to multiple_choice');
+            questionType = 'multiple_choice';
+          }
+
+          // If fill_blank but no text, convert to multiple_choice
+          if (questionType === 'fill_blank' && !q.fillBlankText) {
+            console.warn('[Quiz] Fill blank question missing text, converting to multiple_choice');
+            questionType = 'multiple_choice';
+          }
+
+          // If identify_error but no error text, convert to multiple_choice
+          if (questionType === 'identify_error' && !q.errorText) {
+            console.warn('[Quiz] Identify error question missing text, converting to multiple_choice');
+            questionType = 'multiple_choice';
+          }
+
+          return {
+            id: q.id,
+            question: q.question,
+            options: q.options || ['Opción A', 'Opción B', 'Opción C', 'Opción D'],
+            correctIndex: q.correctIndex || 0,
+            explanation: q.explanation,
+            type: questionType,
+            scenario: q.scenario,
+            designPrompt: q.designPrompt,
+            evaluationCriteria: q.evaluationCriteria,
+            realWorldExample: q.realWorldExample,
+            // God Mode Mappings
+            orderingItems: q.orderingItems,
+            matchingPairs: q.matchingPairs,
+            fillBlankText: q.fillBlankText,
+            fillBlankAnswers: q.fillBlankAnswers,
+            errorText: q.errorText
+          };
+        });
 
         setQuizQuestions(mappedQuestions);
         setQuizGenerated(true);
