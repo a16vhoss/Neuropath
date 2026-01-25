@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getZpBotResponseStream, generatePromptedFlashcards, searchInternet, generateResearchClarifications, isSearchServiceAvailable } from '../services/geminiService';
 import { addFlashcardsBatch, createMaterialWithFlashcards } from '../services/supabaseClient';
 import { generateFlashcardsFromText } from '../services/pdfProcessingService';
-import { generateEducationalImage, shouldGenerateImage, isImageServiceAvailable } from '../services/imageGenerationService';
+import { generateEducationalImage, generateImageDescription, shouldGenerateImage, isImageServiceAvailable } from '../services/imageGenerationService';
 import {
     saveChatMessage,
     ChatMessage,
@@ -40,7 +40,9 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
 
     // Image Generation State
     const [messageImages, setMessageImages] = useState<Record<string, string>>({});
+    const [messageImageDescriptions, setMessageImageDescriptions] = useState<Record<string, string>>({});
     const [generatingImage, setGeneratingImage] = useState(false);
+    const [generatingImageDescription, setGeneratingImageDescription] = useState(false);
 
     // Initial load: Fetch sessions
     useEffect(() => {
@@ -122,7 +124,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
     // Auto-scroll
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isOpen, suggestions, fcMode, researchMode, researchResults, isStreaming, messageImages, generatingImage]);
+    }, [messages, isOpen, suggestions, fcMode, researchMode, researchResults, isStreaming, messageImages, messageImageDescriptions, generatingImage, generatingImageDescription]);
 
     const startFlashcardFlow = () => {
         setFcMode('asking_topic');
@@ -451,10 +453,23 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                     const imageResult = await generateEducationalImage(userText, contextText);
                     if (imageResult?.url) {
                         setMessageImages(prev => ({ ...prev, [aiMsgId]: imageResult.url }));
+                        setGeneratingImage(false);
+
+                        // Now generate description of the image
+                        setGeneratingImageDescription(true);
+                        try {
+                            const description = await generateImageDescription(userText, imageResult.url);
+                            if (description) {
+                                setMessageImageDescriptions(prev => ({ ...prev, [aiMsgId]: description }));
+                            }
+                        } catch (descError) {
+                            console.error('Image description failed:', descError);
+                        } finally {
+                            setGeneratingImageDescription(false);
+                        }
                     }
                 } catch (imgError) {
                     console.error('Image generation failed:', imgError);
-                } finally {
                     setGeneratingImage(false);
                 }
             }
@@ -599,7 +614,7 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                                             <span className="inline-block w-2 h-4 ml-1 bg-cyan-400 animate-pulse rounded-sm" />
                                         )}
 
-                                        {/* Generated image */}
+                                        {/* Generated image with description */}
                                         {msg.role === 'assistant' && messageImages[msg.id] && (
                                             <div className="mt-3 rounded-lg overflow-hidden border border-slate-600">
                                                 <img
@@ -612,6 +627,15 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                                                     <span className="material-symbols-outlined text-xs">auto_awesome</span>
                                                     Imagen generada por IA
                                                 </div>
+                                                {/* Image description */}
+                                                {messageImageDescriptions[msg.id] && (
+                                                    <div className="bg-slate-800 px-3 py-2 border-t border-slate-600">
+                                                        <p className="text-xs text-slate-300 leading-relaxed">
+                                                            <span className="font-semibold text-cyan-400">Sobre la imagen: </span>
+                                                            {messageImageDescriptions[msg.id]}
+                                                        </p>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -637,6 +661,16 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                                     <div className="flex items-center gap-2 text-xs text-cyan-400 bg-slate-800/50 px-3 py-2 rounded-xl border border-cyan-500/20">
                                         <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
                                         Generando ilustracion...
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Image description generation indicator */}
+                            {generatingImageDescription && (
+                                <div className="flex justify-start pl-4">
+                                    <div className="flex items-center gap-2 text-xs text-emerald-400 bg-slate-800/50 px-3 py-2 rounded-xl border border-emerald-500/20">
+                                        <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
+                                        Describiendo la imagen...
                                     </div>
                                 </div>
                             )}

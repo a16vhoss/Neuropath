@@ -3,11 +3,12 @@
  * Generates diagrams and illustrations for educational concepts
  */
 
-import { getGeminiSDK, getImageModel } from "./geminiModelManager";
+import { getGeminiSDK, getImageModel, getBestGeminiModel } from "./geminiModelManager";
 
 export interface GeneratedImage {
   url: string;
   prompt: string;
+  description?: string;
 }
 
 /**
@@ -24,18 +25,34 @@ export const generateEducationalImage = async (
   }
 
   try {
-    // Create optimized prompt for educational image - NO TEXT
-    const imagePrompt = `Create a simple, clean educational illustration about: ${concept}.
+    // Create optimized prompt for educational image - ABSOLUTELY NO TEXT
+    // Using negative prompt style and very explicit instructions
+    const imagePrompt = `Generate a pure visual educational diagram about: "${concept}"
 
-CRITICAL REQUIREMENTS:
-- NO TEXT whatsoever - no labels, no words, no letters, no numbers
-- Pure visual illustration only
-- Simple, clean vector-style graphics
-- Bright, vibrant colors
-- Easy to understand visually without any text
-- Minimalist design with clear shapes
-- White or light background
-- Professional educational illustration style`;
+MANDATORY STYLE:
+- Flat design infographic illustration
+- Bold geometric shapes
+- Vibrant colors on white background
+- Icons and symbols only
+- Scientific/educational diagram style
+- Clean vector graphics
+
+ABSOLUTELY FORBIDDEN (will reject the image):
+- Any letters (A-Z, a-z)
+- Any numbers (0-9)
+- Any words or labels
+- Any text annotations
+- Any writing of any kind
+- Any symbols that look like text
+
+The image must communicate the concept PURELY through visual elements like:
+- Arrows showing flow/direction
+- Color coding to show relationships
+- Size differences to show importance
+- Shapes to represent different elements
+- Icons to represent concepts
+
+Create a professional, text-free educational illustration.`;
 
     console.log('Generating educational image with Gemini...');
 
@@ -70,6 +87,61 @@ CRITICAL REQUIREMENTS:
 
   } catch (error) {
     console.error('Image generation error:', error);
+    return null;
+  }
+};
+
+/**
+ * Generate a description of an educational image
+ * This explains what the image shows to the user
+ */
+export const generateImageDescription = async (
+  concept: string,
+  imageUrl: string
+): Promise<string | null> => {
+  const ai = getGeminiSDK();
+  if (!ai) return null;
+
+  try {
+    const modelName = await getBestGeminiModel();
+
+    // Extract base64 data from data URL
+    const base64Match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!base64Match) {
+      console.warn('Invalid image URL format for description');
+      return null;
+    }
+
+    const mimeType = base64Match[1];
+    const base64Data = base64Match[2];
+
+    const prompt = `Observa esta imagen educativa sobre "${concept}" y describe lo que muestra de forma clara y concisa en español.
+
+INSTRUCCIONES:
+- Explica qué elementos visuales hay en la imagen
+- Describe cómo estos elementos representan el concepto
+- Usa un tono educativo y amigable
+- Máximo 2-3 oraciones
+- NO uses emojis
+
+Ejemplo de formato: "La imagen muestra [descripción]. Los colores/flechas/formas representan [explicación]."`;
+
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: [
+        {
+          inlineData: {
+            mimeType: mimeType,
+            data: base64Data
+          }
+        },
+        prompt
+      ]
+    });
+
+    return response.text || null;
+  } catch (error) {
+    console.error('Error generating image description:', error);
     return null;
   }
 };
