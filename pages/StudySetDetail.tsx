@@ -1479,9 +1479,9 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                         </span>
                                                     )}
                                                     {card.is_ai_generated && (
-                                                        <span className="bg-cyan-50 text-cyan-600 text-xs font-bold px-2 py-1 rounded border border-cyan-100 flex items-center gap-1" title="Generada por IA">
-                                                            <span className="material-symbols-outlined text-sm">smart_toy</span>
-                                                            IA
+                                                        <span className="bg-emerald-500 text-white text-[10px] font-black px-2 py-1 rounded-full flex items-center gap-1 shadow-sm ring-1 ring-emerald-600/20 animate-pulse-slow" title="Potenciado con IA">
+                                                            <span className="material-symbols-outlined text-[12px]">auto_awesome</span>
+                                                            AI BOT
                                                         </span>
                                                     )}
                                                     {card.source_name && (
