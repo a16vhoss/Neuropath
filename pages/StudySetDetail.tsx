@@ -1464,7 +1464,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                         ) : (
                             <div className="space-y-3">
                                 {studySet.flashcards.map((card, index) => (
-                                    <div key={card.id} className="bg-white rounded-xl p-4 border border-slate-100 hover:shadow-md transition">
+                                    <div key={card.id} className={`bg-white rounded-xl p-4 border transition ${card.is_ai_generated || card.category?.includes('AI') ? 'border-emerald-100 border-l-4 border-l-emerald-500 shadow-sm shadow-emerald-50' : 'border-slate-100 hover:shadow-md'}`}>
                                         <div className="flex justify-between items-start">
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 mb-2">
@@ -1483,8 +1483,8 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                             {'⭐'.repeat(flashcardProgress.get(card.id)?.difficulty_level || 1)} Nv.{flashcardProgress.get(card.id)?.difficulty_level || 1}
                                                         </span>
                                                     )}
-                                                    {card.is_ai_generated && (
-                                                        <span className="bg-emerald-500 text-white text-[10px] font-black px-2 py-1 rounded-full flex items-center gap-1 shadow-sm ring-1 ring-emerald-600/20 animate-pulse-slow" title="Potenciado con IA">
+                                                    {(card.is_ai_generated || card.category?.includes('AI')) && (
+                                                        <span className="bg-emerald-500 text-white text-[10px] font-black px-2 py-1 rounded-full flex items-center gap-1 shadow-sm ring-1 ring-emerald-600/20" title="Potenciado con IA">
                                                             <span className="material-symbols-outlined text-[12px]">auto_awesome</span>
                                                             AI BOT
                                                         </span>
