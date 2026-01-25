@@ -460,41 +460,45 @@ const NotebookEditor: React.FC<NotebookEditorProps> = ({
         <div className="h-20"></div> {/* Bottom spacer */}
       </div>
 
-      {/* Floating Action Bar (Bottom Right) */}
+      {/* Floating Dock (Bottom Center) */}
       {canEdit && (
-        <div className="fixed bottom-8 right-8 flex flex-col gap-3 z-30">
-          {/* Quick Draft Button */}
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 p-1.5 bg-white/90 backdrop-blur-xl rounded-full shadow-2xl border border-white/20 ring-1 ring-slate-900/5 animate-in slide-in-from-bottom-4 duration-500">
+
+          {/* Quick Save (Draft) */}
           <button
             onClick={handleQuickSave}
             disabled={isSaving || !hasUnsavedChanges}
-            className={`p-4 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center group ${hasUnsavedChanges ? 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200' : 'bg-white/0 text-transparent shadow-none pointer-events-none'
+            className={`p-3 rounded-full transition-all duration-300 flex items-center justify-center ${hasUnsavedChanges
+                ? 'bg-slate-50 text-slate-600 hover:bg-white hover:shadow-sm hover:text-indigo-600'
+                : 'bg-transparent text-slate-300'
               }`}
-            title="Guardar borrador"
+            title={hasUnsavedChanges ? "Guardar borrador" : "Sin cambios"}
           >
-            <span className="material-symbols-outlined group-hover:scale-110 transition-transform">save_as</span>
+            <span className="material-symbols-outlined text-[20px]">save_as</span>
           </button>
 
+          <div className="w-px h-8 bg-slate-200/80 mx-1" />
 
-          {/* Main Save Button */}
+          {/* Main Save & Generate Button */}
           <button
             onClick={handleSave}
             disabled={isSaving || isGenerating}
-            className={`group flex items-center gap-3 pl-5 pr-2 py-2 rounded-full shadow-xl transition-all duration-300 ${isGenerating ? 'bg-indigo-600 cursor-wait' : 'bg-indigo-600 hover:bg-indigo-700 hover:scale-105 hover:shadow-2xl'
+            className={`flex items-center gap-3 pl-5 pr-2 py-2 rounded-full transition-all duration-300 group ${isGenerating ? 'bg-indigo-600 cursor-wait' : 'bg-slate-900 hover:bg-indigo-600 hover:shadow-lg hover:shadow-indigo-500/30'
               } text-white`}
           >
-            <div className="flex flex-col items-start min-w-[100px]">
-              <span className="font-bold text-sm">
-                {isGenerating ? 'Generando...' : (isSaving ? 'Guardando...' : 'Guardar Todo')}
+            <div className="flex flex-col items-start">
+              <span className="font-bold text-xs tracking-wide">
+                {isGenerating ? 'GENERANDO...' : (isSaving ? 'GUARDANDO...' : 'GUARDAR TODO')}
               </span>
-              <span className="text-[10px] opacity-80 font-medium">
+              <span className="text-[9px] font-medium opacity-80 uppercase tracking-wider">
                 {isGenerating ? 'Creando Flashcards' : '+ Generar Flashcards'}
               </span>
             </div>
-            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center group-hover:rotate-12 transition-transform">
+            <div className="w-9 h-9 bg-white/10 rounded-full flex items-center justify-center group-hover:scale-110 group-hover:bg-white/20 transition-all">
               {isGenerating || isSaving ? (
-                <span className="material-symbols-outlined animate-spin">sync</span>
+                <span className="material-symbols-outlined text-[18px] animate-spin">sync</span>
               ) : (
-                <span className="material-symbols-outlined">auto_awesome</span>
+                <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
               )}
             </div>
           </button>
