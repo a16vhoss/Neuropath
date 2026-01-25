@@ -807,37 +807,36 @@ export const generateFlashcardsFromNotebook = async (params: {
     const prompt = `
 Eres un experto creador de material de estudio con amplia experiencia en pedagogía.
 
-TAREA: Genera exactamente ${count} flashcards de ALTA CALIDAD basadas en el NUEVO CONTENIDO.
+TAREA: Genera TODAS las flashcards necesarias para cubrir EXHAUSTIVAMENTE el NUEVO CONTENIDO.
 
 CUADERNO: "${notebookTitle}" (parte del set de estudio "${studySetName}")
 
-NUEVO CONTENIDO (genera flashcards ÚNICAMENTE de esto):
+NUEVO CONTENIDO (Analiza cada frase para extraer conocimiento):
 ---
-${newContent.slice(0, 25000)}
+${newContent.slice(0, 30000)}
 ---
 
 ${previousContent ? `
-CONTEXTO PREVIO (usa para entender relaciones y terminología, pero NO generes flashcards de aquí):
+CONTEXTO PREVIO (usa para entender relaciones, NO generes flashcards de aquí):
 ---
 ${previousContent.slice(0, 15000)}
 ---
 ` : ''}
 
 ${existingFlashcards ? `
-FLASHCARDS EXISTENTES (evita preguntas similares o duplicadas):
+FLASHCARDS EXISTENTES (evita duplicados):
 ${existingFlashcards.slice(0, 3000)}
 ` : ''}
 
-REGLAS ESTRICTAS:
-1. Las flashcards deben venir ÚNICAMENTE del nuevo contenido
-2. Usa el contexto previo para entender terminología
-3. Evita preguntas que ya existen
-4. Cada flashcard debe ser autocontenida
-5. Prioriza: definiciones > conceptos clave > relaciones > ejemplos
-6. Categoriza: Definición, Concepto, Relación, Ejemplo, Importante, Proceso, Fórmula
+REGLAS ESTRICTAS DE COBERTURA:
+1. NO HAY LÍMITE DE CANTIDAD. Genera tantas tarjetas como conceptos existan en el texto.
+2. Si hay una lista, intenta crear una tarjeta sobre el concepto general y otras específicas si son importantes.
+3. Prioriza la CALIDAD pero sin sacrificar la COBERTURA. Si está en el texto y es relevante, haz una tarjeta.
+4. Cada flashcard debe ser autocontenida.
+5. Categoriza inteligentemente.
 
 Idioma: Español.
-Genera EXACTAMENTE ${count} flashcards de alta calidad.
+Genera el JSON array con TODAS las tarjetas.
 `;
 
     const result = await generateContent(prompt, {
