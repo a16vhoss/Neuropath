@@ -619,6 +619,7 @@ export const addFlashcardsBatch = async (flashcards: {
     answer: string;
     category?: string;
     material_id?: string;
+    is_ai_generated?: boolean;
 }[]) => {
     const { data, error } = await supabase
         .from('flashcards')
