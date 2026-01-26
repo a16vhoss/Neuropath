@@ -424,7 +424,7 @@ const StudySession: React.FC = () => {
           return {
             id: q.id,
             question: q.question,
-            options: q.options || ['Opción A', 'Opción B', 'Opción C', 'Opción D'],
+            options: q.options || [],
             correctIndex: q.correctIndex || 0,
             explanation: q.explanation,
             type: questionType,
@@ -1361,7 +1361,7 @@ const StudySession: React.FC = () => {
                     {/* TIMER Display */}
                     {(gameMode === 'time_attack' || quizConfig?.timeLimitPerQuestion) && (
                       <div className={`flex items-center gap-2 px-3 py-1 rounded-full font-mono font-bold ${questionTimer < 10 ? 'bg-red-100 text-red-600 animate-pulse' :
-                          'bg-slate-100 text-slate-600'
+                        'bg-slate-100 text-slate-600'
                         }`}>
                         <span className="material-symbols-outlined text-sm">timer</span>
                         {gameMode === 'time_attack' ? (
@@ -1688,15 +1688,15 @@ const StudySession: React.FC = () => {
 
                   {showResult && (
                     <div className={`mt-6 p-4 rounded-xl text-sm relative overflow-hidden transition-all animate-fade-in ${persona === 'strict' ? 'bg-slate-800 text-slate-200 border-l-4 border-red-500' :
-                        persona === 'socratic' ? 'bg-amber-50 text-amber-800 border-l-4 border-amber-500' :
-                          persona === 'friendly' ? 'bg-pink-50 text-pink-800 border-l-4 border-pink-400' :
-                            'bg-blue-50 text-blue-700 border-l-4 border-blue-400'
+                      persona === 'socratic' ? 'bg-amber-50 text-amber-800 border-l-4 border-amber-500' :
+                        persona === 'friendly' ? 'bg-pink-50 text-pink-800 border-l-4 border-pink-400' :
+                          'bg-blue-50 text-blue-700 border-l-4 border-blue-400'
                       }`}>
                       <div className="flex items-start gap-4">
                         <div className={`w-12 h-12 rounded-full shrink-0 flex items-center justify-center text-2xl shadow-sm ${persona === 'strict' ? 'bg-slate-700 text-red-500' :
-                            persona === 'socratic' ? 'bg-amber-100 text-amber-600' :
-                              persona === 'friendly' ? 'bg-pink-100 text-pink-500' :
-                                'bg-blue-100 text-blue-600'
+                          persona === 'socratic' ? 'bg-amber-100 text-amber-600' :
+                            persona === 'friendly' ? 'bg-pink-100 text-pink-500' :
+                              'bg-blue-100 text-blue-600'
                           }`}>
                           {persona === 'strict' ? '👮‍♂️' : persona === 'socratic' ? '🦉' : persona === 'friendly' ? '🎉' : '🤖'}
                         </div>

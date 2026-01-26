@@ -755,7 +755,7 @@ export const generateAdvancedQuiz = async (prompt: string): Promise<any[]> => {
           fillBlankAnswers: { type: Type.ARRAY, items: { type: Type.STRING } },
           errorText: { type: Type.STRING }
         },
-        required: ["question", "explanation", "type"]
+        required: ["question", "explanation", "type", "options", "correctIndex"]
       }
     };
 

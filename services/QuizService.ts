@@ -420,25 +420,43 @@ Return as JSON array. IMPORTANT: Include specific fields for each type:
         const generatedQuestions = await generateAdvancedQuiz(prompt);
 
         if (generatedQuestions && generatedQuestions.length > 0) {
-            return generatedQuestions.map((q: any, i: number) => ({
-                id: `quiz-${Date.now()}-${i}`,
-                type: q.type || 'multiple_choice',
-                question: q.question,
-                options: q.options,
-                correctIndex: q.correctIndex,
-                explanation: q.explanation || '',
-                topic: q.topic || 'General',
-                scenario: q.scenario,
-                designPrompt: q.designPrompt,
-                evaluationCriteria: q.evaluationCriteria,
-                realWorldExample: q.realWorldExample,
-                // Map new fields
-                orderingItems: q.orderingItems,
-                matchingPairs: q.matchingPairs,
-                fillBlankText: q.fillBlankText,
-                fillBlankAnswers: q.fillBlankAnswers,
-                errorText: q.errorText
-            }));
+            return generatedQuestions
+                .filter((q: any) => {
+                    // BASIC VALIDATION to prevent "Opción A" placeholders
+                    if (!q.question) return false;
+
+                    // Types that require options
+                    const optionTypes = ['multiple_choice', 'true_false', 'analysis', 'practical'];
+                    if (optionTypes.includes(q.type || 'multiple_choice')) {
+                        return q.options && Array.isArray(q.options) && q.options.length >= 2;
+                    }
+
+                    // Ordering needs items
+                    if (q.type === 'ordering') {
+                        return q.orderingItems && Array.isArray(q.orderingItems) && q.orderingItems.length >= 2;
+                    }
+
+                    return true;
+                })
+                .map((q: any, i: number) => ({
+                    id: `quiz-${Date.now()}-${i}`,
+                    type: q.type || 'multiple_choice',
+                    question: q.question,
+                    options: q.options || [], // Will be handled by filter above for relevant types
+                    correctIndex: q.correctIndex !== undefined ? q.correctIndex : 0,
+                    explanation: q.explanation || '',
+                    topic: q.topic || 'General',
+                    scenario: q.scenario,
+                    designPrompt: q.designPrompt,
+                    evaluationCriteria: q.evaluationCriteria,
+                    realWorldExample: q.realWorldExample,
+                    // Map new fields
+                    orderingItems: q.orderingItems,
+                    matchingPairs: q.matchingPairs,
+                    fillBlankText: q.fillBlankText,
+                    fillBlankAnswers: q.fillBlankAnswers,
+                    errorText: q.errorText
+                }));
         }
 
         return [];
