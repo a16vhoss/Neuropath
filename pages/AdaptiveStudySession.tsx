@@ -90,11 +90,18 @@ const AdaptiveStudySession: React.FC = () => {
 
             setLoading(true);
 
+            // Parse sets from URL if present
+            const setsParam = searchParams.get('sets');
+            const targetSetIds = setsParam ? setsParam.split(',') : undefined;
+
             try {
                 // Create session
+                // We pass raw array; backend might need adapting if it expects strict Omit<StudySessionConfig, 'userId'> interface that matches exactly implementation
+                // The interface was updated to accept string | string[]
+
                 const newSessionId = await createAdaptiveSession(user.id, {
                     classId: classId || undefined,
-                    studySetId: studySetId || undefined,
+                    studySetId: studySetId || targetSetIds, // Use prop param or URL list
                     mode: modeParam,
                     maxNewCards: 10,
                     maxReviewCards: 30,
@@ -105,7 +112,7 @@ const AdaptiveStudySession: React.FC = () => {
                 const sessionCards = await getCardsForSession({
                     userId: user.id,
                     classId: classId || undefined,
-                    studySetId: studySetId || undefined,
+                    studySetId: studySetId || targetSetIds,
                     mode: modeParam,
                     maxNewCards: 10,
                     maxReviewCards: 30,
@@ -126,7 +133,7 @@ const AdaptiveStudySession: React.FC = () => {
         };
 
         initSession();
-    }, [user, classId, studySetId, modeParam, navigate]);
+    }, [user, classId, studySetId, modeParam, navigate, searchParams]);
 
     // Current card
     const currentCard = cards[currentIndex];
