@@ -428,54 +428,103 @@ export async function getCardsForSession(
 
     const now = new Date().toISOString();
 
-    // First, get all flashcards for this study set or class
-    let flashcardsQuery = supabase.from('flashcards').select('*');
+    // FIRST: Get SRS data for all user's cards (needed for filtering and Global Mode)
+    const { data: srsDataList, error: srsError } = await supabase
+        .from('flashcard_srs_data')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('archived', false);
 
-    // IMPORTANT: Filter by study set first (most specific), then by class
-    if (studySetId) {
-        // Filter flashcards by study_set_id - this ensures data isolation per set
-        flashcardsQuery = flashcardsQuery.eq('study_set_id', studySetId);
-    } else if (classId) {
-        // Only filter by class if no study set specified
-        flashcardsQuery = flashcardsQuery.eq('class_id', classId);
-    } else {
-        // GLOBAL MODE: No set/class specified, so fetch from ALL user's study sets
+    if (srsError) console.error('Error fetching SRS data:', srsError);
+
+    // Create a map for quick lookup
+    const srsMap = new Map<string, SRSCard>();
+    const srsFlashcardIds: string[] = [];
+
+    (srsDataList || []).forEach(srs => {
+        srsMap.set(srs.flashcard_id, srs as SRSCard);
+        srsFlashcardIds.push(srs.flashcard_id);
+    });
+
+    let flashcards: any[] = [];
+
+    // QUERY STRATEGY
+    if (!studySetId && !classId) {
+        // === GLOBAL MODE ===
+        // Strategy: 
+        // 1. Fetch ALL cards we need to review (based on SRS data)
+        // 2. Fetch some cards from OWNED sets (for new cards)
+
+        // A. Get IDs of cards that are actually Due or Learning
+        const dueOrLearningIds = (srsDataList || [])
+            .filter(srs => {
+                const isDue = new Date(srs.next_review_at) <= new Date();
+                const isLearning = srs.state === 'learning' || srs.state === 'relearning';
+                return isDue || isLearning;
+            })
+            .map(srs => srs.flashcard_id);
+
+        // B. Get IDs of Owned Sets (for finding new cards)
         const { data: userSets } = await supabase
             .from('study_sets')
             .select('id')
             .eq('owner_id', userId);
 
-        if (userSets && userSets.length > 0) {
-            const setIds = userSets.map(s => s.id);
-            flashcardsQuery = flashcardsQuery.in('study_set_id', setIds);
-        } else {
-            // User has no sets
-            return [];
+        const ownedSetIds = userSets?.map(s => s.id) || [];
+
+        // C. Construct Query
+        // We want: (ID in dueOrLearningIds) OR (study_set_id in ownedSetIds and ID not in srsFlashcardIds)
+        // Since OR is tricky with complex conditions, we'll do two parallel fetches and merge.
+
+        const promises = [];
+
+        // Fetch 1: Specific Review Candidates (Global)
+        if (dueOrLearningIds.length > 0) {
+            promises.push(
+                supabase.from('flashcards').select('*').in('id', dueOrLearningIds).limit(maxReviewCards + 20)
+            );
         }
+
+        // Fetch 2: Potential New Cards (from Owned Sets)
+        // Only if we need new cards
+        if (maxNewCards > 0 && ownedSetIds.length > 0) {
+            // We can't easily "exclude" SRS cards in one query without a huge NOT IN list.
+            // Instead, we fetch a batch and filter in memory.
+            promises.push(
+                supabase.from('flashcards')
+                    .select('*')
+                    .in('study_set_id', ownedSetIds)
+                    .limit(maxNewCards + 50) // Overfetch slightly
+            );
+        }
+
+        const results = await Promise.all(promises);
+
+        // Merge results, removing duplicates by ID
+        const cardMap = new Map();
+
+        results.forEach(({ data }) => {
+            if (data) {
+                data.forEach(card => cardMap.set(card.id, card));
+            }
+        });
+
+        flashcards = Array.from(cardMap.values());
+
+    } else {
+        // === SPECIFIC MODE ===
+        let flashcardsQuery = supabase.from('flashcards').select('*');
+
+        if (studySetId) {
+            flashcardsQuery = flashcardsQuery.eq('study_set_id', studySetId);
+        } else if (classId) {
+            flashcardsQuery = flashcardsQuery.eq('class_id', classId);
+        }
+
+        const { data, error } = await flashcardsQuery;
+        if (error) console.error('Error fetching flashcards:', error);
+        flashcards = data || [];
     }
-
-    const { data: flashcards, error: flashcardsError } = await flashcardsQuery;
-
-    if (flashcardsError || !flashcards) {
-        console.error('Error fetching flashcards:', flashcardsError);
-        return [];
-    }
-
-    // Get SRS data for all these cards
-    const flashcardIds = flashcards.map(f => f.id);
-
-    const { data: srsDataList, error: srsError } = await supabase
-        .from('flashcard_srs_data')
-        .select('*')
-        .eq('user_id', userId)
-        .in('flashcard_id', flashcardIds)
-        .eq('archived', false); // Exclude archived cards
-
-    // Create a map for quick lookup
-    const srsMap = new Map<string, SRSCard>();
-    (srsDataList || []).forEach(srs => {
-        srsMap.set(srs.flashcard_id, srs as SRSCard);
-    });
 
     // Categorize cards
     const dueCards: FlashcardWithSRS[] = [];
