@@ -432,8 +432,7 @@ export async function getCardsForSession(
     const { data: srsDataList, error: srsError } = await supabase
         .from('flashcard_srs_data')
         .select('*')
-        .eq('user_id', userId)
-        .eq('archived', false);
+        .eq('user_id', userId);
 
     if (srsError) console.error('Error fetching SRS data:', srsError);
 
