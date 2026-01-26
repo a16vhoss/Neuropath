@@ -658,7 +658,7 @@ const ClassItemDetail: React.FC = () => {
                 </div>
 
                 {/* Render Full Study Set Logic */}
-                <StudySetDetail studySetId={linkedStudySetId} embedded={true} readOnly={true} />
+                <StudySetDetail studySetId={linkedStudySetId} embedded={true} />
             </div>
         );
     }
