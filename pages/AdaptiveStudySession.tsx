@@ -104,7 +104,7 @@ const AdaptiveStudySession: React.FC = () => {
                     studySetId: studySetId || targetSetIds, // Use prop param or URL list
                     mode: modeParam,
                     maxNewCards: 10,
-                    maxReviewCards: 30,
+                    maxReviewCards: 50,
                 });
                 setSessionId(newSessionId);
 
@@ -115,7 +115,7 @@ const AdaptiveStudySession: React.FC = () => {
                     studySetId: studySetId || targetSetIds,
                     mode: modeParam,
                     maxNewCards: 10,
-                    maxReviewCards: 30,
+                    maxReviewCards: 50,
                 });
 
                 if (sessionCards.length === 0) {

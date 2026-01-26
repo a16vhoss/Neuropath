@@ -652,7 +652,8 @@ export async function getCardsForSession(
             .slice(0, maxReviewCards + maxNewCards);
 
     } else if (mode === 'review_due') {
-        selectedCards = dueCards.slice(0, maxReviewCards);
+        // Include both Learning cards (highest priority) and Due Review cards
+        selectedCards = [...learningCards, ...dueCards].slice(0, maxReviewCards);
 
     } else if (mode === 'learn_new') {
         selectedCards = newCards.slice(0, maxNewCards);
