@@ -575,7 +575,10 @@ export const mergeStudySets = async (targetSetId: string, sourceSetId: string) =
         .update({ study_set_id: targetSetId })
         .eq('study_set_id', sourceSetId);
 
-    if (flashcardsError) throw flashcardsError;
+    if (flashcardsError) {
+        console.error('Error moving flashcards:', flashcardsError);
+        throw flashcardsError;
+    }
 
     // 2. Move all materials from source to target
     const { error: materialsError } = await supabase
@@ -583,15 +586,50 @@ export const mergeStudySets = async (targetSetId: string, sourceSetId: string) =
         .update({ study_set_id: targetSetId })
         .eq('study_set_id', sourceSetId);
 
-    if (materialsError) throw materialsError;
+    if (materialsError) {
+        console.error('Error moving materials:', materialsError);
+        throw materialsError;
+    }
 
-    // 3. Delete the source study set (now empty)
+    // 3. Move all notebooks from source to target
+    const { error: notebooksError } = await supabase
+        .from('notebooks')
+        .update({ study_set_id: targetSetId })
+        .eq('study_set_id', sourceSetId);
+
+    if (notebooksError) {
+        console.error('Error moving notebooks:', notebooksError);
+        // Don't throw - notebooks table might not exist or be empty
+    }
+
+    // 4. Delete chat sessions related to source set (they reference study_set_id)
+    await supabase
+        .from('study_set_chat_sessions')
+        .delete()
+        .eq('study_set_id', sourceSetId);
+
+    // 5. Delete chat messages related to source set
+    await supabase
+        .from('study_set_chat_messages')
+        .delete()
+        .eq('study_set_id', sourceSetId);
+
+    // 6. Delete study guide progress for source set
+    await supabase
+        .from('study_guide_progress')
+        .delete()
+        .eq('study_set_id', sourceSetId);
+
+    // 7. Finally, delete the source study set (now empty)
     const { error: deleteError } = await supabase
         .from('study_sets')
         .delete()
         .eq('id', sourceSetId);
 
-    if (deleteError) throw deleteError;
+    if (deleteError) {
+        console.error('Error deleting source set:', deleteError);
+        throw new Error(`No se pudo eliminar el set fuente: ${deleteError.message}`);
+    }
 
     return { success: true };
 };
