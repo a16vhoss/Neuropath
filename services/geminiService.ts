@@ -312,19 +312,38 @@ export const generateStudySetFromContext = async (context: string, count: number
       required: ["flashcards"]
     };
 
-    const prompt = `
-      OBJETIVO: Genera EXACTAMENTE ${count} flashcards de alta calidad basadas en el texto proporcionado.
+    let prompt = '';
 
-      INSTRUCCIONES CRÍTICAS DE COBERTURA Y FUENTES:
-      1. ESCANEO DETALLADO: Escanea el texto secuencialmente.
-      2. GRANULARIDAD EXTREMA: Extrae detalles finos para cumplir con la cuota de ${count}.
-      3. COBERTURA GLOBAL: Distribuye las preguntas en todo el texto.
-      4. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material del que proviene en "source_name".
-      5. CANTIDAD EXACTA: Genera EXACTAMENTE ${count} flashcards.
-      6. IDIOMA: Español.
+    if (count > 0) {
+      prompt = `
+        OBJETIVO: Genera EXACTAMENTE ${count} flashcards de alta calidad basadas en el texto proporcionado.
 
-      TEXTO: "${context.slice(0, 100000)}"
-    `;
+        INSTRUCCIONES CRÍTICAS DE COBERTURA Y FUENTES:
+        1. ESCANEO DETALLADO: Escanea el texto secuencialmente.
+        2. GRANULARIDAD EXTREMA: Extrae detalles finos para cumplir con la cuota de ${count}.
+        3. COBERTURA GLOBAL: Distribuye las preguntas en todo el texto.
+        4. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material del que proviene en "source_name".
+        5. CANTIDAD EXACTA: Genera EXACTAMENTE ${count} flashcards.
+        6. IDIOMA: Español.
+
+        TEXTO: "${context.slice(0, 100000)}"
+      `;
+    } else {
+      // Auto-scale mode
+      prompt = `
+        OBJETIVO: Genera un conjunto COMPLETO de flashcards que cubra TODOS los conceptos clave del texto proporcionado.
+
+        INSTRUCCIONES CRÍTICAS DE COBERTURA Y FUENTES:
+        1. COBERTURA EXHAUSTIVA: Analiza TODO el contenido. No dejes ningún concepto importante fuera.
+        2. SIN LÍMITE ARTIFICIAL: Genera tantas tarjetas como sean necesarias para cubrir el material completamente (pueden ser 10, 20 o más).
+        3. GRANULARIDAD: Desglosa conceptos complejos en tarjetas más simples.
+        4. TIPOS DE PREGUNTAS: Incluye definiciones, relaciones, ejemplos y causas/efectos.
+        5. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material del que proviene en "source_name".
+        6. IDIOMA: Español.
+
+        TEXTO: "${context.slice(0, 100000)}"
+      `;
+    }
 
     const result = await generateContent(prompt, {
       jsonSchema: schema,
