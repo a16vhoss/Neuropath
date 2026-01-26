@@ -928,3 +928,140 @@ export const generateUnstructuredNoteContent = async (
     return '<p><em>Error generando contenido AI. Intenta de nuevo.</em></p>';
   }
 };
+
+/**
+ * Mind Map Node and Edge types for concept visualization
+ */
+export interface MindMapNode {
+  id: string;
+  label: string;
+  type: 'root' | 'concept' | 'subconcept' | 'detail';
+  color?: string;
+}
+
+export interface MindMapEdge {
+  source: string;
+  target: string;
+  label?: string;
+}
+
+export interface MindMapData {
+  nodes: MindMapNode[];
+  edges: MindMapEdge[];
+}
+
+/**
+ * Generate a concept mind map from materials and notebooks content
+ */
+export const generateMindMapFromContent = async (
+  materials: { name: string; content: string }[],
+  notebooks: { title: string; content: string }[],
+  studySetName: string
+): Promise<MindMapData> => {
+  const genAI = getGeminiSDK();
+  if (!genAI) {
+    console.warn('Gemini SDK not available');
+    return { nodes: [], edges: [] };
+  }
+
+  try {
+    const modelName = await getBestGeminiModel('pro');
+
+    // Combine content from materials and notebooks
+    const materialContent = materials
+      .filter(m => m.content && m.content.trim().length > 10)
+      .map(m => `[MATERIAL: ${m.name}]\n${m.content.substring(0, 2000)}`)
+      .join('\n\n');
+
+    const notebookContent = notebooks
+      .filter(n => n.content && n.content.trim().length > 10)
+      .map(n => `[CUADERNO: ${n.title}]\n${n.content.substring(0, 2000)}`)
+      .join('\n\n');
+
+    const combinedContent = `${materialContent}\n\n${notebookContent}`.substring(0, 8000);
+
+    if (combinedContent.trim().length < 50) {
+      return { nodes: [], edges: [] };
+    }
+
+    const prompt = `
+Analiza el siguiente contenido educativo y genera un mapa mental de conceptos.
+
+CONTENIDO:
+${combinedContent}
+
+NOMBRE DEL SET: ${studySetName}
+
+INSTRUCCIONES:
+1. Identifica los 4-7 conceptos principales del contenido
+2. Para cada concepto principal, identifica 2-4 subconceptos o detalles importantes
+3. Genera conexiones lógicas entre los conceptos
+
+FORMATO DE RESPUESTA (JSON estricto):
+{
+  "nodes": [
+    {"id": "root", "label": "Tema Principal", "type": "root"},
+    {"id": "c1", "label": "Concepto 1", "type": "concept"},
+    {"id": "c1_1", "label": "Subconcepto 1.1", "type": "subconcept"},
+    ...
+  ],
+  "edges": [
+    {"source": "root", "target": "c1"},
+    {"source": "c1", "target": "c1_1"},
+    ...
+  ]
+}
+
+REGLAS:
+- El nodo "root" debe tener el nombre del tema principal (no el nombre del set)
+- Máximo 20 nodos en total
+- Cada concepto principal debe conectarse al root
+- Los subconceptos se conectan a su concepto padre
+- Labels cortos (máximo 30 caracteres)
+- IDs únicos sin espacios
+`;
+
+    const response = await genAI.models.generateContent({
+      model: modelName,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        maxOutputTokens: 2000,
+        temperature: 0.3,
+      }
+    });
+
+    const text = response.text || '';
+    const data = JSON.parse(text);
+
+    // Validate and sanitize the response
+    if (!data.nodes || !Array.isArray(data.nodes) || !data.edges || !Array.isArray(data.edges)) {
+      throw new Error('Invalid mind map structure');
+    }
+
+    // Ensure all nodes have required fields
+    const validNodes: MindMapNode[] = data.nodes
+      .filter((n: any) => n.id && n.label && n.type)
+      .map((n: any) => ({
+        id: String(n.id),
+        label: String(n.label).substring(0, 40),
+        type: ['root', 'concept', 'subconcept', 'detail'].includes(n.type) ? n.type : 'concept'
+      }));
+
+    // Ensure all edges reference valid nodes
+    const nodeIds = new Set(validNodes.map(n => n.id));
+    const validEdges: MindMapEdge[] = data.edges
+      .filter((e: any) => e.source && e.target && nodeIds.has(e.source) && nodeIds.has(e.target))
+      .map((e: any) => ({
+        source: String(e.source),
+        target: String(e.target),
+        label: e.label ? String(e.label) : undefined
+      }));
+
+    return { nodes: validNodes, edges: validEdges };
+
+  } catch (error) {
+    console.error('Error generating mind map:', error);
+    return { nodes: [], edges: [] };
+  }
+};

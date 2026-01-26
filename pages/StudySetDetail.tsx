@@ -21,6 +21,7 @@ import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL, autoCat
 import CumulativeReportsCard from '../components/CumulativeReportsCard';
 import VisualProgressionMap from '../components/VisualProgressionMap';
 import StudyGuideRenderer from '../components/StudyGuideRenderer/index';
+import ConceptMindMap from '../components/ConceptMindMap';
 import ZpBotChat from '../components/ZpBotChat';
 import { NotebookList, NotebookEditor } from '../components/notebooks';
 import { Notebook } from '../types';
@@ -322,7 +323,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
     const [generatingGuide, setGeneratingGuide] = useState(false);
     const [generatingInfographic, setGeneratingInfographic] = useState(false);
     const [generatingPresentation, setGeneratingPresentation] = useState(false);
-    const [activeGuideTab, setActiveGuideTab] = useState<'guide' | 'infographic' | 'presentation'>('guide');
+    const [activeGuideTab, setActiveGuideTab] = useState<'guide' | 'infographic' | 'presentation' | 'mindmap'>('guide');
 
     const [viewContentModal, setViewContentModal] = useState<{
         isOpen: boolean;
@@ -1263,10 +1264,18 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                     <span className="material-symbols-outlined text-lg">slideshow</span>
                                     Presentación
                                 </button>
+                                <button
+                                    onClick={() => setActiveGuideTab('mindmap')}
+                                    className={`flex-1 px-4 py-3 flex items-center justify-center gap-2 text-sm font-semibold transition-all border-b-2 ${activeGuideTab === 'mindmap' ? 'text-purple-600 border-purple-600 bg-white' : 'text-slate-500 border-transparent hover:bg-slate-50'}`}
+                                >
+                                    <span className="material-symbols-outlined text-lg">hub</span>
+                                    Mapa Mental
+                                </button>
                             </div>
 
                             <div className="p-6">
                                 <div className="flex justify-between items-center mb-6">
+                                    {activeGuideTab !== 'mindmap' && (
                                     <h3 className="font-bold text-slate-900 flex items-center gap-2">
                                         <span className={`material-symbols-outlined ${activeGuideTab === 'guide' ? 'text-indigo-500' : activeGuideTab === 'infographic' ? 'text-amber-500' : 'text-cyan-500'}`}>
                                             {activeGuideTab === 'guide' ? 'auto_stories' : activeGuideTab === 'infographic' ? 'leaderboard' : 'slideshow'}
@@ -1276,6 +1285,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                             IA
                                         </span>
                                     </h3>
+                                    )}
 
                                     <div className="flex items-center gap-2">
                                         {canEdit && activeGuideTab === 'guide' && (
@@ -1538,6 +1548,14 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                             />
                                         )}
                                     </div>
+                                )}
+
+                                {activeGuideTab === 'mindmap' && (
+                                    <ConceptMindMap
+                                        materials={studySet.materials}
+                                        notebooks={notebooks}
+                                        studySetName={studySet.name}
+                                    />
                                 )}
                             </div>
                         </div>
