@@ -100,6 +100,17 @@ const StudySetStatistics: React.FC<{ studySetId: string }> = ({ studySetId }) =>
                 };
             });
 
+            // Sort by next_review_at ascending (soonest to study first)
+            mergedStats.sort((a, b) => {
+                if (a.next_review_at && b.next_review_at) {
+                    return new Date(a.next_review_at).getTime() - new Date(b.next_review_at).getTime();
+                }
+                // If one has a date and the other doesn't, the one with date comes first (prioritize scheduled reviews)
+                if (a.next_review_at && !b.next_review_at) return -1;
+                if (!a.next_review_at && b.next_review_at) return 1;
+                return 0; // Both are new/null
+            });
+
             setFlashcardStats(mergedStats);
 
             // 4. Fetch Session History (Adaptive Sessions)
