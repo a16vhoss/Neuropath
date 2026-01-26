@@ -54,6 +54,7 @@ const StudentDashboard: React.FC = () => {
 
   // Adaptive Study Config State
   const [showAdaptiveConfigModal, setShowAdaptiveConfigModal] = useState(false);
+  const [sessionMode, setSessionMode] = useState<'adaptive' | 'review_due' | 'learn_new' | 'cramming'>('adaptive');
   const [availableSets, setAvailableSets] = useState<{ id: string, name: string, type: 'class' | 'personal', count: number }[]>([]);
   const [selectedSetIds, setSelectedSetIds] = useState<string[]>([]);
 
@@ -617,24 +618,20 @@ const StudentDashboard: React.FC = () => {
               {/* Adaptive Study Widget */}
               <AdaptiveProgressCard
                 onStartSession={(mode) => {
-                  if (mode !== 'adaptive') {
-                    // Quick start modes (review_due / learn_new) go direct
-                    navigate(`/student/adaptive-study?mode=${mode}`);
-                  } else {
-                    // Main "Adaptive Study" opens config
-                    // Pre-fill available sets
-                    const allSets = [
-                      ...classes.map(c => ({ id: c.id, name: c.name, type: 'class', count: 0 })), // We might lack count here, purely UI
-                      ...studySets.map(s => ({ id: s.id, name: s.name, type: 'personal', count: s.flashcard_count || 0 }))
-                    ];
-                    // Uniqueness check just in case
-                    const uniqueSets = Array.from(new Map(allSets.map(item => [item.id, item])).values());
+                  // Always open config modal to let user choose sets
+                  // Pre-fill available sets
+                  const allSets = [
+                    ...classes.map(c => ({ id: c.id, name: c.name, type: 'class', count: 0 })),
+                    ...studySets.map(s => ({ id: s.id, name: s.name, type: 'personal', count: s.flashcard_count || 0 }))
+                  ];
+                  // Uniqueness check just in case
+                  const uniqueSets = Array.from(new Map(allSets.map(item => [item.id, item])).values());
 
-                    setAvailableSets(uniqueSets);
-                    // Default select all? Or select none? Let's select all by default for "Global" feel
-                    setSelectedSetIds(uniqueSets.map(s => s.id));
-                    setShowAdaptiveConfigModal(true);
-                  }
+                  setAvailableSets(uniqueSets);
+                  // Default select all
+                  setSelectedSetIds(uniqueSets.map(s => s.id));
+                  setSessionMode(mode);
+                  setShowAdaptiveConfigModal(true);
                 }}
               />
 
@@ -1018,14 +1015,13 @@ const StudentDashboard: React.FC = () => {
                 </button>
                 <button
                   onClick={() => {
-                    const mode = 'adaptive';
-                    let url = `/student/adaptive-study?mode=${mode}`;
+                    let url = `/student/adaptive-study?mode=${sessionMode}`;
                     if (selectedSetIds.length > 0 && selectedSetIds.length < availableSets.length) {
                       url += `&sets=${selectedSetIds.join(',')}`;
                     }
+                    // If all selected (or none explicitly selected implying all), sending no params implies global (all) in service
                     navigate(url);
-                  }}
-                  disabled={selectedSetIds.length === 0}
+                  }} disabled={selectedSetIds.length === 0}
                   className="px-6 py-2 bg-violet-600 text-white font-bold text-sm rounded-lg hover:bg-violet-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-200"
                 >
                   Comenzar Sesión ({selectedSetIds.length})
