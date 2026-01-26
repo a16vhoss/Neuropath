@@ -438,6 +438,20 @@ export async function getCardsForSession(
     } else if (classId) {
         // Only filter by class if no study set specified
         flashcardsQuery = flashcardsQuery.eq('class_id', classId);
+    } else {
+        // GLOBAL MODE: No set/class specified, so fetch from ALL user's study sets
+        const { data: userSets } = await supabase
+            .from('study_sets')
+            .select('id')
+            .eq('owner_id', userId);
+
+        if (userSets && userSets.length > 0) {
+            const setIds = userSets.map(s => s.id);
+            flashcardsQuery = flashcardsQuery.in('study_set_id', setIds);
+        } else {
+            // User has no sets
+            return [];
+        }
     }
 
     const { data: flashcards, error: flashcardsError } = await flashcardsQuery;
