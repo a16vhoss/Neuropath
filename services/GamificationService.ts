@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { DailyMissionsService } from './DailyMissionsService';
 
 export interface Achievement {
     id: string;
@@ -136,6 +137,14 @@ export const GamificationService = {
             .eq('id', userId);
 
         if (updateError) throw updateError;
+
+        // Update daily mission progress for streak maintenance
+        try {
+            await DailyMissionsService.updateProgress(userId, 'streak_maintain', 1);
+        } catch (e) {
+            console.error('Error updating streak_maintain mission:', e);
+        }
+
         return newStreak;
     },
 

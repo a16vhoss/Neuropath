@@ -10,6 +10,7 @@
 
 import { supabase } from './supabaseClient';
 import { generateQuizQuestions, generateAdvancedQuiz } from './geminiService';
+import { DailyMissionsService } from './DailyMissionsService';
 
 export type QuestionType = 'true_false' | 'multiple_choice' | 'analysis' | 'design' | 'practical' | 'ordering' | 'matching' | 'fill_blank' | 'identify_error';
 export type QuizGameMode = 'classic' | 'survival' | 'time_attack';
@@ -620,6 +621,19 @@ export async function saveQuizSession(
             total: stats.total,
             percentage: Math.round((stats.correct / stats.total) * 100)
         }));
+
+        // 4. Update daily mission progress
+        try {
+            // Update quiz_count mission
+            await DailyMissionsService.updateProgress(userId, 'quiz_count', 1);
+
+            // Update quiz_score_threshold mission if score >= 80%
+            if (percentCorrect >= 80) {
+                await DailyMissionsService.updateProgress(userId, 'quiz_score_threshold', 1, { score: percentCorrect });
+            }
+        } catch (e) {
+            console.error('Error updating daily missions from quiz:', e);
+        }
 
         return {
             session: {

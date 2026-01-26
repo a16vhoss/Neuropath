@@ -13,6 +13,7 @@ import FolderBrowser from '../components/FolderBrowser';
 import NotificationBell from '../components/NotificationBell';
 import DailySummaryModal from '../components/DailySummaryModal';
 import DailySummaryCard from '../components/DailySummaryCard';
+import DailyMissionsCard from '../components/DailyMissionsCard';
 import PushNotificationPrompt from '../components/PushNotificationPrompt';
 
 interface ClassData {
@@ -596,6 +597,9 @@ const StudentDashboard: React.FC = () => {
                 onOpenModal={() => setShowDailySummaryModal(true)}
                 loading={loadingSummary}
               />
+
+              {/* Daily Missions Card */}
+              <DailyMissionsCard />
 
               {/* XP Widget */}
               <div className="bg-gradient-to-br from-violet-600 to-primary p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">

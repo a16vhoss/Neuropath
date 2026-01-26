@@ -13,6 +13,7 @@
 
 import { supabase } from './supabaseClient';
 import { updateFlashcardMastery } from './supabaseClient';
+import { DailyMissionsService } from './DailyMissionsService';
 
 // ============================================
 // TYPES
@@ -410,6 +411,19 @@ export async function updateCardAfterReview(
         next_interval_days: nextIntervalDays,
         session_id: sessionId,
     });
+
+    // Update daily mission progress
+    try {
+        // Update flashcard_reviews mission
+        await DailyMissionsService.updateProgress(userId, 'flashcard_reviews', 1);
+
+        // If this was a new card that was successfully learned (rating >= 3)
+        if (isNewCard && rating >= 3) {
+            await DailyMissionsService.updateProgress(userId, 'new_cards_learned', 1);
+        }
+    } catch (e) {
+        console.error('Error updating daily missions progress:', e);
+    }
 
     return {
         newInterval: nextIntervalDays,
@@ -838,7 +852,9 @@ export async function createAdaptiveSession(
  */
 export async function endAdaptiveSession(
     sessionId: string,
-    stats: SessionStats
+    stats: SessionStats,
+    userId?: string,
+    durationMinutes?: number
 ): Promise<void> {
     const now = new Date();
 
@@ -857,6 +873,21 @@ export async function endAdaptiveSession(
             streak_bonus: stats.streakBonus,
         })
         .eq('id', sessionId);
+
+    // Update daily mission progress for session completion
+    if (userId) {
+        try {
+            // Update session_count mission
+            await DailyMissionsService.updateProgress(userId, 'session_count', 1);
+
+            // Update study_minutes mission if duration is provided
+            if (durationMinutes && durationMinutes > 0) {
+                await DailyMissionsService.updateProgress(userId, 'study_minutes', Math.round(durationMinutes));
+            }
+        } catch (e) {
+            console.error('Error updating daily missions on session end:', e);
+        }
+    }
 }
 
 // ============================================
