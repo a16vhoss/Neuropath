@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { initializePushNotifications } from './services/webPushService';
 import Landing from './pages/Landing';
 import AuthPage from './pages/AuthPage';
 import TeacherDashboard from './pages/TeacherDashboard';
@@ -194,6 +195,11 @@ const AppRoutes: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  // Initialize push notifications on app load
+  useEffect(() => {
+    initializePushNotifications().catch(console.error);
+  }, []);
+
   return (
     <AuthProvider>
       <Router>

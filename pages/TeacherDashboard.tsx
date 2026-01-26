@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getTeacherClasses, createClass, supabase } from '../services/supabaseClient';
 import { getClassAnalytics, getAtRiskStudents } from '../services/ClassroomService';
+import NotificationBell from '../components/NotificationBell';
 
 interface ClassInfo {
   id: string;
@@ -143,9 +144,12 @@ const TeacherDashboard: React.FC = () => {
           <span className="material-symbols-outlined text-primary text-2xl font-bold">neurology</span>
           <span className="font-extrabold text-lg tracking-tighter text-slate-900">MHS</span>
         </div>
-        <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-600 hover:bg-slate-50 rounded-lg">
-          <span className="material-symbols-outlined">menu</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-600 hover:bg-slate-50 rounded-lg">
+            <span className="material-symbols-outlined">menu</span>
+          </button>
+        </div>
       </div>
 
       {/* Sidebar Overlay */}
@@ -228,15 +232,20 @@ const TeacherDashboard: React.FC = () => {
       <main className="flex-1 p-6 md:p-10 space-y-8 overflow-y-auto">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">¡Buenos días, {displayName}! 👋</h1>
-            <p className="text-slate-500 font-medium">Aquí está el resumen de tus clases</p>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight">¡Buenos dias, {displayName}!</h1>
+            <p className="text-slate-500 font-medium">Aqui esta el resumen de tus clases</p>
           </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-primary text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
-          >
-            <span className="material-symbols-outlined text-lg">add</span> Crear Clase
-          </button>
+          <div className="flex items-center gap-4">
+            <div className="hidden md:block">
+              <NotificationBell />
+            </div>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="bg-primary text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-lg">add</span> Crear Clase
+            </button>
+          </div>
         </header>
 
         {/* Stats Grid */}

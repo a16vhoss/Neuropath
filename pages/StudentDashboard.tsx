@@ -4,11 +4,16 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getStudentClasses, joinClass, getStudentAchievements, getStudentStudySets, createStudySet, supabase, deleteStudySet } from '../services/supabaseClient';
 import { generateFlashcardsFromText, extractTextFromPDF } from '../services/pdfProcessingService';
+import { getOrGenerateTodaySummary, markSummaryViewed, DailySummary } from '../services/DailySummaryService';
 
 import StudySetManager from '../components/StudySetManager';
 import MagicImportModal from '../components/MagicImportModal';
 import AdaptiveProgressCard from '../components/AdaptiveProgressCard';
 import FolderBrowser from '../components/FolderBrowser';
+import NotificationBell from '../components/NotificationBell';
+import DailySummaryModal from '../components/DailySummaryModal';
+import DailySummaryCard from '../components/DailySummaryCard';
+import PushNotificationPrompt from '../components/PushNotificationPrompt';
 
 interface ClassData {
   id: string;
@@ -71,6 +76,11 @@ const StudentDashboard: React.FC = () => {
   const [loadingSets, setLoadingSets] = useState(true);
   const [badges, setBadges] = useState<number>(0);
 
+  // Daily Summary
+  const [dailySummary, setDailySummary] = useState<DailySummary | null>(null);
+  const [showDailySummaryModal, setShowDailySummaryModal] = useState(false);
+  const [loadingSummary, setLoadingSummary] = useState(true);
+
   // Load student's classes
   useEffect(() => {
     const loadClasses = async () => {
@@ -129,6 +139,42 @@ const StudentDashboard: React.FC = () => {
   useEffect(() => {
     loadStudySets();
   }, [user]);
+
+  // Load daily summary and show modal once per day
+  useEffect(() => {
+    const loadDailySummary = async () => {
+      if (!user?.id) return;
+
+      setLoadingSummary(true);
+      try {
+        const summary = await getOrGenerateTodaySummary(user.id);
+        setDailySummary(summary);
+
+        // Check if we should show the modal (once per day)
+        const today = new Date().toISOString().split('T')[0];
+        const lastShown = localStorage.getItem(`daily_summary_shown_${user.id}`);
+
+        if (lastShown !== today && summary && !summary.viewed_at) {
+          setShowDailySummaryModal(true);
+          localStorage.setItem(`daily_summary_shown_${user.id}`, today);
+        }
+      } catch (error) {
+        console.error('Error loading daily summary:', error);
+      } finally {
+        setLoadingSummary(false);
+      }
+    };
+
+    loadDailySummary();
+  }, [user?.id]);
+
+  // Handle closing the daily summary modal
+  const handleCloseDailySummary = async () => {
+    setShowDailySummaryModal(false);
+    if (dailySummary?.id) {
+      await markSummaryViewed(dailySummary.id);
+    }
+  };
 
   // Join class handler
   const handleJoinClass = async () => {
@@ -320,6 +366,7 @@ const StudentDashboard: React.FC = () => {
               <p className="text-slate-500 font-medium">¿Listo para expandir tus rutas neuronales hoy?</p>
             </div>
             <div className="flex items-center gap-4">
+              <NotificationBell />
               <div className="bg-amber-50 px-4 py-2 rounded-2xl flex items-center gap-2 border border-amber-100">
                 <span className="text-amber-500 material-symbols-outlined fill-1">local_fire_department</span>
                 <span className="text-amber-700 font-black text-xl">{streakDays} Días</span>
@@ -537,6 +584,13 @@ const StudentDashboard: React.FC = () => {
 
             {/* Sidebar */}
             <div className="lg:col-span-4 space-y-6">
+              {/* Daily Summary Card */}
+              <DailySummaryCard
+                summary={dailySummary}
+                onOpenModal={() => setShowDailySummaryModal(true)}
+                loading={loadingSummary}
+              />
+
               {/* XP Widget */}
               <div className="bg-gradient-to-br from-violet-600 to-primary p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
                 <div className="relative z-10 flex flex-col items-center text-center">
@@ -560,6 +614,8 @@ const StudentDashboard: React.FC = () => {
                 onStartSession={(mode) => navigate(`/student/adaptive-study?mode=${mode}`)}
               />
 
+              {/* Push Notification Prompt */}
+              <PushNotificationPrompt />
 
 
             </div>
@@ -832,6 +888,14 @@ const StudentDashboard: React.FC = () => {
             />
           )
         }
+
+        {/* Daily Summary Modal */}
+        {showDailySummaryModal && dailySummary && (
+          <DailySummaryModal
+            summary={dailySummary}
+            onClose={handleCloseDailySummary}
+          />
+        )}
       </div>
     </div>
   );
