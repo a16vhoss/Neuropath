@@ -219,7 +219,7 @@ const StudyGuideRenderer: React.FC<StudyGuideRendererProps> = ({
     );
 
     sections
-      .filter(s => s.level === 2)
+      .filter(s => s.level === 1 || s.level === 2)
       .forEach(section => {
         const element = document.getElementById(section.id);
         if (element) observer.observe(element);
@@ -273,12 +273,12 @@ const StudyGuideRenderer: React.FC<StudyGuideRendererProps> = ({
   }, []);
 
   const collapseAll = useCallback(() => {
-    setCollapsedSections(new Set(sections.filter(s => s.level === 2).map(s => s.id)));
+    setCollapsedSections(new Set(sections.filter(s => s.level === 1 || s.level === 2).map(s => s.id)));
   }, [sections]);
 
   if (!content) return null;
 
-  const h2Sections = sections.filter(s => s.level === 2);
+  const mainSections = sections.filter(s => s.level === 1 || s.level === 2);
 
   return (
     <div className="relative">
@@ -343,7 +343,7 @@ const StudyGuideRenderer: React.FC<StudyGuideRendererProps> = ({
       {/* Main layout with TOC */}
       <div className="flex gap-6">
         {/* TOC Sidebar - Desktop */}
-        {showTOC && h2Sections.length > 0 && (
+        {showTOC && mainSections.length > 0 && (
           <aside className="hidden lg:block w-64 flex-shrink-0">
             <div className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-300">
               <StudyGuideTOC
@@ -371,7 +371,7 @@ const StudyGuideRenderer: React.FC<StudyGuideRendererProps> = ({
       </div>
 
       {/* Mobile TOC Button */}
-      {showTOC && h2Sections.length > 0 && (
+      {showTOC && mainSections.length > 0 && (
         <button
           onClick={() => setShowMobileTOC(true)}
           className="lg:hidden fixed bottom-24 right-4 z-40 p-3 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 transition-all"

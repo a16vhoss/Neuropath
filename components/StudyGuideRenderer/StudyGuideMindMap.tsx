@@ -84,9 +84,9 @@ const StudyGuideMindMap: React.FC<StudyGuideMindMapProps> = ({
       position: { x: centerX - 90, y: centerY }
     });
 
-    // H2 sections as primary branches (radial layout)
-    const h2Sections = sections.filter(s => s.level === 2);
-    const numSections = h2Sections.length;
+    // H1/H2 sections as primary branches (radial layout)
+    const mainSections = sections.filter(s => s.level === 1 || s.level === 2);
+    const numSections = mainSections.length;
 
     if (numSections === 0) return { initialNodes: nodes, initialEdges: edges };
 
@@ -96,7 +96,7 @@ const StudyGuideMindMap: React.FC<StudyGuideMindMapProps> = ({
     const endAngle = Math.PI * 0.8;    // End slightly to right
     const angleStep = numSections > 1 ? (endAngle - startAngle) / (numSections - 1) : 0;
 
-    h2Sections.forEach((section, i) => {
+    mainSections.forEach((section, i) => {
       const angle = numSections === 1 ? Math.PI / 2 : startAngle + angleStep * i;
       const x = centerX + radius * Math.cos(angle) - 70;
       const y = centerY + radius * Math.sin(angle) + 50;
@@ -140,7 +140,7 @@ const StudyGuideMindMap: React.FC<StudyGuideMindMapProps> = ({
     }
   }, [onNodeClick]);
 
-  if (sections.filter(s => s.level === 2).length === 0) {
+  if (sections.filter(s => s.level === 1 || s.level === 2).length === 0) {
     return (
       <div className="h-[400px] flex items-center justify-center bg-slate-50 rounded-2xl border border-slate-200">
         <p className="text-slate-400">No hay secciones para mostrar en el mapa</p>
