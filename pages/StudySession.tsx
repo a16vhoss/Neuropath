@@ -1172,6 +1172,28 @@ const StudySession: React.FC = () => {
           {/* Flashcards Mode */}
           {mode === 'flashcards' && !flashcardsComplete && !noCardsDue && (
             <>
+              {/* Progress Counter */}
+              <div className="w-full max-w-lg mb-4">
+                <div className="bg-white/90 backdrop-blur-xl rounded-2xl px-4 py-3 shadow-lg border border-white/50 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-blue-500">style</span>
+                    <span className="text-sm font-medium text-slate-600">Flashcards</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-slate-900">{currentIndex + 1} / {flashcards.length}</div>
+                    </div>
+                    {/* Mini progress bar */}
+                    <div className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-300"
+                        style={{ width: `${((currentIndex + 1) / flashcards.length) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div
                 onClick={() => setIsFlipped(!isFlipped)}
                 className="w-full max-w-lg aspect-[3/4] md:aspect-[4/3] cursor-pointer perspective-1000"
