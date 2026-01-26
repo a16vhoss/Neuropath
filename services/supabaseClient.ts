@@ -564,6 +564,38 @@ export const deleteStudySet = async (studySetId: string) => {
     if (error) throw error;
 };
 
+/**
+ * Merge two study sets by moving all content from sourceSetId into targetSetId,
+ * then deleting the source set.
+ */
+export const mergeStudySets = async (targetSetId: string, sourceSetId: string) => {
+    // 1. Move all flashcards from source to target
+    const { error: flashcardsError } = await supabase
+        .from('flashcards')
+        .update({ study_set_id: targetSetId })
+        .eq('study_set_id', sourceSetId);
+
+    if (flashcardsError) throw flashcardsError;
+
+    // 2. Move all materials from source to target
+    const { error: materialsError } = await supabase
+        .from('study_set_materials')
+        .update({ study_set_id: targetSetId })
+        .eq('study_set_id', sourceSetId);
+
+    if (materialsError) throw materialsError;
+
+    // 3. Delete the source study set (now empty)
+    const { error: deleteError } = await supabase
+        .from('study_sets')
+        .delete()
+        .eq('id', sourceSetId);
+
+    if (deleteError) throw deleteError;
+
+    return { success: true };
+};
+
 export const toggleStudySetEditor = async (studySetId: string, userId: string) => {
     const { error } = await supabase.rpc('toggle_study_set_editor', {
         set_id: studySetId,

@@ -5,6 +5,7 @@ import {
     getStudySetWithDetails,
     updateStudySet,
     deleteStudySet,
+    mergeStudySets,
     addFlashcardToStudySet,
     updateFlashcard,
     deleteFlashcard,
@@ -16,6 +17,7 @@ import {
     getClassEnrollments,
     toggleStudySetEditor
 } from '../services/supabaseClient';
+import MergeSetModal from '../components/MergeSetModal';
 import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary, generateInfographicFromMaterials, generatePresentationFromMaterials } from '../services/pdfProcessingService';
 import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL, autoCategorizeFlashcards } from '../services/geminiService';
 import CumulativeReportsCard from '../components/CumulativeReportsCard';
@@ -189,6 +191,9 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
     const [notebooks, setNotebooks] = useState<Notebook[]>([]);
     const [loadingNotebooks, setLoadingNotebooks] = useState(false);
     const [selectedNotebook, setSelectedNotebook] = useState<Notebook | null>(null);
+
+    // Merge modal state
+    const [showMergeModal, setShowMergeModal] = useState(false);
 
     useEffect(() => {
         if (activeTab === 'people') {
@@ -806,6 +811,19 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
         }
     };
 
+    const handleMergeSet = async (sourceSetId: string) => {
+        if (!studySet) return;
+        try {
+            await mergeStudySets(studySet.id, sourceSetId);
+            // Reload the study set to get updated flashcard/material counts
+            const updated = await getStudySetWithDetails(studySet.id);
+            if (updated) setStudySet(updated);
+        } catch (error) {
+            console.error('Error merging study sets:', error);
+            throw error;
+        }
+    };
+
     // Toggle summary expanded/collapsed
     const toggleSummary = (materialId: string) => {
         setExpandedSummaries(prev => {
@@ -948,13 +966,22 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                 <span className="hidden md:inline">Simulacro</span>
                             </button>
                             {!readOnly && isOwner && (
-                                <button
-                                    onClick={handleDeleteSet}
-                                    className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition shrink-0"
-                                    title="Eliminar set"
-                                >
-                                    <span className="material-symbols-outlined">delete</span>
-                                </button>
+                                <>
+                                    <button
+                                        onClick={() => setShowMergeModal(true)}
+                                        className="p-2 text-violet-500 hover:bg-violet-50 rounded-lg transition shrink-0"
+                                        title="Fusionar con otro set"
+                                    >
+                                        <span className="material-symbols-outlined">merge</span>
+                                    </button>
+                                    <button
+                                        onClick={handleDeleteSet}
+                                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition shrink-0"
+                                        title="Eliminar set"
+                                    >
+                                        <span className="material-symbols-outlined">delete</span>
+                                    </button>
+                                </>
                             )}
                         </div>
                     </div>
@@ -2227,6 +2254,18 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                     </div>
                 </div>
             )}
+            {/* Merge Set Modal */}
+            {studySet && user && (
+                <MergeSetModal
+                    isOpen={showMergeModal}
+                    onClose={() => setShowMergeModal(false)}
+                    onMerge={handleMergeSet}
+                    currentSetId={studySet.id}
+                    currentSetName={studySet.name}
+                    userId={user.id}
+                />
+            )}
+
             {/* ZpBot Chat Integration */}
             {studySet && (
                 <ZpBotChat
