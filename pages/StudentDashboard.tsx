@@ -565,6 +565,12 @@ const StudentDashboard: React.FC = () => {
                       >
                         <span className="material-symbols-outlined">auto_awesome</span> Importar Mágico (IA)
                       </button>
+                      <button
+                        onClick={() => navigate('/student/exercise-session')}
+                        className="mt-3 ml-3 bg-indigo-500/80 backdrop-blur-md border border-white/40 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:bg-indigo-600/90 transition-all flex items-center gap-2 text-sm"
+                      >
+                        <span className="material-symbols-outlined">fitness_center</span> Práctica de Ejercicios
+                      </button>
                     </div>
                   </div>
 
@@ -851,7 +857,7 @@ const StudentDashboard: React.FC = () => {
         {
           editingStudySet && (
             <StudySetManager
-              studySet={editingStudySet}
+              studySet={editingStudySet as any}
               onClose={() => setEditingStudySet(null)}
               onUpdate={() => {
                 loadStudySets();

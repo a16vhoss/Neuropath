@@ -58,6 +58,9 @@ const UltraReview: React.FC = () => {
     const [showCompletion, setShowCompletion] = useState(false);
     const [completionSummary, setCompletionSummary] = useState<CompletionSummary | null>(null);
 
+    // Adaptive phases from session
+    const [phases, setPhases] = useState<PhaseConfig[]>(DEFAULT_PHASES);
+
     // Timer
     const [elapsedSeconds, setElapsedSeconds] = useState(0);
     const [timerActive, setTimerActive] = useState(false);
@@ -98,6 +101,10 @@ const UltraReview: React.FC = () => {
                 setSession(newSession);
                 setCurrentPhase(1);
                 setTimerActive(true);
+                // Set adaptive phases from session
+                if (newSession.generated_content?.phaseConfig) {
+                    setPhases(newSession.generated_content.phaseConfig);
+                }
                 loadPhaseContent(newSession.id, 1, mode);
             } else {
                 // Check for existing in-progress session
@@ -118,6 +125,10 @@ const UltraReview: React.FC = () => {
                     setElapsedSeconds(existing.total_time_seconds || 0);
                     setShowConfig(false);
                     setTimerActive(true);
+                    // Set adaptive phases from existing session
+                    if (existing.generated_content?.phaseConfig) {
+                        setPhases(existing.generated_content.phaseConfig);
+                    }
                     loadPhaseContent(existing.id, existing.current_phase as PhaseNumber, existing.duration_mode as DurationMode);
                 }
             }
@@ -191,6 +202,11 @@ const UltraReview: React.FC = () => {
         setCurrentPhase(1);
         setElapsedSeconds(0);
         setTimerActive(true);
+
+        // Set adaptive phases from session
+        if (newSession.generated_content?.phaseConfig) {
+            setPhases(newSession.generated_content.phaseConfig);
+        }
 
         await loadPhaseContent(newSession.id, 1, selectedDuration);
         setLoading(false);
@@ -321,8 +337,24 @@ const UltraReview: React.FC = () => {
         );
     }
 
+    // Helper to get subject type label
+    const getSubjectTypeLabel = (type: string) => {
+        const labels: Record<string, { label: string; icon: string; color: string }> = {
+            mathematical: { label: 'Matemáticas/Ciencias', icon: 'function', color: 'text-purple-600' },
+            historical: { label: 'Historia/Humanidades', icon: 'history_edu', color: 'text-amber-600' },
+            programming: { label: 'Programación', icon: 'code', color: 'text-cyan-600' },
+            scientific: { label: 'Ciencias Naturales', icon: 'biotech', color: 'text-green-600' },
+            linguistic: { label: 'Idiomas/Literatura', icon: 'translate', color: 'text-blue-600' },
+            business: { label: 'Negocios/Economía', icon: 'trending_up', color: 'text-orange-600' },
+            general: { label: 'General', icon: 'school', color: 'text-slate-600' }
+        };
+        return labels[type] || labels.general;
+    };
+
     // Render completion screen
     if (showCompletion && completionSummary) {
+        const subjectLabel = getSubjectTypeLabel(completionSummary.subjectType);
+
         return (
             <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-900 flex items-center justify-center p-4">
                 <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 text-center">
@@ -331,7 +363,13 @@ const UltraReview: React.FC = () => {
                     </div>
 
                     <h1 className="text-3xl font-black text-slate-800 mb-2">¡Ultra Repaso Completado!</h1>
-                    <p className="text-slate-500 mb-8">Estás listo para tu examen</p>
+                    <p className="text-slate-500 mb-2">Estás listo para tu examen</p>
+
+                    {/* Subject Type Badge */}
+                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full mb-8">
+                        <span className={`material-symbols-outlined ${subjectLabel.color}`}>{subjectLabel.icon}</span>
+                        <span className="text-sm font-medium text-slate-600">{subjectLabel.label}</span>
+                    </div>
 
                     <div className="grid grid-cols-2 gap-4 mb-8">
                         <div className="bg-slate-50 rounded-xl p-4">
@@ -379,7 +417,7 @@ const UltraReview: React.FC = () => {
                             Hacer otro Ultra Repaso
                         </button>
                         <button
-                            onClick={() => navigate(`/study-set/${studySetId}`)}
+                            onClick={() => navigate(`/student/set/${studySetId}`)}
                             className="w-full py-3 text-slate-600 font-medium hover:text-slate-800 transition"
                         >
                             Volver al Set de Estudio
@@ -399,7 +437,7 @@ const UltraReview: React.FC = () => {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
                             <button
-                                onClick={() => navigate(`/study-set/${studySetId}`)}
+                                onClick={() => navigate(`/student/set/${studySetId}`)}
                                 className="p-2 hover:bg-white/10 rounded-lg transition text-white/70 hover:text-white"
                             >
                                 <span className="material-symbols-outlined">arrow_back</span>
@@ -411,6 +449,29 @@ const UltraReview: React.FC = () => {
                         </div>
 
                         <div className="flex items-center gap-4">
+                            {/* Subject Type Badge */}
+                            {session?.generated_content?.subjectType && (
+                                <div className="hidden sm:flex bg-white/10 px-3 py-2 rounded-xl items-center gap-2">
+                                    <span className={`material-symbols-outlined text-sm ${
+                                        session.generated_content.subjectType === 'mathematical' ? 'text-purple-400' :
+                                        session.generated_content.subjectType === 'historical' ? 'text-amber-400' :
+                                        session.generated_content.subjectType === 'programming' ? 'text-cyan-400' :
+                                        session.generated_content.subjectType === 'scientific' ? 'text-green-400' :
+                                        session.generated_content.subjectType === 'linguistic' ? 'text-blue-400' :
+                                        session.generated_content.subjectType === 'business' ? 'text-orange-400' :
+                                        'text-white/60'
+                                    }`}>
+                                        {session.generated_content.subjectType === 'mathematical' ? 'function' :
+                                         session.generated_content.subjectType === 'historical' ? 'history_edu' :
+                                         session.generated_content.subjectType === 'programming' ? 'code' :
+                                         session.generated_content.subjectType === 'scientific' ? 'biotech' :
+                                         session.generated_content.subjectType === 'linguistic' ? 'translate' :
+                                         session.generated_content.subjectType === 'business' ? 'trending_up' :
+                                         'school'}
+                                    </span>
+                                    <span className="text-white/70 text-sm">Adaptado</span>
+                                </div>
+                            )}
                             <div className="bg-white/10 px-4 py-2 rounded-xl flex items-center gap-2">
                                 <span className="material-symbols-outlined text-purple-400">timer</span>
                                 <span className="text-white font-mono font-bold">{formatTime(elapsedSeconds)}</span>
@@ -420,25 +481,25 @@ const UltraReview: React.FC = () => {
 
                     {/* Phase Progress */}
                     <div className="flex items-center gap-2 mt-4 overflow-x-auto pb-2">
-                        {PHASES.map((phase, index) => (
-                            <React.Fragment key={phase.num}>
+                        {phases.map((phase, index) => (
+                            <React.Fragment key={phase.phase}>
                                 <button
-                                    onClick={() => goToPhase(phase.num)}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl transition whitespace-nowrap ${currentPhase === phase.num
+                                    onClick={() => goToPhase(phase.phase)}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl transition whitespace-nowrap ${currentPhase === phase.phase
                                             ? `${phase.color} text-white shadow-lg`
-                                            : currentPhase > phase.num
+                                            : currentPhase > phase.phase
                                                 ? 'bg-white/20 text-white'
                                                 : 'bg-white/5 text-white/50'
                                         }`}
                                 >
                                     <span className="material-symbols-outlined text-lg">{phase.icon}</span>
                                     <span className="font-medium text-sm">{phase.name}</span>
-                                    {session?.phase_progress[phase.num.toString()]?.completed && (
+                                    {session?.phase_progress[phase.phase.toString()]?.completed && (
                                         <span className="material-symbols-outlined text-emerald-400 text-sm">check_circle</span>
                                     )}
                                 </button>
-                                {index < PHASES.length - 1 && (
-                                    <div className={`w-8 h-0.5 ${currentPhase > phase.num ? 'bg-white/40' : 'bg-white/10'}`} />
+                                {index < phases.length - 1 && (
+                                    <div className={`w-8 h-0.5 ${currentPhase > phase.phase ? 'bg-white/40' : 'bg-white/10'}`} />
                                 )}
                             </React.Fragment>
                         ))}
@@ -458,17 +519,17 @@ const UltraReview: React.FC = () => {
                     <>
                         {/* Phase 1: Summary */}
                         {currentPhase === 1 && phaseContent && (
-                            <Phase1Summary content={phaseContent as SummaryContent} />
+                            <Phase1Summary content={phaseContent as AdaptiveSummaryContent} />
                         )}
 
-                        {/* Phase 2: Formulas */}
+                        {/* Phase 2: Adaptive Key Elements (Formulas/Timeline/Code/etc) */}
                         {currentPhase === 2 && phaseContent && (
-                            <Phase2Formulas content={phaseContent as FormulaContent} />
+                            <Phase2Adaptive content={phaseContent as AdaptivePhase2Content} phaseConfig={phases[1]} />
                         )}
 
                         {/* Phase 3: Methodologies */}
                         {currentPhase === 3 && phaseContent && (
-                            <Phase3Methodologies content={phaseContent as MethodologyContent} />
+                            <Phase3Methodologies content={phaseContent as AdaptiveMethodologyContent} />
                         )}
 
                         {/* Phase 4: Flashcards */}
@@ -485,7 +546,7 @@ const UltraReview: React.FC = () => {
                         {/* Phase 5: Exercises */}
                         {currentPhase === 5 && phaseContent && (
                             <Phase5Exercises
-                                content={phaseContent as ExerciseContent}
+                                content={phaseContent as AdaptiveExerciseContent}
                                 currentIndex={currentExerciseIndex}
                                 setCurrentIndex={setCurrentExerciseIndex}
                                 showSolution={showExerciseSolution}
@@ -495,7 +556,7 @@ const UltraReview: React.FC = () => {
 
                         {/* Phase 6: Tips */}
                         {currentPhase === 6 && phaseContent && (
-                            <Phase6Tips content={phaseContent as TipsContent} />
+                            <Phase6Tips content={phaseContent as AdaptiveTipsContent} />
                         )}
                     </>
                 )}
@@ -535,7 +596,7 @@ const UltraReview: React.FC = () => {
 // PHASE COMPONENTS
 // ============================================
 
-const Phase1Summary: React.FC<{ content: SummaryContent }> = ({ content }) => {
+const Phase1Summary: React.FC<{ content: AdaptiveSummaryContent }> = ({ content }) => {
     const getImportanceStyle = (importance: string) => {
         switch (importance) {
             case 'critical': return 'border-l-red-500 bg-red-50/10';
@@ -555,9 +616,27 @@ const Phase1Summary: React.FC<{ content: SummaryContent }> = ({ content }) => {
     return (
         <div className="space-y-6">
             <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-white mb-2">Resumen de Conceptos Clave</h2>
+                <h2 className="text-2xl font-bold text-white mb-2">{content.title || 'Resumen de Conceptos Clave'}</h2>
                 <p className="text-white/60">{content.totalConcepts} conceptos identificados</p>
             </div>
+
+            {/* Exam Predictions */}
+            {content.examPredictions && content.examPredictions.length > 0 && (
+                <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 backdrop-blur-sm rounded-xl p-6 border border-purple-500/30">
+                    <h3 className="text-lg font-bold text-purple-300 mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined">psychology</span>
+                        Predicciones para el Examen
+                    </h3>
+                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {content.examPredictions.map((prediction, i) => (
+                            <li key={i} className="flex items-start gap-2 text-white/80 text-sm">
+                                <span className="material-symbols-outlined text-pink-400 text-sm mt-0.5">star</span>
+                                <span>{prediction}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
 
             {content.sections.map((section, i) => {
                 const label = getImportanceLabel(section.importance);
@@ -578,6 +657,24 @@ const Phase1Summary: React.FC<{ content: SummaryContent }> = ({ content }) => {
                                 </li>
                             ))}
                         </ul>
+
+                        {/* Must Know section */}
+                        {section.mustKnow && section.mustKnow.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-white/10">
+                                <h4 className="text-sm font-bold text-emerald-400 mb-2 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-sm">verified</span>
+                                    DEBES SABER:
+                                </h4>
+                                <ul className="space-y-1">
+                                    {section.mustKnow.map((item, k) => (
+                                        <li key={k} className="flex items-start gap-2 text-emerald-300 text-sm">
+                                            <span className="material-symbols-outlined text-emerald-400 text-xs mt-0.5">check</span>
+                                            <span>{item}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                     </div>
                 );
             })}
@@ -585,46 +682,85 @@ const Phase1Summary: React.FC<{ content: SummaryContent }> = ({ content }) => {
     );
 };
 
-const Phase2Formulas: React.FC<{ content: FormulaContent }> = ({ content }) => (
-    <div className="space-y-6">
-        <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-white mb-2">Cheat Sheet de Fórmulas</h2>
-            <p className="text-white/60">Todas las fórmulas que necesitas</p>
-        </div>
+const Phase2Adaptive: React.FC<{ content: AdaptivePhase2Content; phaseConfig: PhaseConfig }> = ({ content, phaseConfig }) => {
+    // Get icon color based on content type
+    const getTypeIcon = (type: string) => {
+        switch (type) {
+            case 'formulas': return { icon: 'function', color: 'text-purple-400' };
+            case 'timeline': return { icon: 'timeline', color: 'text-amber-400' };
+            case 'codePatterns': return { icon: 'code', color: 'text-cyan-400' };
+            case 'processes': return { icon: 'autorenew', color: 'text-green-400' };
+            case 'vocabulary': return { icon: 'translate', color: 'text-blue-400' };
+            case 'principles': return { icon: 'analytics', color: 'text-orange-400' };
+            default: return { icon: 'push_pin', color: 'text-purple-400' };
+        }
+    };
 
-        {content.categories.map((category, i) => (
-            <div key={i} className="bg-white/10 backdrop-blur-sm rounded-xl p-6">
-                <h3 className="text-lg font-bold text-purple-400 mb-4 flex items-center gap-2">
-                    <span className="material-symbols-outlined">category</span>
-                    {category.name}
-                </h3>
-                <div className="grid gap-4">
-                    {category.formulas.map((formula, j) => (
-                        <div key={j} className="bg-white/5 rounded-lg p-4">
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="flex-1">
-                                    <div className="text-sm text-white/60 mb-1">{formula.name}</div>
-                                    <div className="text-xl font-mono font-bold text-white bg-black/20 px-3 py-2 rounded-lg inline-block">
-                                        {formula.formula}
-                                    </div>
-                                    <div className="text-sm text-white/70 mt-2">{formula.description}</div>
-                                    {formula.whenToUse && (
-                                        <div className="text-xs text-purple-400 mt-1">
-                                            <span className="font-bold">Usar cuando:</span> {formula.whenToUse}
+    const typeStyle = getTypeIcon(content.type);
+
+    return (
+        <div className="space-y-6">
+            <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold text-white mb-2">{content.title}</h2>
+                <p className="text-white/60">{phaseConfig?.description || 'Información clave para el examen'}</p>
+            </div>
+
+            {content.categories.map((category, i) => (
+                <div key={i} className="bg-white/10 backdrop-blur-sm rounded-xl p-6">
+                    <h3 className={`text-lg font-bold ${typeStyle.color} mb-4 flex items-center gap-2`}>
+                        <span className="material-symbols-outlined">{typeStyle.icon}</span>
+                        {category.name}
+                    </h3>
+                    <div className="grid gap-4">
+                        {category.items.map((item, j) => (
+                            <div key={j} className="bg-white/5 rounded-lg p-4">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex-1">
+                                        <div className="text-sm text-white/60 mb-1">{item.name}</div>
+                                        <div className={`text-xl font-mono font-bold text-white bg-black/20 px-3 py-2 rounded-lg inline-block ${content.type === 'codePatterns' ? 'text-sm whitespace-pre-wrap' : ''}`}>
+                                            {item.content}
                                         </div>
-                                    )}
+                                        <div className="text-sm text-white/70 mt-2">{item.explanation}</div>
+
+                                        {item.example && (
+                                            <div className="text-xs text-blue-400 mt-2">
+                                                <span className="font-bold">Ejemplo:</span> {item.example}
+                                            </div>
+                                        )}
+                                        {item.whenToUse && (
+                                            <div className="text-xs text-emerald-400 mt-1">
+                                                <span className="font-bold">Usar cuando:</span> {item.whenToUse}
+                                            </div>
+                                        )}
+                                        {item.commonMistake && (
+                                            <div className="text-xs text-red-400 mt-1">
+                                                <span className="font-bold">Error común:</span> {item.commonMistake}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
-            </div>
-        ))}
-    </div>
-);
+            ))}
+        </div>
+    );
+};
 
-const Phase3Methodologies: React.FC<{ content: MethodologyContent }> = ({ content }) => {
+const Phase3Methodologies: React.FC<{ content: AdaptiveMethodologyContent }> = ({ content }) => {
     const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
+
+    const getTypeIcon = (type: string) => {
+        switch (type) {
+            case 'problemSolving': return 'calculate';
+            case 'analysis': return 'analytics';
+            case 'writing': return 'edit_document';
+            case 'coding': return 'code';
+            case 'memorization': return 'psychology';
+            default: return 'route';
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -641,9 +777,14 @@ const Phase3Methodologies: React.FC<{ content: MethodologyContent }> = ({ conten
                     >
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
-                                <span className="material-symbols-outlined text-amber-400">route</span>
+                                <span className="material-symbols-outlined text-amber-400">{getTypeIcon(content.type)}</span>
                             </div>
-                            <span className="font-bold text-white">{method.problemType}</span>
+                            <div>
+                                <span className="font-bold text-white">{method.situationType}</span>
+                                {method.description && (
+                                    <p className="text-sm text-white/50">{method.description}</p>
+                                )}
+                            </div>
                         </div>
                         <span className="material-symbols-outlined text-white/60">
                             {expandedIndex === i ? 'expand_less' : 'expand_more'}
@@ -666,7 +807,7 @@ const Phase3Methodologies: React.FC<{ content: MethodologyContent }> = ({ conten
                                 </ol>
                             </div>
 
-                            {method.tips.length > 0 && (
+                            {method.tips && method.tips.length > 0 && (
                                 <div className="bg-purple-500/10 rounded-lg p-4">
                                     <h4 className="text-sm font-bold text-purple-400 mb-2">TIPS:</h4>
                                     <ul className="space-y-1">
@@ -683,7 +824,21 @@ const Phase3Methodologies: React.FC<{ content: MethodologyContent }> = ({ conten
                             {method.example && (
                                 <div className="bg-blue-500/10 rounded-lg p-4">
                                     <h4 className="text-sm font-bold text-blue-400 mb-2">EJEMPLO:</h4>
-                                    <p className="text-sm text-white/70">{method.example}</p>
+                                    <p className="text-sm text-white/70 whitespace-pre-wrap">{method.example}</p>
+                                </div>
+                            )}
+
+                            {method.commonErrors && method.commonErrors.length > 0 && (
+                                <div className="bg-red-500/10 rounded-lg p-4">
+                                    <h4 className="text-sm font-bold text-red-400 mb-2">ERRORES A EVITAR:</h4>
+                                    <ul className="space-y-1">
+                                        {method.commonErrors.map((error, j) => (
+                                            <li key={j} className="text-sm text-white/70 flex items-start gap-2">
+                                                <span className="material-symbols-outlined text-red-400 text-sm">close</span>
+                                                {error}
+                                            </li>
+                                        ))}
+                                    </ul>
                                 </div>
                             )}
                         </div>
@@ -774,7 +929,7 @@ const Phase4Flashcards: React.FC<{
 };
 
 const Phase5Exercises: React.FC<{
-    content: ExerciseContent;
+    content: AdaptiveExerciseContent;
     currentIndex: number;
     setCurrentIndex: (i: number) => void;
     showSolution: boolean;
@@ -790,6 +945,16 @@ const Phase5Exercises: React.FC<{
         );
     }
 
+    const getLikelihoodStyle = (likelihood: string) => {
+        switch (likelihood) {
+            case 'high': return { text: 'Muy probable', color: 'bg-red-500/20 text-red-400' };
+            case 'medium': return { text: 'Probable', color: 'bg-amber-500/20 text-amber-400' };
+            default: return { text: 'Posible', color: 'bg-blue-500/20 text-blue-400' };
+        }
+    };
+
+    const likelihood = getLikelihoodStyle(exercise.examLikelihood);
+
     return (
         <div className="space-y-6">
             <div className="text-center mb-4">
@@ -797,14 +962,27 @@ const Phase5Exercises: React.FC<{
                 <p className="text-white/60">{currentIndex + 1} de {content.exercises.length}</p>
             </div>
 
+            {/* Practice Strategy */}
+            {content.practiceStrategy && currentIndex === 0 && (
+                <div className="bg-purple-500/10 backdrop-blur-sm rounded-xl p-4 border border-purple-500/30">
+                    <div className="flex items-start gap-2">
+                        <span className="material-symbols-outlined text-purple-400">tips_and_updates</span>
+                        <p className="text-sm text-purple-200">{content.practiceStrategy}</p>
+                    </div>
+                </div>
+            )}
+
             {/* Exercise */}
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6">
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-2 mb-4 flex-wrap">
                     <span className="px-3 py-1 bg-rose-500/20 text-rose-400 text-xs font-bold rounded-full">
                         Dificultad {exercise.difficulty}/5
                     </span>
                     <span className="px-3 py-1 bg-white/10 text-white/60 text-xs rounded-full">
                         {exercise.topic}
+                    </span>
+                    <span className={`px-3 py-1 ${likelihood.color} text-xs font-bold rounded-full`}>
+                        {likelihood.text} en examen
                     </span>
                 </div>
 
@@ -867,77 +1045,133 @@ const Phase5Exercises: React.FC<{
     );
 };
 
-const Phase6Tips: React.FC<{ content: TipsContent }> = ({ content }) => (
-    <div className="space-y-6">
-        <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-white mb-2">Tips y Errores Comunes</h2>
-            <p className="text-white/60">Lo que debes recordar para el examen</p>
-        </div>
+const Phase6Tips: React.FC<{ content: AdaptiveTipsContent }> = ({ content }) => {
+    const getFrequencyBadge = (frequency: string) => {
+        switch (frequency) {
+            case 'very-common': return { text: 'Muy común', color: 'bg-red-500/30 text-red-300' };
+            case 'common': return { text: 'Común', color: 'bg-amber-500/30 text-amber-300' };
+            default: return { text: 'Ocasional', color: 'bg-blue-500/30 text-blue-300' };
+        }
+    };
 
-        {/* Common Mistakes */}
-        {content.commonMistakes.length > 0 && (
-            <div className="bg-red-500/10 backdrop-blur-sm rounded-xl p-6">
-                <h3 className="text-lg font-bold text-red-400 mb-4 flex items-center gap-2">
-                    <span className="material-symbols-outlined">error</span>
-                    Errores Comunes a Evitar
-                </h3>
-                <div className="space-y-4">
-                    {content.commonMistakes.map((mistake, i) => (
-                        <div key={i} className="bg-white/5 rounded-lg p-4">
-                            <div className="flex items-start gap-3">
-                                <span className="material-symbols-outlined text-red-400 mt-1">close</span>
-                                <div>
-                                    <p className="text-white font-medium">{mistake.mistake}</p>
-                                    <p className="text-emerald-400 text-sm mt-1">
-                                        <span className="font-bold">Correcto:</span> {mistake.correction}
-                                    </p>
-                                    <p className="text-white/60 text-sm mt-1">
-                                        <span className="font-bold">Evítalo:</span> {mistake.howToAvoid}
-                                    </p>
+    return (
+        <div className="space-y-6">
+            <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold text-white mb-2">Tips y Errores Comunes</h2>
+                <p className="text-white/60">Lo que debes recordar para el examen</p>
+            </div>
+
+            {/* Common Mistakes */}
+            {content.commonMistakes && content.commonMistakes.length > 0 && (
+                <div className="bg-red-500/10 backdrop-blur-sm rounded-xl p-6">
+                    <h3 className="text-lg font-bold text-red-400 mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined">error</span>
+                        Errores Comunes a Evitar
+                    </h3>
+                    <div className="space-y-4">
+                        {content.commonMistakes.map((mistake, i) => {
+                            const freqBadge = getFrequencyBadge(mistake.frequency);
+                            return (
+                                <div key={i} className="bg-white/5 rounded-lg p-4">
+                                    <div className="flex items-start gap-3">
+                                        <span className="material-symbols-outlined text-red-400 mt-1">close</span>
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <p className="text-white font-medium">{mistake.mistake}</p>
+                                                <span className={`px-2 py-0.5 text-xs rounded-full ${freqBadge.color}`}>
+                                                    {freqBadge.text}
+                                                </span>
+                                            </div>
+                                            <p className="text-emerald-400 text-sm mt-1">
+                                                <span className="font-bold">Correcto:</span> {mistake.correction}
+                                            </p>
+                                            <p className="text-white/60 text-sm mt-1">
+                                                <span className="font-bold">Evítalo:</span> {mistake.howToAvoid}
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                    ))}
+                            );
+                        })}
+                    </div>
                 </div>
-            </div>
-        )}
+            )}
 
-        {/* Exam Tips */}
-        {content.examTips.length > 0 && (
-            <div className="bg-amber-500/10 backdrop-blur-sm rounded-xl p-6">
-                <h3 className="text-lg font-bold text-amber-400 mb-4 flex items-center gap-2">
-                    <span className="material-symbols-outlined">lightbulb</span>
-                    Tips para el Examen
-                </h3>
-                <ul className="space-y-2">
-                    {content.examTips.map((tip, i) => (
-                        <li key={i} className="flex items-start gap-3 text-white/80">
-                            <span className="material-symbols-outlined text-amber-400 text-sm mt-1">arrow_right</span>
-                            <span>{tip}</span>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-        )}
+            {/* Exam Strategies */}
+            {content.examStrategies && content.examStrategies.length > 0 && (
+                <div className="bg-amber-500/10 backdrop-blur-sm rounded-xl p-6">
+                    <h3 className="text-lg font-bold text-amber-400 mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined">psychology</span>
+                        Estrategias para el Examen
+                    </h3>
+                    <div className="space-y-3">
+                        {content.examStrategies.map((item, i) => (
+                            <div key={i} className="bg-white/5 rounded-lg p-3">
+                                <p className="text-white font-medium">{item.strategy}</p>
+                                <p className="text-amber-300 text-sm mt-1">
+                                    <span className="font-bold">Usar cuando:</span> {item.whenToUse}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
-        {/* Last Minute Reminders */}
-        {content.lastMinuteReminders.length > 0 && (
-            <div className="bg-cyan-500/10 backdrop-blur-sm rounded-xl p-6">
-                <h3 className="text-lg font-bold text-cyan-400 mb-4 flex items-center gap-2">
-                    <span className="material-symbols-outlined">notifications_active</span>
-                    Recordatorios de Última Hora
-                </h3>
-                <ul className="space-y-2">
-                    {content.lastMinuteReminders.map((reminder, i) => (
-                        <li key={i} className="flex items-start gap-3 text-white/80">
-                            <span className="material-symbols-outlined text-cyan-400 text-sm mt-1">check</span>
-                            <span>{reminder}</span>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-        )}
-    </div>
-);
+            {/* Time Management */}
+            {content.timeManagement && content.timeManagement.length > 0 && (
+                <div className="bg-purple-500/10 backdrop-blur-sm rounded-xl p-6">
+                    <h3 className="text-lg font-bold text-purple-400 mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined">schedule</span>
+                        Gestión del Tiempo
+                    </h3>
+                    <ul className="space-y-2">
+                        {content.timeManagement.map((tip, i) => (
+                            <li key={i} className="flex items-start gap-3 text-white/80">
+                                <span className="material-symbols-outlined text-purple-400 text-sm mt-1">timer</span>
+                                <span>{tip}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            {/* Last Minute Reminders */}
+            {content.lastMinuteReminders && content.lastMinuteReminders.length > 0 && (
+                <div className="bg-cyan-500/10 backdrop-blur-sm rounded-xl p-6">
+                    <h3 className="text-lg font-bold text-cyan-400 mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined">notifications_active</span>
+                        Recordatorios de Última Hora
+                    </h3>
+                    <ul className="space-y-2">
+                        {content.lastMinuteReminders.map((reminder, i) => (
+                            <li key={i} className="flex items-start gap-3 text-white/80">
+                                <span className="material-symbols-outlined text-cyan-400 text-sm mt-1">check</span>
+                                <span>{reminder}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            {/* Confidence Boosters */}
+            {content.confidenceBoosters && content.confidenceBoosters.length > 0 && (
+                <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 backdrop-blur-sm rounded-xl p-6 border border-emerald-500/20">
+                    <h3 className="text-lg font-bold text-emerald-400 mb-4 flex items-center gap-2">
+                        <span className="material-symbols-outlined">favorite</span>
+                        Confía en Ti
+                    </h3>
+                    <ul className="space-y-2">
+                        {content.confidenceBoosters.map((boost, i) => (
+                            <li key={i} className="flex items-start gap-3 text-emerald-200">
+                                <span className="material-symbols-outlined text-emerald-400 text-sm mt-1">star</span>
+                                <span>{boost}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
+};
 
 export default UltraReview;

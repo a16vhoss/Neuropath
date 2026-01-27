@@ -87,6 +87,16 @@ export interface LearningStats {
     weakExerciseTypes: string[];
 }
 
+export interface ExerciseInstance {
+    id: string;
+    template_id: string;
+    user_id: string;
+    started_at: string;
+    problem: string;
+    solution: string;
+    variables: Record<string, any>;
+}
+
 // ============================================
 // HELPER: Generate with Gemini
 // ============================================
@@ -815,3 +825,105 @@ export async function generateExercisesForStudySet(
     // Save to database
     return await saveExerciseTemplates(studySetId, undefined, exercises);
 }
+
+// ============================================
+// EXERCISE SESSION FUNCTIONS
+// ============================================
+
+/**
+ * Get recommended exercises for a user, optionally filtered by study sets
+ */
+export async function getRecommendedExercises(
+    userId: string,
+    studySetIds: string[],
+    limit: number = 10
+): Promise<ExerciseTemplate[]> {
+    let query = supabase
+        .from('exercise_templates')
+        .select('*');
+
+    if (studySetIds.length > 0) {
+        query = query.in('study_set_id', studySetIds);
+    }
+
+    // Prioritize by last practiced (prefer less practiced)
+    const { data: exercises, error } = await query
+        .order('times_practiced', { ascending: true })
+        .limit(limit);
+
+    if (error) {
+        console.error('Error fetching recommended exercises:', error);
+        return [];
+    }
+
+    return exercises || [];
+}
+
+/**
+ * Start an exercise attempt
+ */
+export async function startExerciseAttempt(
+    userId: string,
+    template: ExerciseTemplate
+): Promise<ExerciseInstance> {
+    // Create instance from template
+    const instance: ExerciseInstance = {
+        id: crypto.randomUUID(),
+        template_id: template.id,
+        user_id: userId,
+        started_at: new Date().toISOString(),
+        problem: template.problem_statement,
+        solution: template.solution || '',
+        variables: template.variables || {}
+    };
+
+    return instance;
+}
+
+/**
+ * Submit exercise attempt and get feedback
+ */
+export async function submitExerciseAttempt(
+    userId: string,
+    instance: ExerciseInstance,
+    userAnswer: string,
+    timeSpent: number,
+    wasCorrect: boolean
+): Promise<{ isCorrect: boolean; feedback: string }> {
+    // Record the attempt
+    await recordExerciseAttempt(
+        userId,
+        instance.template_id,
+        wasCorrect,
+        timeSpent
+    );
+
+    return {
+        isCorrect: wasCorrect,
+        feedback: wasCorrect
+            ? '¡Correcto! Buen trabajo.'
+            : 'Revisa la solución y los pasos para entender mejor.'
+    };
+}
+
+// ============================================
+// NAMESPACE EXPORT
+// ============================================
+
+export const ExerciseService = {
+    classifyContent,
+    extractExercises,
+    generateExercisesFromTheory,
+    generateSimilarExercise,
+    saveExerciseTemplates,
+    getExercisesForStudySet,
+    getUserExerciseProgress,
+    recordExerciseAttempt,
+    getLearningStats,
+    updateLearningStats,
+    processUploadedContent,
+    generateExercisesForStudySet,
+    getRecommendedExercises,
+    startExerciseAttempt,
+    submitExerciseAttempt
+};
