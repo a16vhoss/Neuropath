@@ -18,6 +18,8 @@ import {
     toggleStudySetEditor
 } from '../services/supabaseClient';
 import MergeSetModal from '../components/MergeSetModal';
+import ExercisesTab from '../components/ExercisesTab';
+import { processUploadedContent } from '../services/ExerciseService';
 import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary, generateInfographicFromMaterials, generatePresentationFromMaterials } from '../services/pdfProcessingService';
 import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL, autoCategorizeFlashcards } from '../services/geminiService';
 import CumulativeReportsCard from '../components/CumulativeReportsCard';
@@ -91,7 +93,7 @@ interface RankingMember {
     ranking_score: number;
 }
 
-type TabType = 'overview' | 'flashcards' | 'materials' | 'notebooks' | 'reports' | 'people';
+type TabType = 'overview' | 'flashcards' | 'exercises' | 'materials' | 'notebooks' | 'reports' | 'people';
 
 interface StudySetDetailProps {
     studySetId?: string;
@@ -641,7 +643,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                     category: fc.category || 'General'
                 }));
 
-                await createMaterialWithFlashcards({
+                const materialResult = await createMaterialWithFlashcards({
                     study_set_id: studySet.id,
                     name: file.name,
                     type: 'pdf',
@@ -650,6 +652,38 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                     summary: summary,
                     flashcards: flashcardsPayload
                 });
+
+                // Process content for exercise extraction
+                setUploadProgress('Analizando contenido y extrayendo ejercicios...');
+                try {
+                    // Get the material id from the result or fetch the latest material
+                    let materialId = materialResult?.id || materialResult;
+                    if (!materialId) {
+                        // Fetch the most recent material for this study set
+                        const { data: materials } = await supabase
+                            .from('study_set_materials')
+                            .select('id')
+                            .eq('study_set_id', studySet.id)
+                            .order('created_at', { ascending: false })
+                            .limit(1);
+                        materialId = materials?.[0]?.id;
+                    }
+
+                    if (materialId && extractedText) {
+                        const result = await processUploadedContent(
+                            studySet.id,
+                            materialId,
+                            extractedText,
+                            file.name
+                        );
+                        console.log('Content processed:', result);
+                        if (result.exercisesCreated > 0) {
+                            setUploadProgress(`${result.exercisesCreated} ejercicios extraídos!`);
+                        }
+                    }
+                } catch (exerciseError) {
+                    console.error('Error processing exercises (non-critical):', exerciseError);
+                }
 
                 // Regenerate guide with new text
                 await regenerateStudyGuide(extractedText);
@@ -697,7 +731,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                     category: fc.category || 'General'
                 }));
 
-                await createMaterialWithFlashcards({
+                const materialResult = await createMaterialWithFlashcards({
                     study_set_id: studySet.id,
                     name: `Notas: ${textContent.slice(0, 20)}...`,
                     type: 'notes',
@@ -705,6 +739,27 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                     summary: summary,
                     flashcards: flashcardsPayload
                 });
+
+                // Process content for exercise extraction
+                setUploadProgress('Analizando contenido...');
+                try {
+                    let materialId = materialResult?.id || materialResult;
+                    if (!materialId) {
+                        const { data: materials } = await supabase
+                            .from('study_set_materials')
+                            .select('id')
+                            .eq('study_set_id', studySet.id)
+                            .order('created_at', { ascending: false })
+                            .limit(1);
+                        materialId = materials?.[0]?.id;
+                    }
+
+                    if (materialId) {
+                        await processUploadedContent(studySet.id, materialId, textContent, 'Notas');
+                    }
+                } catch (exerciseError) {
+                    console.error('Error processing exercises:', exerciseError);
+                }
 
                 // Regenerate guide with new text
                 await regenerateStudyGuide(textContent);
@@ -995,7 +1050,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                 WebkitMaskImage: 'linear-gradient(to right, black 85%, transparent 100%)'
                             }}
                         >
-                            {(['overview', 'flashcards', 'materials', 'notebooks', 'reports', 'people'] as TabType[]).map((tab) => (
+                            {(['overview', 'flashcards', 'exercises', 'materials', 'notebooks', 'reports', 'people'] as TabType[]).map((tab) => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
@@ -1006,6 +1061,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                 >
                                     {tab === 'overview' && 'Resumen'}
                                     {tab === 'flashcards' && `Flashcards (${studySet.flashcard_count})`}
+                                    {tab === 'exercises' && 'Ejercicios'}
                                     {tab === 'materials' && `Materiales (${studySet.material_count})`}
                                     {tab === 'notebooks' && `Cuadernos (${notebooks.length})`}
                                     {tab === 'reports' && 'Reportes'}
@@ -1721,6 +1777,17 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                 })}
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* Exercises Tab */}
+                {activeTab === 'exercises' && studySet && (
+                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <ExercisesTab
+                            studySetId={studySet.id}
+                            studySetName={studySet.name}
+                            canEdit={canEdit}
+                        />
                     </div>
                 )}
 

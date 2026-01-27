@@ -11,8 +11,15 @@
 import { supabase } from './supabaseClient';
 import { generateQuizQuestions, generateAdvancedQuiz } from './geminiService';
 import { DailyMissionsService } from './DailyMissionsService';
+import {
+    getExercisesForStudySet,
+    getLearningStats,
+    updateLearningStats,
+    generateSimilarExercise,
+    ExerciseTemplate
+} from './ExerciseService';
 
-export type QuestionType = 'true_false' | 'multiple_choice' | 'analysis' | 'design' | 'practical' | 'ordering' | 'matching' | 'fill_blank' | 'identify_error';
+export type QuestionType = 'true_false' | 'multiple_choice' | 'analysis' | 'design' | 'practical' | 'ordering' | 'matching' | 'fill_blank' | 'identify_error' | 'exercise';
 export type QuizGameMode = 'classic' | 'survival' | 'time_attack';
 export type QuizPersona = 'standard' | 'socratic' | 'strict' | 'friendly';
 
@@ -35,6 +42,13 @@ export interface QuizQuestion {
     fillBlankText?: string; // For cloze: "The [blank] is blue."
     fillBlankAnswers?: string[]; // Correct words for blanks.
     errorText?: string; // For Identify Error: Text containing the error.
+
+    // Exercise-based question fields
+    exerciseProblem?: string; // The exercise problem statement
+    exerciseSolution?: string; // The correct solution
+    exerciseSteps?: string[]; // Step-by-step explanation
+    exerciseType?: 'mathematical' | 'programming' | 'case_study' | 'conceptual' | 'practical' | 'general';
+    exerciseTemplateId?: string; // Reference to the original template
 }
 
 export interface QuizResult {
@@ -123,7 +137,8 @@ function getQuestionTypeDistribution(totalQuestions: number): Record<QuestionTyp
         ordering: 0.10,
         matching: 0.10,
         fill_blank: 0.05,
-        identify_error: 0.05
+        identify_error: 0.05,
+        exercise: 0 // Exercises are added dynamically based on availability
     };
 
     // Calculate counts
@@ -137,6 +152,7 @@ function getQuestionTypeDistribution(totalQuestions: number): Record<QuestionTyp
         matching: Math.round(totalQuestions * distribution.matching),
         fill_blank: Math.round(totalQuestions * distribution.fill_blank),
         identify_error: Math.round(totalQuestions * distribution.identify_error),
+        exercise: 0 // Added dynamically in generateAdaptiveQuiz based on learning stats
     };
 
     // Ensure variety for larger quizzes
@@ -173,6 +189,21 @@ export async function generateAdaptiveQuiz(
 ): Promise<QuizQuestion[]> {
     try {
         const questionCount = config?.questionCount || 5;
+
+        // 0. Get learning stats and exercises for adaptive balance
+        const [learningStats, exerciseTemplates] = await Promise.all([
+            getLearningStats(userId, studySetId),
+            getExercisesForStudySet(studySetId)
+        ]);
+
+        // Calculate how many exercise-based questions to include
+        const exerciseRatio = learningStats.recommendedExerciseRatio / 100;
+        const exerciseQuestionCount = exerciseTemplates.length > 0
+            ? Math.round(questionCount * exerciseRatio * 0.5) // Up to 50% of ratio can be exercises
+            : 0;
+        const theoryQuestionCount = questionCount - exerciseQuestionCount;
+
+        console.log(`[Quiz] Adaptive ratio: ${learningStats.recommendedExerciseRatio}%, Exercises: ${exerciseQuestionCount}/${questionCount}, Theory: ${theoryQuestionCount}/${questionCount}`);
 
         // 1. Fetch flashcards from study set for content
         let flashcardsQuery = supabase
@@ -262,13 +293,23 @@ export async function generateAdaptiveQuiz(
             })
             .join('\n\n');
 
-        // Combine both sources
+        // Build exercise context for prompt
+        const exercisesSummary = exerciseTemplates.length > 0
+            ? exerciseTemplates.slice(0, 10).map((ex, i) =>
+                `Ejercicio ${i + 1} [${ex.exercise_type}, Dif: ${ex.difficulty}/5]:\n${ex.problem_statement}\nTema: ${ex.topic}`
+            ).join('\n\n')
+            : '';
+
+        // Combine all sources
         let contentSummary = '';
         if (flashcardsSummary) {
             contentSummary += `FLASHCARDS DEL SET:\n${flashcardsSummary}`;
         }
         if (notebooksSummary) {
             contentSummary += `\n\nAPUNTES DE CUADERNOS:\n${notebooksSummary}`;
+        }
+        if (exercisesSummary) {
+            contentSummary += `\n\nEJERCICIOS DISPONIBLES (para inspirar preguntas prácticas):\n${exercisesSummary}`;
         }
 
         console.log('[Quiz] Content sources - Flashcards:', (flashcards || []).length, 'Notebooks:', (notebooks || []).filter(n => n.content).length);
@@ -289,21 +330,26 @@ export async function generateAdaptiveQuiz(
             ? `\n\nAvoid repeating these exact questions:\n${previousQuestions.slice(0, 10).join('\n')}`
             : '';
 
-        // 6. Get question type distribution 
+        // 6. Get question type distribution
         // Logic: Use user selection if provided, otherwise default balanced
         let typeCounts: Record<string, number> = {};
 
         if (config && config.questionTypes && config.questionTypes.length > 0) {
             // Distribute evenly among selected types
-            const typeCount = Math.floor(questionCount / config.questionTypes.length);
-            const remainder = questionCount % config.questionTypes.length;
+            const typeCount = Math.floor(theoryQuestionCount / config.questionTypes.length);
+            const remainder = theoryQuestionCount % config.questionTypes.length;
 
             config.questionTypes.forEach((type, index) => {
                 typeCounts[type] = typeCount + (index < remainder ? 1 : 0);
             });
         } else {
-            // Default balanced
-            typeCounts = getQuestionTypeDistribution(questionCount);
+            // Default balanced for theory questions
+            typeCounts = getQuestionTypeDistribution(theoryQuestionCount);
+        }
+
+        // Add exercise-based questions if available
+        if (exerciseQuestionCount > 0 && exerciseTemplates.length > 0) {
+            typeCounts['exercise'] = exerciseQuestionCount;
         }
 
         const typeInstructions = `
@@ -383,7 +429,31 @@ QUESTION TYPE FORMATS:
    - "correctIndex": 0 (Irrelevant here, but keep schema consistent)
    - "explanation": "Actually, the heart pumps deoxygenated blood to the lungs."
    - "question": "Find the error in this statement."
+
+10. EXERCISE TYPE (for practice-based questions):
+   - Present a problem for the student to solve
+   - Can be mathematical, programming, case study, etc.
+   - "exerciseProblem": The full problem statement to solve
+   - "exerciseSolution": The correct solution/answer
+   - "exerciseSteps": ["Step 1: ...", "Step 2: ...", ...] (how to arrive at solution)
+   - "exerciseType": "mathematical" | "programming" | "case_study" | "conceptual" | "practical" | "general"
+   - "options": ["Tengo la solución"] (single option for submission)
+   - "correctIndex": 0
+   - Create SIMILAR but DIFFERENT problems inspired by the exercise examples provided
+   - Vary the numbers, scenarios, or data while testing the same concepts
 `;
+
+        // Add exercise context if we have exercises
+        const exercisePromptAddition = exerciseQuestionCount > 0 ? `
+
+IMPORTANT: Generate ${exerciseQuestionCount} "exercise" type questions.
+These should be practice problems SIMILAR to the exercises in the study set, but with DIFFERENT values/scenarios.
+Use the EJERCICIOS DISPONIBLES section above as inspiration to create varied problems.
+Each exercise question should:
+- Test the same concepts as the original exercises
+- Have different numbers, data, or scenarios
+- Include a complete solution and step-by-step explanation
+` : '';
 
         const prompt = `Based on this study material, generate a quiz with ${questionCount} questions.
 ${personaInstruction}
@@ -397,10 +467,11 @@ ${avoidContext}
 
 ${typeInstructions}
 ${typeDetails}
+${exercisePromptAddition}
 
 Return as JSON array. IMPORTANT: Include specific fields for each type:
 [{
-  "type": "true_false" | "multiple_choice" | "analysis" | "design" | "practical" | "ordering" | "matching" | "fill_blank" | "identify_error",
+  "type": "true_false" | "multiple_choice" | "analysis" | "design" | "practical" | "ordering" | "matching" | "fill_blank" | "identify_error" | "exercise",
   "question": "...",
   "options": [...],
   "correctIndex": 0,
@@ -414,7 +485,11 @@ Return as JSON array. IMPORTANT: Include specific fields for each type:
   "matchingPairs": [{"left": "A", "right": "B"}...],
   "fillBlankText": "Text with [blank]...",
   "fillBlankAnswers": ["word1", "word2"],
-  "errorText": "Text with error..."
+  "errorText": "Text with error...",
+  "exerciseProblem": "Full problem statement...",
+  "exerciseSolution": "The solution...",
+  "exerciseSteps": ["Step 1...", "Step 2..."],
+  "exerciseType": "mathematical" | "programming" | "case_study" | "conceptual" | "practical" | "general"
 }]`;
 
         // 7. Generate questions with Gemini
@@ -437,6 +512,11 @@ Return as JSON array. IMPORTANT: Include specific fields for each type:
                         return q.orderingItems && Array.isArray(q.orderingItems) && q.orderingItems.length >= 2;
                     }
 
+                    // Exercise type needs problem and solution
+                    if (q.type === 'exercise') {
+                        return q.exerciseProblem && q.exerciseSolution;
+                    }
+
                     return true;
                 })
                 .map((q: any, i: number) => ({
@@ -451,12 +531,17 @@ Return as JSON array. IMPORTANT: Include specific fields for each type:
                     designPrompt: q.designPrompt,
                     evaluationCriteria: q.evaluationCriteria,
                     realWorldExample: q.realWorldExample,
-                    // Map new fields
+                    // Map advanced type fields
                     orderingItems: q.orderingItems,
                     matchingPairs: q.matchingPairs,
                     fillBlankText: q.fillBlankText,
                     fillBlankAnswers: q.fillBlankAnswers,
-                    errorText: q.errorText
+                    errorText: q.errorText,
+                    // Map exercise fields
+                    exerciseProblem: q.exerciseProblem,
+                    exerciseSolution: q.exerciseSolution,
+                    exerciseSteps: q.exerciseSteps,
+                    exerciseType: q.exerciseType
                 }));
         }
 
@@ -633,6 +718,28 @@ export async function saveQuizSession(
             }
         } catch (e) {
             console.error('Error updating daily missions from quiz:', e);
+        }
+
+        // 5. Update adaptive learning stats (theory vs exercises)
+        try {
+            // Separate results by question type
+            const exerciseResults = results.filter((_, i) => questions[i]?.type === 'exercise');
+            const theoryResults = results.filter((_, i) => questions[i]?.type !== 'exercise');
+
+            const theoryStats = {
+                correct: theoryResults.filter(r => r.isCorrect).length,
+                total: theoryResults.length
+            };
+            const exerciseStats = {
+                correct: exerciseResults.filter(r => r.isCorrect).length,
+                total: exerciseResults.length
+            };
+
+            if (theoryStats.total > 0 || exerciseStats.total > 0) {
+                await updateLearningStats(userId, studySetId, theoryStats, exerciseStats);
+            }
+        } catch (e) {
+            console.error('Error updating learning stats from quiz:', e);
         }
 
         return {

@@ -44,6 +44,13 @@ interface QuizQuestion {
   fillBlankText?: string;
   fillBlankAnswers?: string[];
   errorText?: string;
+
+  // Exercise-based question fields
+  exerciseProblem?: string;
+  exerciseSolution?: string;
+  exerciseSteps?: string[];
+  exerciseType?: 'mathematical' | 'programming' | 'case_study' | 'conceptual' | 'practical' | 'general';
+  exerciseTemplateId?: string;
 }
 
 const mockFlashcards: Flashcard[] = [
@@ -111,6 +118,8 @@ const StudySession: React.FC = () => {
   const [matchingState, setMatchingState] = useState<Record<string, string>>({}); // Left -> Right
   const [fillBlankAnswer, setFillBlankAnswer] = useState<string>('');
   const [selectedErrorOption, setSelectedErrorOption] = useState<number | null>(null);
+  const [exerciseAnswer, setExerciseAnswer] = useState<string>('');
+  const [showExerciseSolution, setShowExerciseSolution] = useState(false);
 
   // Custom Quiz Configuration
   const [showQuizConfig, setShowQuizConfig] = useState(false);
@@ -347,6 +356,12 @@ const StudySession: React.FC = () => {
       if (currentQ.type === 'identify_error') {
         setSelectedErrorOption(null);
       }
+
+      // Exercise: Clear answer and solution visibility
+      if (currentQ.type === 'exercise') {
+        setExerciseAnswer('');
+        setShowExerciseSolution(false);
+      }
     }
   }, [currentQuizIndex, quizQuestions]);
 
@@ -421,6 +436,12 @@ const StudySession: React.FC = () => {
             questionType = 'multiple_choice';
           }
 
+          // If exercise type but no problem/solution, convert to multiple_choice
+          if (questionType === 'exercise' && (!q.exerciseProblem || !q.exerciseSolution)) {
+            console.warn('[Quiz] Exercise question missing problem/solution, converting to multiple_choice');
+            questionType = 'multiple_choice';
+          }
+
           return {
             id: q.id,
             question: q.question,
@@ -437,7 +458,13 @@ const StudySession: React.FC = () => {
             matchingPairs: q.matchingPairs,
             fillBlankText: q.fillBlankText,
             fillBlankAnswers: q.fillBlankAnswers,
-            errorText: q.errorText
+            errorText: q.errorText,
+            // Exercise type mappings
+            exerciseProblem: q.exerciseProblem,
+            exerciseSolution: q.exerciseSolution,
+            exerciseSteps: q.exerciseSteps,
+            exerciseType: q.exerciseType,
+            exerciseTemplateId: q.exerciseTemplateId
           };
         });
 
@@ -739,6 +766,8 @@ const StudySession: React.FC = () => {
       setFillBlankAnswer('');
       setOrderingState([]);
       setMatchingState({});
+      setExerciseAnswer('');
+      setShowExerciseSolution(false);
       setSelectedErrorOption(null);
 
       // Reset Timer
@@ -1354,7 +1383,8 @@ const StudySession: React.FC = () => {
                                 quizQuestions[currentQuizIndex]?.type === 'matching' ? '🔗 Relacionar' :
                                   quizQuestions[currentQuizIndex]?.type === 'fill_blank' ? '✍️ Completar' :
                                     quizQuestions[currentQuizIndex]?.type === 'identify_error' ? '🚫 Error' :
-                                      quizQuestions[currentQuizIndex]?.type === 'practical' ? '🚀 Aplicación' : '📝 Opción Múltiple'}
+                                      quizQuestions[currentQuizIndex]?.type === 'practical' ? '🚀 Aplicación' :
+                                        quizQuestions[currentQuizIndex]?.type === 'exercise' ? '📐 Ejercicio' : '📝 Opción Múltiple'}
                       </span>
                     </div>
 
@@ -1610,6 +1640,112 @@ const StudySession: React.FC = () => {
                       ) : (
                         // Fallback if no options -> simple button "I spotted it" revealed in explanation
                         <button onClick={() => handleQuizAnswer(0)} className="w-full p-4 bg-violet-600 text-white rounded-xl">Ver Respuesta</button>
+                      )}
+                    </div>
+                  ) : quizQuestions[currentQuizIndex]?.type === 'exercise' ? (
+                    /* EXERCISE TYPE - Problem solving with solution reveal */
+                    <div className="space-y-4">
+                      {/* Exercise Problem */}
+                      <div className="p-6 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="material-symbols-outlined text-amber-600">calculate</span>
+                          <span className="font-bold text-amber-700">
+                            {quizQuestions[currentQuizIndex].exerciseType === 'mathematical' ? 'Problema Matemático' :
+                              quizQuestions[currentQuizIndex].exerciseType === 'programming' ? 'Ejercicio de Programación' :
+                              quizQuestions[currentQuizIndex].exerciseType === 'case_study' ? 'Caso de Estudio' :
+                              quizQuestions[currentQuizIndex].exerciseType === 'conceptual' ? 'Ejercicio Conceptual' :
+                              quizQuestions[currentQuizIndex].exerciseType === 'practical' ? 'Ejercicio Práctico' : 'Ejercicio'}
+                          </span>
+                        </div>
+                        <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">
+                          {quizQuestions[currentQuizIndex].exerciseProblem}
+                        </p>
+                      </div>
+
+                      {/* Answer input area */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-600">Tu respuesta:</label>
+                        <textarea
+                          value={exerciseAnswer}
+                          onChange={(e) => setExerciseAnswer(e.target.value)}
+                          disabled={showResult}
+                          placeholder="Escribe tu solución aquí..."
+                          className="w-full h-32 p-4 border-2 border-slate-200 rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-200 transition-all resize-none text-slate-700 font-mono"
+                        />
+                      </div>
+
+                      {/* Submit button */}
+                      {!showResult && (
+                        <button
+                          onClick={() => {
+                            setShowExerciseSolution(true);
+                            // For exercises, we let the student self-evaluate
+                            // The handleQuizAnswer will be called when they confirm correct/incorrect
+                          }}
+                          disabled={!exerciseAnswer.trim()}
+                          className={`w-full py-4 font-bold rounded-xl transition-all ${exerciseAnswer.trim()
+                            ? 'bg-amber-600 text-white hover:bg-amber-700 shadow-md'
+                            : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          }`}
+                        >
+                          Ver Solución
+                        </button>
+                      )}
+
+                      {/* Solution reveal with step-by-step */}
+                      {showExerciseSolution && (
+                        <div className="space-y-4 animate-fade-in">
+                          {/* Solution */}
+                          <div className="p-5 bg-emerald-50 border-2 border-emerald-200 rounded-xl">
+                            <div className="flex items-center gap-2 mb-3">
+                              <span className="material-symbols-outlined text-emerald-600">check_circle</span>
+                              <span className="font-bold text-emerald-700">Solución Correcta</span>
+                            </div>
+                            <p className="text-slate-700 whitespace-pre-wrap font-medium">
+                              {quizQuestions[currentQuizIndex].exerciseSolution}
+                            </p>
+                          </div>
+
+                          {/* Step by step explanation */}
+                          {quizQuestions[currentQuizIndex].exerciseSteps && quizQuestions[currentQuizIndex].exerciseSteps!.length > 0 && (
+                            <div className="p-5 bg-blue-50 border-2 border-blue-200 rounded-xl">
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="material-symbols-outlined text-blue-600">format_list_numbered</span>
+                                <span className="font-bold text-blue-700">Paso a Paso</span>
+                              </div>
+                              <ol className="space-y-2">
+                                {quizQuestions[currentQuizIndex].exerciseSteps!.map((step, i) => (
+                                  <li key={i} className="flex gap-3 text-slate-700">
+                                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-200 text-blue-700 text-xs font-bold flex items-center justify-center">
+                                      {i + 1}
+                                    </span>
+                                    <span>{step}</span>
+                                  </li>
+                                ))}
+                              </ol>
+                            </div>
+                          )}
+
+                          {/* Self-evaluation buttons */}
+                          {!showResult && (
+                            <div className="flex gap-3">
+                              <button
+                                onClick={() => handleQuizAnswer(0, exerciseAnswer, false, true)}
+                                className="flex-1 py-4 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-md flex items-center justify-center gap-2"
+                              >
+                                <span className="material-symbols-outlined">thumb_up</span>
+                                Lo hice bien
+                              </button>
+                              <button
+                                onClick={() => handleQuizAnswer(-1, exerciseAnswer, false, false)}
+                                className="flex-1 py-4 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700 shadow-md flex items-center justify-center gap-2"
+                              >
+                                <span className="material-symbols-outlined">thumb_down</span>
+                                Me equivoqué
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   ) : (quizQuestions[currentQuizIndex]?.type === 'design' || quizQuestions[currentQuizIndex]?.options?.[0]?.includes('solución')) ? (
