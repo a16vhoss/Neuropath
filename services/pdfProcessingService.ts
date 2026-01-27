@@ -72,7 +72,7 @@ export const extractTextFromPDF = async (pdfBase64: string): Promise<string | nu
       4. If the document is purely visual but contains text, transcribe that text.
       5. Output ONLY the raw extracted text. No markdown formatting, no "Here is the text:", just the content.
     `;
-    const text = await generateContent(prompt, { pdfBase64, model: 'gemini-1.5-flash' });
+    const text = await generateContent(prompt, { pdfBase64, model: model });
 
     // Check if the model returned a refusal or empty string despite no error
     if (!text || text.trim().length === 0) {
