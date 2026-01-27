@@ -490,7 +490,7 @@ const ExercisesTab: React.FC<ExercisesTabProps> = ({
                                         )}
                                     </div>
 
-                                    <p className="text-slate-800 line-clamp-2">
+                                    <p className={`text-slate-800 whitespace-pre-wrap ${isExpanded ? '' : 'line-clamp-4'}`}>
                                         {exercise.problem_statement}
                                     </p>
 
