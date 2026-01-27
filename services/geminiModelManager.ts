@@ -28,13 +28,13 @@ export const getBestGeminiModel = async (preferredTier?: 'pro' | 'flash' | 'imag
     // Model selection based on preference
     switch (preferredTier) {
         case 'pro':
-            return 'gemini-1.5-pro-002'; // Pro-level capabilities (Stable 002)
+            return 'gemini-2.0-flash'; // Pro-level capabilities
         case 'flash':
-            return 'gemini-1.5-flash-002'; // Fast and efficient (Stable 002)
+            return 'gemini-2.0-flash'; // Fast and efficient
         case 'image':
-            return 'gemini-2.0-flash-exp'; // Supports image generation
+            return 'gemini-2.0-flash'; // Supports image/vision
         default:
-            return 'gemini-1.5-flash-002'; // Default to stable 1.5 flash 002
+            return 'gemini-2.0-flash'; // Default to 2.0 flash
     }
 };
 
@@ -42,7 +42,7 @@ export const getBestGeminiModel = async (preferredTier?: 'pro' | 'flash' | 'imag
  * Model for image generation
  */
 export const getImageModel = (): string => {
-    return 'gemini-2.0-flash-exp'; // Supports native image generation
+    return 'gemini-2.0-flash'; // Supports native image generation
 };
 
 /**
