@@ -115,7 +115,7 @@ BEGIN
     FROM 
         student_stats ss
     ORDER BY 
-        rank_score DESC NULLS LAST, 
+        rank_score DESC NULLS LAST,     
         last_active_date DESC NULLS LAST;
 END;
 $$;

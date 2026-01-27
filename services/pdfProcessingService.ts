@@ -1,5 +1,12 @@
 import { Type } from "@google/genai";
 import { getBestGeminiModel, getGeminiSDK } from "./geminiModelManager";
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Configure PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+// Max file size for Gemini (approximately 20MB)
+const MAX_GEMINI_FILE_SIZE = 20 * 1024 * 1024;
 
 /**
  * Convert base64 to Blob
@@ -12,6 +19,43 @@ const base64ToBlob = (base64: string, mimeType: string): Blob => {
   }
   const byteArray = new Uint8Array(byteNumbers);
   return new Blob([byteArray], { type: mimeType });
+};
+
+/**
+ * Convert base64 to ArrayBuffer
+ */
+const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+};
+
+/**
+ * Extract text from PDF using PDF.js (local, no API needed)
+ */
+const extractTextWithPDFJS = async (pdfBase64: string): Promise<string> => {
+  try {
+    const arrayBuffer = base64ToArrayBuffer(pdfBase64);
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    let fullText = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(' ');
+      fullText += pageText + '\n\n';
+    }
+
+    return fullText.trim();
+  } catch (error) {
+    console.error('PDF.js extraction error:', error);
+    return '';
+  }
 };
 
 /**
@@ -106,7 +150,10 @@ const generateContent = async (
 };
 
 /**
- * Extract text content from a PDF file using Gemini
+ * Extract text content from a PDF file
+ * Strategy:
+ * 1. First try PDF.js for fast local extraction (works for text-based PDFs)
+ * 2. If PDF.js returns little/no text (scanned PDF), use Gemini OCR
  */
 export const extractTextFromPDF = async (pdfBase64: string): Promise<string | null> => {
   try {
@@ -120,7 +167,27 @@ export const extractTextFromPDF = async (pdfBase64: string): Promise<string | nu
       throw new Error('PDF data is too small or empty');
     }
 
-    console.log('Sending PDF to Gemini (Size:', cleanBase64.length, 'chars)');
+    // Calculate approximate file size
+    const approximateSize = (cleanBase64.length * 3) / 4;
+    console.log('PDF size:', Math.round(approximateSize / 1024), 'KB');
+
+    // Step 1: Try PDF.js extraction first (fast, local, no API limits)
+    console.log('Attempting local PDF.js text extraction...');
+    const pdfJsText = await extractTextWithPDFJS(cleanBase64);
+
+    // If PDF.js extracted substantial text, use it
+    if (pdfJsText && pdfJsText.length > 200) {
+      console.log('PDF.js extracted', pdfJsText.length, 'characters');
+      return pdfJsText;
+    }
+
+    // Step 2: PDF.js didn't extract much - likely a scanned PDF
+    // Check file size before sending to Gemini
+    if (approximateSize > MAX_GEMINI_FILE_SIZE) {
+      throw new Error(`El PDF es demasiado grande (${Math.round(approximateSize / 1024 / 1024)}MB). El límite es 20MB. Por favor, usa un PDF más pequeño o divídelo en partes.`);
+    }
+
+    console.log('PDF appears to be scanned, using Gemini OCR...');
     const prompt = `
       TASK: Extract all text from this PDF document.
       CRITICAL INSTRUCTIONS:
@@ -140,25 +207,7 @@ export const extractTextFromPDF = async (pdfBase64: string): Promise<string | nu
     return text;
   } catch (e: any) {
     console.error('Error extracting PDF text:', e);
-
-    // Debug: List available models to find the correct one
-    try {
-      const ai = getGeminiSDK();
-      if (ai) {
-        const models = await ai.models.list();
-        const modelNames = [];
-        // @ts-ignore - Pager definition might vary, ensuring iteration
-        for await (const m of models) {
-          if (m.name) modelNames.push(m.name);
-        }
-        console.log('Available Models:', modelNames.join(', '));
-        throw new Error(`Gemini Error: ${e.message}. Available models: ${modelNames.join(', ')}`);
-      }
-    } catch (listError) {
-      // Ignore listing error
-    }
-
-    throw new Error(`Gemini Extraction Error: ${e.message || e}`);
+    throw new Error(`Error procesando PDF: ${e.message || e}`);
   }
 };
 

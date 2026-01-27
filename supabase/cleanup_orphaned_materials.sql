@@ -8,7 +8,7 @@ WHERE id NOT IN (
     SELECT unnest(attached_materials)
     FROM public.assignments
     WHERE attached_materials IS NOT NULL
-);
+);  
 
 -- Note: We only delete from the 'materials' table. 
 -- The actual files in Storage might stay there for now unless we manually clean them, 

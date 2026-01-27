@@ -23,6 +23,7 @@
     "@tiptap/suggestion": "^2.27.2",
     "@xyflow/react": "^12.10.0",
     "katex": "^0.16.28",
+    "pdfjs-dist": "^5.4.530",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-markdown": "^10.1.0",
