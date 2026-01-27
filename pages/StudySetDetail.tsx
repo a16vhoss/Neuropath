@@ -614,7 +614,8 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
             const extractedText = await extractTextFromPDF(pdfBase64);
 
             if (!extractedText || extractedText.length < 50) {
-                throw new Error('No se pudo extraer texto del PDF via OCR. Asegúrate de que la imagen sea legible o usa un PDF de texto nativo.');
+                const preview = extractedText ? `(Respuesta: ${extractedText.slice(0, 100)}...)` : '(Sin respuesta)';
+                throw new Error(`No se pudo extraer suficiente texto del PDF via OCR. Asegúrate de que la imagen sea legible. ${preview}`);
             }
             console.log('Extracted text length:', extractedText.length);
 

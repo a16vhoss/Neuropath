@@ -63,6 +63,10 @@ CREATE TABLE IF NOT EXISTS public.ultra_review_content (
 ALTER TABLE public.ultra_review_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ultra_review_content ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (for re-running migration)
+DROP POLICY IF EXISTS "Users manage own ultra review sessions" ON public.ultra_review_sessions;
+DROP POLICY IF EXISTS "Users manage own ultra review content" ON public.ultra_review_content;
+
 CREATE POLICY "Users manage own ultra review sessions" ON public.ultra_review_sessions
     FOR ALL USING (auth.uid() = user_id);
 
@@ -90,6 +94,8 @@ CREATE INDEX IF NOT EXISTS idx_ultra_review_content_session
 -- ===========================================
 -- 5. Trigger for updated_at
 -- ===========================================
+DROP TRIGGER IF EXISTS update_ultra_review_sessions_timestamp ON public.ultra_review_sessions;
+
 CREATE TRIGGER update_ultra_review_sessions_timestamp
     BEFORE UPDATE ON public.ultra_review_sessions
     FOR EACH ROW

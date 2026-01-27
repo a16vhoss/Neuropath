@@ -42,7 +42,10 @@ const generateContent = async (
     config: Object.keys(config).length > 0 ? config : undefined
   });
 
-  return response.text || "";
+  // Handle different SDK versions (text() method vs text property)
+  // @ts-ignore - Handle potential SDK version mismatch
+  const text = typeof response.text === 'function' ? response.text() : response.text;
+  return text || "";
 };
 
 /**

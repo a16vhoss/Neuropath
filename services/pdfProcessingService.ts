@@ -49,7 +49,10 @@ const generateContent = async (
     config: Object.keys(config).length > 0 ? config : undefined
   });
 
-  return response.text || "";
+  // Handle different SDK versions (text() method vs text property)
+  // @ts-ignore - Handle potential SDK version mismatch
+  const text = typeof response.text === 'function' ? response.text() : response.text;
+  return text || "";
 };
 
 /**
@@ -58,19 +61,26 @@ const generateContent = async (
 export const extractTextFromPDF = async (pdfBase64: string): Promise<string | null> => {
   try {
     const prompt = `
-      Analiza este documento PDF.
-      INSTRUCCIÓN CLAVE: El documento puede ser un PDF nativo digital O un documento escaneado/imágenes.
-      TU TAREA:
-      1. Si es texto, extráelo.
-      2. Si son IMÁGENES o ESCANEOS, realiza OCR y transcribe TODO el texto visible en las imágenes.
-      3. Mantén el orden lógico de lectura.
-      4. Ignora encabezados repetitivos o números de página si rompen el flujo.
-      5. Devuelve SOLO el contenido textual extraído en texto plano.
+      TASK: Extract all text from this PDF document.
+      CRITICAL INSTRUCTIONS:
+      1. This document may be a SCANNED IMAGE or contain key text in images/diagrams.
+      2. YOU MUST PERFORM OCR on all images/scans to transcribe the text.
+      3. Do NOT summarize. Return the FULL TRANSCRIPT.
+      4. If the document is purely visual but contains text, transcribe that text.
+      5. Output ONLY the raw extracted text. No markdown formatting, no "Here is the text:", just the content.
     `;
-    return await generateContent(prompt, { pdfBase64 });
+    const text = await generateContent(prompt, { pdfBase64 });
+
+    // Check if the model returned a refusal or empty string despite no error
+    if (!text || text.trim().length === 0) {
+      throw new Error('Gemini API returned empty response.');
+    }
+
+    return text;
   } catch (e: any) {
     console.error('Error extracting PDF text:', e);
-    return null;
+    // Throw the specific error so the UI can show it (e.g. 400 Bad Request, 429 Too Many Requests)
+    throw new Error(`Gemini Extraction Error: ${e.message || e}`);
   }
 };
 
