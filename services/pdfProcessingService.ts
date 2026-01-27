@@ -1,5 +1,18 @@
-import { Type, createPartFromBase64, createPartFromText } from "@google/genai";
+import { Type } from "@google/genai";
 import { getBestGeminiModel, getGeminiSDK } from "./geminiModelManager";
+
+/**
+ * Convert base64 to Blob
+ */
+const base64ToBlob = (base64: string, mimeType: string): Blob => {
+  const byteCharacters = atob(base64);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return new Blob([byteArray], { type: mimeType });
+};
 
 /**
  * Helper to generate content with the new SDK
@@ -37,10 +50,35 @@ const generateContent = async (
   let contents: any;
 
   if (options?.pdfBase64) {
-    // Multimodal content with PDF - use helper functions from SDK
-    const pdfPart = createPartFromBase64(options.pdfBase64, "application/pdf");
-    const textPart = createPartFromText(prompt);
-    contents = [pdfPart, textPart];
+    // Upload PDF using Files API first, then reference it
+    console.log('Uploading PDF to Gemini Files API...');
+    const pdfBlob = base64ToBlob(options.pdfBase64, 'application/pdf');
+
+    const uploadedFile = await ai.files.upload({
+      file: pdfBlob,
+      config: { mimeType: 'application/pdf' }
+    });
+
+    console.log('PDF uploaded, file name:', uploadedFile.name);
+
+    // Wait for file to be processed
+    let file = uploadedFile;
+    while (file.state === 'PROCESSING') {
+      console.log('Waiting for file processing...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const fileStatus = await ai.files.get({ name: file.name! });
+      file = fileStatus;
+    }
+
+    if (file.state === 'FAILED') {
+      throw new Error('File processing failed');
+    }
+
+    // Use the uploaded file reference
+    contents = [
+      { fileData: { fileUri: file.uri, mimeType: 'application/pdf' } },
+      { text: prompt }
+    ];
   } else {
     // Text-only content
     contents = prompt;
