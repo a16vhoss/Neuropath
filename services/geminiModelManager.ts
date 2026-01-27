@@ -28,13 +28,13 @@ export const getBestGeminiModel = async (preferredTier?: 'pro' | 'flash' | 'imag
     // Model selection based on preference
     switch (preferredTier) {
         case 'pro':
-            return 'gemini-2.0-flash'; // Pro-level capabilities
+            return 'gemini-1.5-pro'; // Pro-level capabilities (Stable)
         case 'flash':
-            return 'gemini-2.0-flash'; // Fast and efficient
+            return 'gemini-1.5-flash'; // Fast and efficient (Stable)
         case 'image':
             return 'gemini-2.0-flash-exp'; // Supports image generation
         default:
-            return 'gemini-2.0-flash'; // Default to flash for speed/cost
+            return 'gemini-1.5-flash'; // Default to stable 1.5 flash
     }
 };
 
