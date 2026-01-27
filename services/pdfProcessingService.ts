@@ -34,13 +34,27 @@ const generateContent = async (
     config.maxOutputTokens = options.maxTokens;
   }
 
-  let contents: any = prompt;
+  let contents: any;
 
   if (options?.pdfBase64) {
+    // Multimodal content with PDF - use proper format for new SDK
     contents = [
-      { inlineData: { mimeType: "application/pdf", data: options.pdfBase64 } },
-      { text: prompt }
+      {
+        role: "user",
+        parts: [
+          {
+            inlineData: {
+              mimeType: "application/pdf",
+              data: options.pdfBase64
+            }
+          },
+          { text: prompt }
+        ]
+      }
     ];
+  } else {
+    // Text-only content
+    contents = prompt;
   }
 
   const response = await ai.models.generateContent({
@@ -60,12 +74,17 @@ const generateContent = async (
  */
 export const extractTextFromPDF = async (pdfBase64: string): Promise<string | null> => {
   try {
-    // Clean base64 string if it contains the data URI prefix
-    const cleanBase64 = pdfBase64.replace(/^data:application\/pdf;base64,/, '');
+    // Clean base64 string - remove data URI prefix and any whitespace/newlines
+    let cleanBase64 = pdfBase64
+      .replace(/^data:application\/pdf;base64,/, '')
+      .replace(/\s/g, ''); // Remove all whitespace including newlines
 
-    // Use default model (via optional parameter) which was working before the 404s
-    // The previous error "Invalid Argument" was likely due to the prefix, not the model.
-    console.log('Sending PDF to Gemini (Size:', cleanBase64.length, ')');
+    // Validate base64
+    if (!cleanBase64 || cleanBase64.length < 100) {
+      throw new Error('PDF data is too small or empty');
+    }
+
+    console.log('Sending PDF to Gemini (Size:', cleanBase64.length, 'chars)');
     const prompt = `
       TASK: Extract all text from this PDF document.
       CRITICAL INSTRUCTIONS:
