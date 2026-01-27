@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import MagicImportModal from '../components/MagicImportModal';
-import { supabase, getClassMaterials, getClassEnrollments, uploadMaterial, createClassStudySet, getClassStudySet } from '../services/supabaseClient';
+import { supabase, getClassMaterials, getClassEnrollments, uploadMaterial, createClassStudySet, getClassStudySet, deleteClass } from '../services/supabaseClient';
 import {
     extractTextFromPDF,
     generateFlashcardsFromText,
@@ -134,6 +134,26 @@ const TeacherClassDetail: React.FC = () => {
 
     // View Assignment Details State
     const [viewingAssignment, setViewingAssignment] = useState<Assignment | null>(null);
+
+    // Handle Class Deletion
+    const handleDeleteClass = async () => {
+        if (!classId || !classData) return;
+
+        // Double confirmation for safety
+        const confirm1 = window.confirm(`¿Estás seguro que deseas eliminar la clase "${classData.name}"?`);
+        if (!confirm1) return;
+
+        const confirm2 = window.confirm("Esta acción es irreversible y eliminará todos los materiales, tareas y datos asociados. ¿Confirmas la eliminación?");
+        if (!confirm2) return;
+
+        try {
+            await deleteClass(classId);
+            navigate('/teacher');
+        } catch (error) {
+            console.error('Error deleting class:', error);
+            alert('Hubo un error al eliminar la clase. Por favor intenta de nuevo.');
+        }
+    };
 
     // Load class data
     const loadClassData = useCallback(async () => {
@@ -921,6 +941,13 @@ const TeacherClassDetail: React.FC = () => {
                         </p>
                     </div>
                     <div className="flex gap-3">
+                        <button
+                            onClick={handleDeleteClass}
+                            className="px-4 py-2 rounded-lg border border-red-200 bg-red-50 text-red-600 font-bold hover:bg-red-100 flex items-center gap-2 transition-colors"
+                        >
+                            <span className="material-symbols-outlined text-lg">delete</span>
+                            <span className="hidden md:inline">Eliminar Clase</span>
+                        </button>
                         <button
                             onClick={() => navigate(`/teacher/analytics/${classId}`)}
                             className="px-4 py-2 rounded-lg border border-slate-200 font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2"

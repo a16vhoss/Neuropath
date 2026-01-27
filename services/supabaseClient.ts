@@ -159,6 +159,15 @@ export const getClassEnrollments = async (classId: string) => {
     return data;
 };
 
+export const deleteClass = async (classId: string) => {
+    const { error } = await supabase
+        .from('classes')
+        .delete()
+        .eq('id', classId);
+
+    if (error) throw error;
+};
+
 // Flashcards helpers
 export const getClassFlashcards = async (classId: string) => {
     const { data, error } = await supabase

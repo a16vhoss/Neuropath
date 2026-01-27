@@ -13,29 +13,31 @@ import {
     DurationMode,
     PhaseNumber,
     UltraReviewSession,
-    SummaryContent,
-    FormulaContent,
-    MethodologyContent,
+    PhaseConfig,
+    AdaptiveSummaryContent,
+    AdaptivePhase2Content,
+    AdaptiveMethodologyContent,
     FlashcardReviewContent,
-    ExerciseContent,
-    TipsContent,
+    AdaptiveExerciseContent,
+    AdaptiveTipsContent,
     CompletionSummary,
     getOrCreateSession,
     startFreshSession,
     updateSessionProgress,
     completeSession,
     generatePhaseContent,
-    getCompletionSummary
+    getCompletionSummary,
+    getPhaseConfigForSubject
 } from '../services/UltraReviewService';
 
-// Phase metadata
-const PHASES = [
-    { num: 1 as PhaseNumber, name: 'Resumen', icon: 'menu_book', color: 'bg-blue-500' },
-    { num: 2 as PhaseNumber, name: 'Fórmulas', icon: 'function', color: 'bg-purple-500' },
-    { num: 3 as PhaseNumber, name: 'Metodologías', icon: 'route', color: 'bg-amber-500' },
-    { num: 4 as PhaseNumber, name: 'Flashcards', icon: 'style', color: 'bg-emerald-500' },
-    { num: 5 as PhaseNumber, name: 'Ejercicios', icon: 'edit_note', color: 'bg-rose-500' },
-    { num: 6 as PhaseNumber, name: 'Tips', icon: 'lightbulb', color: 'bg-cyan-500' }
+// Default phase metadata (used before session loads)
+const DEFAULT_PHASES: PhaseConfig[] = [
+    { phase: 1, name: 'Resumen', icon: 'menu_book', description: '', color: 'bg-blue-500' },
+    { phase: 2, name: 'Puntos Clave', icon: 'push_pin', description: '', color: 'bg-purple-500' },
+    { phase: 3, name: 'Metodologías', icon: 'route', description: '', color: 'bg-amber-500' },
+    { phase: 4, name: 'Flashcards', icon: 'style', description: '', color: 'bg-emerald-500' },
+    { phase: 5, name: 'Ejercicios', icon: 'edit_note', description: '', color: 'bg-rose-500' },
+    { phase: 6, name: 'Tips', icon: 'lightbulb', description: '', color: 'bg-cyan-500' }
 ];
 
 const UltraReview: React.FC = () => {
