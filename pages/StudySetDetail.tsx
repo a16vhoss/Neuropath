@@ -567,16 +567,16 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
             return;
         }
 
-        // Check file size (max 50MB for browser processing)
-        const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+        // Check file size (max 200MB - PDF.js can handle large files page by page)
+        const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB
+        const sizeMB = Math.round(file.size / 1024 / 1024);
         if (file.size > MAX_FILE_SIZE) {
-            const sizeMB = Math.round(file.size / 1024 / 1024);
-            alert(`El archivo es demasiado grande (${sizeMB}MB). El límite es 50MB.\n\nSugerencias:\n• Comprime el PDF con herramientas como iLovePDF o SmallPDF\n• Divide el PDF en partes más pequeñas\n• Usa un PDF con menos imágenes`);
+            alert(`El archivo es demasiado grande (${sizeMB}MB). El límite es 200MB.\n\nSugerencias:\n• Divide el PDF en partes más pequeñas\n• Elimina páginas innecesarias`);
             e.target.value = ''; // Reset input
             return;
         }
 
-        console.log('Starting file upload:', file.name, 'Size:', Math.round(file.size / 1024 / 1024), 'MB');
+        console.log('Starting file upload:', file.name, 'Size:', sizeMB, 'MB');
 
         try {
             setUploading(true);
@@ -601,10 +601,10 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                 console.log('Storage not available, continuing without it');
             }
 
-            setUploadProgress('Extrayendo texto del PDF...');
+            setUploadProgress('Leyendo archivo PDF...');
             console.log('Extracting text from PDF...');
 
-            // Convert File to base64 for Gemini API
+            // Convert File to base64 for processing
             const fileToBase64 = (file: File): Promise<string> => {
                 return new Promise((resolve, reject) => {
                     const reader = new FileReader();
@@ -620,7 +620,10 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
             const pdfBase64 = await fileToBase64(file);
             console.log('PDF converted to base64, length:', pdfBase64.length);
 
-            const extractedText = await extractTextFromPDF(pdfBase64);
+            // Extract text with progress updates
+            const extractedText = await extractTextFromPDF(pdfBase64, (progress) => {
+                setUploadProgress(progress);
+            });
 
             if (!extractedText || extractedText.length < 50) {
                 const preview = extractedText ? `(Respuesta: ${extractedText.slice(0, 100)}...)` : '(Sin respuesta)';

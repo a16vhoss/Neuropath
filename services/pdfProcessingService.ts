@@ -35,20 +35,39 @@ const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
 
 /**
  * Extract text from PDF using PDF.js (local, no API needed)
+ * Processes page by page to handle large PDFs
  */
-const extractTextWithPDFJS = async (pdfBase64: string): Promise<string> => {
+const extractTextWithPDFJS = async (
+  pdfBase64: string,
+  onProgress?: (current: number, total: number) => void
+): Promise<string> => {
   try {
     const arrayBuffer = base64ToArrayBuffer(pdfBase64);
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
+    console.log(`PDF has ${pdf.numPages} pages`);
     let fullText = '';
+
     for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
-      fullText += pageText + '\n\n';
+      try {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ');
+        fullText += pageText + '\n\n';
+
+        // Report progress
+        if (onProgress) {
+          onProgress(i, pdf.numPages);
+        }
+
+        // Release page resources
+        page.cleanup();
+      } catch (pageError) {
+        console.warn(`Error extracting page ${i}:`, pageError);
+        // Continue with other pages
+      }
     }
 
     return fullText.trim();
@@ -152,10 +171,13 @@ const generateContent = async (
 /**
  * Extract text content from a PDF file
  * Strategy:
- * 1. First try PDF.js for fast local extraction (works for text-based PDFs)
- * 2. If PDF.js returns little/no text (scanned PDF), use Gemini OCR
+ * 1. Use PDF.js for local extraction (works for text-based PDFs, handles large files)
+ * 2. If PDF.js returns little/no text (scanned PDF) AND file is small enough, use Gemini OCR
  */
-export const extractTextFromPDF = async (pdfBase64: string): Promise<string | null> => {
+export const extractTextFromPDF = async (
+  pdfBase64: string,
+  onProgress?: (message: string) => void
+): Promise<string | null> => {
   try {
     // Clean base64 string - remove data URI prefix and any whitespace/newlines
     let cleanBase64 = pdfBase64
@@ -169,11 +191,18 @@ export const extractTextFromPDF = async (pdfBase64: string): Promise<string | nu
 
     // Calculate approximate file size
     const approximateSize = (cleanBase64.length * 3) / 4;
-    console.log('PDF size:', Math.round(approximateSize / 1024), 'KB');
+    const sizeMB = Math.round(approximateSize / 1024 / 1024);
+    console.log('PDF size:', sizeMB, 'MB');
 
-    // Step 1: Try PDF.js extraction first (fast, local, no API limits)
+    // Step 1: Try PDF.js extraction (handles any size, processes page by page)
+    if (onProgress) onProgress('Analizando PDF...');
     console.log('Attempting local PDF.js text extraction...');
-    const pdfJsText = await extractTextWithPDFJS(cleanBase64);
+
+    const pdfJsText = await extractTextWithPDFJS(cleanBase64, (current, total) => {
+      if (onProgress) {
+        onProgress(`Extrayendo texto: página ${current} de ${total}...`);
+      }
+    });
 
     // If PDF.js extracted substantial text, use it
     if (pdfJsText && pdfJsText.length > 200) {
@@ -182,12 +211,20 @@ export const extractTextFromPDF = async (pdfBase64: string): Promise<string | nu
     }
 
     // Step 2: PDF.js didn't extract much - likely a scanned PDF
-    // Check file size before sending to Gemini
+    // For scanned PDFs, we need Gemini OCR but there's a size limit
     if (approximateSize > MAX_GEMINI_FILE_SIZE) {
-      throw new Error(`El PDF es demasiado grande (${Math.round(approximateSize / 1024 / 1024)}MB). El límite es 20MB. Por favor, usa un PDF más pequeño o divídelo en partes.`);
+      // For large scanned PDFs, we can't use Gemini
+      // Return whatever PDF.js got (might be empty) with a warning
+      console.warn('Large scanned PDF detected - OCR not available for files > 20MB');
+      if (pdfJsText && pdfJsText.length > 0) {
+        return pdfJsText;
+      }
+      throw new Error(`Este PDF parece ser escaneado (imágenes) y es muy grande (${sizeMB}MB) para OCR. Por favor:\n• Usa un PDF con texto seleccionable, o\n• Comprime el PDF a menos de 20MB para usar OCR`);
     }
 
+    if (onProgress) onProgress('PDF escaneado detectado, usando OCR...');
     console.log('PDF appears to be scanned, using Gemini OCR...');
+
     const prompt = `
       TASK: Extract all text from this PDF document.
       CRITICAL INSTRUCTIONS:
