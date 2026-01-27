@@ -567,7 +567,16 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
             return;
         }
 
-        console.log('Starting file upload:', file.name);
+        // Check file size (max 50MB for browser processing)
+        const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+        if (file.size > MAX_FILE_SIZE) {
+            const sizeMB = Math.round(file.size / 1024 / 1024);
+            alert(`El archivo es demasiado grande (${sizeMB}MB). El límite es 50MB.\n\nSugerencias:\n• Comprime el PDF con herramientas como iLovePDF o SmallPDF\n• Divide el PDF en partes más pequeñas\n• Usa un PDF con menos imágenes`);
+            e.target.value = ''; // Reset input
+            return;
+        }
+
+        console.log('Starting file upload:', file.name, 'Size:', Math.round(file.size / 1024 / 1024), 'MB');
 
         try {
             setUploading(true);
