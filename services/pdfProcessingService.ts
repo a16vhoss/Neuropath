@@ -60,9 +60,12 @@ const generateContent = async (
  */
 export const extractTextFromPDF = async (pdfBase64: string): Promise<string | null> => {
   try {
-    // Use rigid 1.5-flash versioned
-    const model = 'gemini-1.5-flash-001';
-    console.log(`Using Gemini ${model} for PDF extraction. Size:`, pdfBase64.length);
+    // Clean base64 string if it contains the data URI prefix
+    const cleanBase64 = pdfBase64.replace(/^data:application\/pdf;base64,/, '');
+
+    // Use default model (via optional parameter) which was working before the 404s
+    // The previous error "Invalid Argument" was likely due to the prefix, not the model.
+    console.log('Sending PDF to Gemini (Size:', cleanBase64.length, ')');
     const prompt = `
       TASK: Extract all text from this PDF document.
       CRITICAL INSTRUCTIONS:
@@ -72,7 +75,7 @@ export const extractTextFromPDF = async (pdfBase64: string): Promise<string | nu
       4. If the document is purely visual but contains text, transcribe that text.
       5. Output ONLY the raw extracted text. No markdown formatting, no "Here is the text:", just the content.
     `;
-    const text = await generateContent(prompt, { pdfBase64, model: model });
+    const text = await generateContent(prompt, { pdfBase64: cleanBase64 });
 
     // Check if the model returned a refusal or empty string despite no error
     if (!text || text.trim().length === 0) {
