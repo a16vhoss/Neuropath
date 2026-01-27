@@ -54,31 +54,40 @@ const generateContent = async (
     console.log('Uploading PDF to Gemini Files API...');
     const pdfBlob = base64ToBlob(options.pdfBase64, 'application/pdf');
 
-    const uploadedFile = await ai.files.upload({
-      file: pdfBlob,
-      config: { mimeType: 'application/pdf' }
-    });
+    try {
+      const uploadedFile = await ai.files.upload({
+        file: pdfBlob,
+        config: { mimeType: 'application/pdf' }
+      });
 
-    console.log('PDF uploaded, file name:', uploadedFile.name);
+      console.log('PDF uploaded, file name:', uploadedFile.name, 'uri:', uploadedFile.uri);
 
-    // Wait for file to be processed
-    let file = uploadedFile;
-    while (file.state === 'PROCESSING') {
-      console.log('Waiting for file processing...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const fileStatus = await ai.files.get({ name: file.name! });
-      file = fileStatus;
+      // Wait for file to be processed
+      let file = uploadedFile;
+      while (file.state === 'PROCESSING') {
+        console.log('Waiting for file processing...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        const fileStatus = await ai.files.get({ name: file.name! });
+        file = fileStatus;
+      }
+
+      if (file.state === 'FAILED') {
+        throw new Error('File processing failed');
+      }
+
+      // Use the uploaded file reference - just Parts array
+      contents = [
+        { fileData: { fileUri: file.uri!, mimeType: 'application/pdf' } },
+        { text: prompt }
+      ];
+    } catch (uploadError: any) {
+      console.error('Files API error, falling back to inline data:', uploadError.message);
+      // Fallback: try inline data directly - just Parts array
+      contents = [
+        { inlineData: { data: options.pdfBase64, mimeType: 'application/pdf' } },
+        { text: prompt }
+      ];
     }
-
-    if (file.state === 'FAILED') {
-      throw new Error('File processing failed');
-    }
-
-    // Use the uploaded file reference
-    contents = [
-      { fileData: { fileUri: file.uri, mimeType: 'application/pdf' } },
-      { text: prompt }
-    ];
   } else {
     // Text-only content
     contents = prompt;
