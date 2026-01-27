@@ -57,7 +57,16 @@ const generateContent = async (
  */
 export const extractTextFromPDF = async (pdfBase64: string): Promise<string | null> => {
   try {
-    const prompt = `Analiza este documento PDF y extrae TODO el texto legible. Mantén la estructura original. Devuelve SOLO texto plano.`;
+    const prompt = `
+      Analiza este documento PDF.
+      INSTRUCCIÓN CLAVE: El documento puede ser un PDF nativo digital O un documento escaneado/imágenes.
+      TU TAREA:
+      1. Si es texto, extráelo.
+      2. Si son IMÁGENES o ESCANEOS, realiza OCR y transcribe TODO el texto visible en las imágenes.
+      3. Mantén el orden lógico de lectura.
+      4. Ignora encabezados repetitivos o números de página si rompen el flujo.
+      5. Devuelve SOLO el contenido textual extraído en texto plano.
+    `;
     return await generateContent(prompt, { pdfBase64 });
   } catch (e: any) {
     console.error('Error extracting PDF text:', e);
