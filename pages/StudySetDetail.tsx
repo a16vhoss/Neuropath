@@ -1020,6 +1020,15 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                 <span className="material-symbols-outlined text-lg">timer</span>
                                 <span className="hidden md:inline">Simulacro</span>
                             </button>
+                            <button
+                                onClick={() => navigate(`/student/set/${studySet.id}/ultra-review`)}
+                                className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold px-3 md:px-6 py-2 rounded-xl hover:opacity-90 transition flex items-center gap-2 text-sm md:text-base shadow-sm shadow-purple-200"
+                                title="Repaso intensivo para el día antes del examen"
+                            >
+                                <span className="material-symbols-outlined text-lg">bolt</span>
+                                <span className="hidden md:inline">Ultra Repaso</span>
+                                <span className="md:hidden">Ultra</span>
+                            </button>
                             {!readOnly && isOwner && (
                                 <>
                                     <button

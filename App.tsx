@@ -17,6 +17,7 @@ import StudyBattles from './pages/StudyBattles';
 import BattleArena from './pages/BattleArena';
 import StudySession from './pages/StudySession';
 import AdaptiveStudySession from './pages/AdaptiveStudySession';
+import UltraReview from './pages/UltraReview';
 import MockExamPage from './pages/MockExamPage';
 import CreateAssignment from './pages/CreateAssignment';
 import TeacherSettings from './pages/TeacherSettings';
@@ -120,6 +121,11 @@ const AppRoutes: React.FC = () => {
       <Route path="/student/set/:studySetId" element={
         <ProtectedRoute allowedRole="student">
           <StudySetDetail />
+        </ProtectedRoute>
+      } />
+      <Route path="/student/set/:studySetId/ultra-review" element={
+        <ProtectedRoute allowedRole="student">
+          <UltraReview />
         </ProtectedRoute>
       } />
       <Route path="/student/adaptive-study/:classId" element={
