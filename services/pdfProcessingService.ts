@@ -39,7 +39,7 @@ const generateContent = async (
   if (options?.pdfBase64) {
     contents = [
       { inlineData: { mimeType: "application/pdf", data: options.pdfBase64 } },
-      prompt
+      { text: prompt }
     ];
   }
 
