@@ -1,4 +1,4 @@
-import { Type } from "@google/genai";
+import { Type, createPartFromBase64, createPartFromText } from "@google/genai";
 import { getBestGeminiModel, getGeminiSDK } from "./geminiModelManager";
 
 /**
@@ -37,21 +37,10 @@ const generateContent = async (
   let contents: any;
 
   if (options?.pdfBase64) {
-    // Multimodal content with PDF - use proper format for new SDK
-    contents = [
-      {
-        role: "user",
-        parts: [
-          {
-            inlineData: {
-              mimeType: "application/pdf",
-              data: options.pdfBase64
-            }
-          },
-          { text: prompt }
-        ]
-      }
-    ];
+    // Multimodal content with PDF - use helper functions from SDK
+    const pdfPart = createPartFromBase64(options.pdfBase64, "application/pdf");
+    const textPart = createPartFromText(prompt);
+    contents = [pdfPart, textPart];
   } else {
     // Text-only content
     contents = prompt;
