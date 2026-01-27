@@ -269,10 +269,15 @@ export const generatePromptedFlashcards = async (userPrompt: string, materialCon
       FUENTE: Usa el siguiente contexto del material del estudiante como base principal:
       ${materialContext ? materialContext.slice(0, 30000) : "Usa tu conocimiento general."}
 
+      REGLA CRÍTICA SOBRE EJERCICIOS:
+      - NUNCA crees flashcards del tipo "Problema específico → Respuesta específica" (ej: "Resuelve 2x+5=15" → "x=5")
+      - En su lugar, crea flashcards de METODOLOGÍA: "¿Cómo resolver ecuaciones lineales?" → "Pasos: 1... 2... 3..."
+      - SÍ PUEDES crear: Fórmulas, definiciones, conceptos y metodologías
+
       REGLAS:
       - Preguntas claras y directas relacionadas con "${studySetName}".
       - Respuestas concisas pero completas.
-      - Categoriza cada tarjeta (ej: Definición, Concepto, Relación, Importante).
+      - Categoriza cada tarjeta (ej: Definición, Concepto, Fórmula, Metodología).
       - Idioma: Español.
     `;
 
@@ -312,15 +317,35 @@ export const generateStudySetFromContext = async (context: string, count: number
       required: ["flashcards"]
     };
 
+    // Instructions for handling exercises vs theory
+    const exerciseHandlingRules = `
+        REGLA CRÍTICA SOBRE EJERCICIOS:
+        - NUNCA crees flashcards del tipo "Problema específico → Respuesta específica"
+        - Ejemplo INCORRECTO: "Resuelve 2x + 5 = 15" → "x = 5" (NO HAGAS ESTO)
+        - Ejemplo INCORRECTO: "Calcula el área de un triángulo de base 8 y altura 5" → "20 cm²" (NO HAGAS ESTO)
+
+        En su lugar, cuando detectes ejercicios o problemas, crea FLASHCARDS DE METODOLOGÍA:
+        - Ejemplo CORRECTO: "¿Cómo resolver una ecuación lineal de primer grado?" → "1. Agrupar términos con la variable de un lado, 2. Agrupar constantes del otro lado, 3. Despejar la variable dividiendo"
+        - Ejemplo CORRECTO: "¿Cuál es el procedimiento para calcular el área de un triángulo?" → "1. Identificar la base y la altura, 2. Aplicar la fórmula A = (base × altura) / 2, 3. Expresar el resultado en unidades cuadradas"
+
+        SÍ PUEDES crear flashcards de:
+        - FÓRMULAS: "Fórmula del área del triángulo" → "A = (b × h) / 2"
+        - DEFINICIONES: "¿Qué es una ecuación lineal?" → "Una ecuación donde la variable tiene exponente 1"
+        - CONCEPTOS TEÓRICOS: Cualquier explicación, definición o concepto
+        - METODOLOGÍAS: Pasos para resolver TIPOS de problemas (no problemas específicos)
+    `;
+
     let prompt = '';
 
     if (count > 0) {
       prompt = `
         OBJETIVO: Genera EXACTAMENTE ${count} flashcards de alta calidad basadas en el texto proporcionado.
 
-        INSTRUCCIONES CRÍTICAS DE COBERTURA Y FUENTES:
+        ${exerciseHandlingRules}
+
+        INSTRUCCIONES DE COBERTURA Y FUENTES:
         1. ESCANEO DETALLADO: Escanea el texto secuencialmente.
-        2. GRANULARIDAD EXTREMA: Extrae detalles finos para cumplir con la cuota de ${count}.
+        2. GRANULARIDAD: Extrae conceptos, definiciones, fórmulas y metodologías.
         3. COBERTURA GLOBAL: Distribuye las preguntas en todo el texto.
         4. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material del que proviene en "source_name".
         5. CANTIDAD EXACTA: Genera EXACTAMENTE ${count} flashcards.
@@ -333,11 +358,13 @@ export const generateStudySetFromContext = async (context: string, count: number
       prompt = `
         OBJETIVO: Genera un conjunto COMPLETO de flashcards que cubra TODOS los conceptos clave del texto proporcionado.
 
-        INSTRUCCIONES CRÍTICAS DE COBERTURA Y FUENTES:
+        ${exerciseHandlingRules}
+
+        INSTRUCCIONES DE COBERTURA Y FUENTES:
         1. COBERTURA EXHAUSTIVA: Analiza TODO el contenido. No dejes ningún concepto importante fuera.
         2. SIN LÍMITE ARTIFICIAL: Genera tantas tarjetas como sean necesarias para cubrir el material completamente (pueden ser 10, 20 o más).
         3. GRANULARIDAD: Desglosa conceptos complejos en tarjetas más simples.
-        4. TIPOS DE PREGUNTAS: Incluye definiciones, relaciones, ejemplos y causas/efectos.
+        4. TIPOS DE PREGUNTAS: Incluye definiciones, fórmulas, metodologías y relaciones conceptuales.
         5. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material del que proviene en "source_name".
         6. IDIOMA: Español.
 
@@ -864,12 +891,19 @@ FLASHCARDS EXISTENTES (evita duplicados):
 ${existingFlashcards.slice(0, 3000)}
 ` : ''}
 
-31. REGLAS ESTRICTAS DE COBERTURA:
+REGLA CRÍTICA SOBRE EJERCICIOS:
+- NUNCA crees flashcards del tipo "Problema específico → Respuesta específica"
+- Ejemplo INCORRECTO: "Resuelve 2x + 5 = 15" → "x = 5" (NO HAGAS ESTO)
+- En su lugar, crea FLASHCARDS DE METODOLOGÍA:
+- Ejemplo CORRECTO: "¿Cómo resolver una ecuación lineal?" → "1. Agrupar términos con variable, 2. Agrupar constantes, 3. Despejar"
+- SÍ PUEDES crear: Fórmulas, definiciones, conceptos teóricos y metodologías (pasos para resolver TIPOS de problemas)
+
+REGLAS DE COBERTURA:
 1. CANTIDAD OBJETIVO: Genera aproximadamente ${count} flashcards. Si hay suficiente información, cumple este objetivo.
 2. Si hay una lista, intenta crear una tarjeta sobre el concepto general y otras específicas si son importantes.
 3. Prioriza la CALIDAD pero sin sacrificar la COBERTURA. Si está en el texto y es relevante, haz una tarjeta.
 4. Cada flashcard debe ser autocontenida.
-5. Categoriza inteligentemente.
+5. Categoriza inteligentemente (usa "Metodología" para pasos de resolución).
 
 Idioma: Español.
 Genera el JSON array con las tarjetas.

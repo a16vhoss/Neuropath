@@ -147,7 +147,7 @@ CREATE POLICY "Users can view exercise templates" ON public.exercise_templates
         EXISTS (
             SELECT 1 FROM public.study_sets s
             WHERE s.id = exercise_templates.study_set_id
-            AND (s.student_id = auth.uid() OR s.teacher_id = auth.uid() OR auth.uid() = ANY(s.editors))
+            AND s.student_id = auth.uid()
         )
     );
 
@@ -156,7 +156,7 @@ CREATE POLICY "Owners can manage exercise templates" ON public.exercise_template
         EXISTS (
             SELECT 1 FROM public.study_sets s
             WHERE s.id = exercise_templates.study_set_id
-            AND (s.student_id = auth.uid() OR s.teacher_id = auth.uid())
+            AND s.student_id = auth.uid()
         )
     );
 
