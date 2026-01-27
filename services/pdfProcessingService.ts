@@ -60,7 +60,9 @@ const generateContent = async (
  */
 export const extractTextFromPDF = async (pdfBase64: string): Promise<string | null> => {
   try {
-    console.log('Using Gemini 1.5 Flash for PDF extraction. Size:', pdfBase64.length);
+    // Use rigid 1.5-flash versioned
+    const model = 'gemini-1.5-flash-001';
+    console.log(`Using Gemini ${model} for PDF extraction. Size:`, pdfBase64.length);
     const prompt = `
       TASK: Extract all text from this PDF document.
       CRITICAL INSTRUCTIONS:
@@ -80,7 +82,24 @@ export const extractTextFromPDF = async (pdfBase64: string): Promise<string | nu
     return text;
   } catch (e: any) {
     console.error('Error extracting PDF text:', e);
-    // Throw the specific error so the UI can show it (e.g. 400 Bad Request, 429 Too Many Requests)
+
+    // Debug: List available models to find the correct one
+    try {
+      const ai = getGeminiSDK();
+      if (ai) {
+        const models = await ai.models.list();
+        const modelNames = [];
+        // @ts-ignore - Pager definition might vary, ensuring iteration
+        for await (const m of models) {
+          if (m.name) modelNames.push(m.name);
+        }
+        console.log('Available Models:', modelNames.join(', '));
+        throw new Error(`Gemini Error: ${e.message}. Available models: ${modelNames.join(', ')}`);
+      }
+    } catch (listError) {
+      // Ignore listing error
+    }
+
     throw new Error(`Gemini Extraction Error: ${e.message || e}`);
   }
 };
