@@ -440,7 +440,8 @@ const ZpBotChat: React.FC<ZpBotChatProps> = ({ studySetId, studySetName, context
                     setIsStreaming(false);
                     setStreamingMsgId(null);
                     setSuggestions(newSuggestions);
-                }
+                },
+                studySetId // Pass studySetId for RAG
             );
 
             // Save final message to DB

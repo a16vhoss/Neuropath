@@ -1,6 +1,8 @@
 import { Type } from "@google/genai";
 import { getBestGeminiModel, getGeminiSDK, getSearchModel } from "./geminiModelManager";
 import { getYoutubeTranscript } from "./youtubeService";
+import { searchRelevantContext } from "./embeddingService";
+import { supabase } from "./supabaseClient";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -420,7 +422,8 @@ export const generateFlashcardsFromYouTubeURL = async (url: string, count: numbe
       summary: (isMetadataOnly || !transcript) ? description.slice(0, 1000) : transcript.slice(0, 1000) + "...",
       videoUrl: url,
       videoTitle,
-      channelName: "YouTube"
+      channelName: "YouTube",
+      content: isMetadataOnly ? description : transcript // Return full content for vector indexing
     };
 
   } catch (error) {
@@ -444,7 +447,8 @@ export const generateFlashcardsFromWebURL = async (url: string, count: number = 
       flashcards,
       summary: cleanText.slice(0, 1000) + "...",
       pageTitle: "Página Web (" + new URL(url).hostname + ")",
-      sourceUrl: url
+      sourceUrl: url,
+      content: cleanText // Return full content for vector indexing
     };
   } catch (error) {
     console.warn("Could not fetch web URL directly (likely CORS):", error);
@@ -531,8 +535,29 @@ export const getZpBotResponse = async (
   message: string,
   contextMatches: string,
   chatHistory: { role: string; content: string }[],
+  studySetId?: string
 ): Promise<{ text: string; suggestions: string[] }> => {
   try {
+    // RAG Retrieval
+    let ragContext = "";
+    if (studySetId) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const chunks = await searchRelevantContext(message, user.id, 5, studySetId);
+          if (chunks && chunks.length > 0) {
+            ragContext = chunks.map(c => `[Fuente: ${c.source_name}]\n${c.content}`).join('\n\n');
+            console.log(`RAG: Retrieved ${chunks.length} chunks for context.`);
+          }
+        }
+      } catch (err) {
+        console.warn("RAG retrieval failed, falling back to static context", err);
+      }
+    }
+
+    // Determine effective context (RAG > Provided Context > None)
+    const effectiveContext = ragContext || contextMatches || "No hay contexto específico.";
+
     const schema = {
       type: Type.OBJECT,
       properties: {
@@ -572,8 +597,8 @@ FORMATO JSON OBLIGATORIO:
   "suggestions": ["Pregunta de seguimiento 1", "Pregunta 2", "Pregunta 3"]
 }
 
-## CONTEXTO DE MATERIALES DEL ESTUDIANTE:
-${contextMatches ? contextMatches.slice(0, 25000) : "No hay contexto específico."}
+## CONTEXTO DE MATERIALES DEL ESTUDIANTE (Recuperado de Memoria):
+${effectiveContext.slice(0, 30000)}
     `;
 
     const historyText = chatHistory.slice(-10).map(msg => `${msg.role === 'user' ? 'Estudiante' : 'ZpBot'}: ${msg.content}`).join('\n');
@@ -611,7 +636,8 @@ export const getZpBotResponseStream = async (
   contextMatches: string,
   chatHistory: { role: string; content: string }[],
   onChunk: (accumulatedText: string) => void,
-  onComplete: (suggestions: string[]) => void
+  onComplete: (suggestions: string[]) => void,
+  studySetId?: string
 ): Promise<string> => {
   const ai = getGeminiSDK();
   if (!ai) {
@@ -622,6 +648,28 @@ export const getZpBotResponseStream = async (
   }
 
   try {
+
+    // RAG Retrieval
+    let ragContext = "";
+    if (studySetId) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // Fetch more chunks for streaming to ensure good coverage
+          const chunks = await searchRelevantContext(message, user.id, 8, studySetId);
+          if (chunks && chunks.length > 0) {
+            ragContext = chunks.map(c => `[Fuente: ${c.source_name}]\n${c.content}`).join('\n\n');
+            console.log(`RAG (Stream): Retrieved ${chunks.length} chunks.`);
+          }
+        }
+      } catch (err) {
+        console.warn("RAG retrieval failed (stream), falling back", err);
+      }
+    }
+
+    // Determine effective context
+    const effectiveContext = ragContext || contextMatches || "No hay contexto específico de materiales.";
+
     const modelName = await getBestGeminiModel();
 
     const systemPrompt = `
@@ -650,8 +698,8 @@ Eres ZpBot, un tutor de estudio EXPERTO y DIRECTO. Tu objetivo principal es EDUC
 2. Si el contexto no tiene la información, usa tu conocimiento general
 3. NUNCA inventes datos específicos (fechas, números, nombres) si no estás seguro
 
-## CONTEXTO DE MATERIALES DEL ESTUDIANTE:
-${contextMatches ? contextMatches.slice(0, 25000) : "No hay contexto específico de materiales."}
+## CONTEXTO DE MATERIALES DEL ESTUDIANTE (Recuperado de Memoria):
+${effectiveContext.slice(0, 30000)}
     `;
 
     const historyText = chatHistory.slice(-10)

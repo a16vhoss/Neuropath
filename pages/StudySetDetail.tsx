@@ -22,9 +22,12 @@ import ExercisesTab from '../components/ExercisesTab';
 import { processUploadedContent } from '../services/ExerciseService';
 import { generateFlashcardsFromText, extractTextFromPDFFile, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary, generateInfographicFromMaterials, generatePresentationFromMaterials } from '../services/pdfProcessingService';
 import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL, autoCategorizeFlashcards } from '../services/geminiService';
+import { storeDocumentEmbeddings } from '../services/embeddingService';
 import CumulativeReportsCard from '../components/CumulativeReportsCard';
 import VisualProgressionMap from '../components/VisualProgressionMap';
 import StudyGuideRenderer from '../components/StudyGuideRenderer/index';
+import InfographicRenderer from '../components/InfographicRenderer';
+import PresentationRenderer from '../components/PresentationRenderer';
 import ConceptMindMap from '../components/ConceptMindMap';
 import ZpBotChat from '../components/ZpBotChat';
 import { NotebookList, NotebookEditor } from '../components/notebooks';
@@ -684,6 +687,34 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                 // Regenerate guide with new text
                 await regenerateStudyGuide(extractedText);
 
+                // Store embeddings for RAG (Vector Memory)
+                setUploadProgress('Indexando memoria vectorial...');
+                try {
+                    let materialIdForEmbed = materialResult?.id || (materialResult as any)?.data?.id;
+                    // Fallback to fetch if ID not returned directly
+                    if (!materialIdForEmbed) {
+                        const { data: materials } = await supabase
+                            .from('study_set_materials')
+                            .select('id')
+                            .eq('study_set_id', studySet.id)
+                            .order('created_at', { ascending: false })
+                            .limit(1);
+                        materialIdForEmbed = materials?.[0]?.id;
+                    }
+
+                    if (materialIdForEmbed) {
+                        await storeDocumentEmbeddings(extractedText, {
+                            materialId: materialIdForEmbed,
+                            userId: user.id,
+                            metadata: { source: file.name, type: 'pdf' }
+                        });
+                        console.log('Embeddings stored successfully');
+                    }
+                } catch (embedError) {
+                    console.error('Error storing embeddings:', embedError);
+                    // Non-critical, continue
+                }
+
 
 
             } catch (matError: any) {
@@ -760,6 +791,31 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                 // Regenerate guide with new text
                 await regenerateStudyGuide(textContent);
 
+                // Store embeddings for RAG
+                setUploadProgress('Indexando memoria vectorial...');
+                try {
+                    let materialIdForEmbed = materialResult?.id || (materialResult as any)?.data?.id;
+                    if (!materialIdForEmbed) {
+                        const { data: materials } = await supabase
+                            .from('study_set_materials')
+                            .select('id')
+                            .eq('study_set_id', studySet.id)
+                            .order('created_at', { ascending: false })
+                            .limit(1);
+                        materialIdForEmbed = materials?.[0]?.id;
+                    }
+
+                    if (materialIdForEmbed) {
+                        await storeDocumentEmbeddings(textContent, {
+                            materialId: materialIdForEmbed,
+                            userId: user.id,
+                            metadata: { source: 'Notas', type: 'text' }
+                        });
+                    }
+                } catch (embedError) {
+                    console.error('Error storing embeddings:', embedError);
+                }
+
                 setTextContent('');
                 loadStudySet();
                 setActiveTab('materials');
@@ -802,15 +858,30 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                     category: fc.category || 'General'
                 }));
 
-                await createMaterialWithFlashcards({
+                const materialResult = await createMaterialWithFlashcards({
                     study_set_id: studySet.id,
                     name: youtubeResult.videoTitle || 'Video de YouTube',
                     type: 'url',
                     file_url: youtubeResult.videoUrl,
-                    content_text: `Canal: ${youtubeResult.channelName}\n\n${youtubeResult.summary}`,
+                    content_text: (youtubeResult as any).content || `Canal: ${youtubeResult.channelName}\n\n${youtubeResult.summary}`, // Use full transcript if available
                     summary: youtubeResult.summary,
                     flashcards: flashcardsPayload
                 });
+
+                // Store embeddings
+                try {
+                    const materialId = (materialResult as any)?.id || (materialResult as any)?.data?.id;
+                    if (materialId && (youtubeResult as any).content) {
+                        setUploadProgress('Indexando memoria vectorial...');
+                        await storeDocumentEmbeddings((youtubeResult as any).content, {
+                            materialId,
+                            userId: user.id,
+                            metadata: { source: youtubeResult.videoTitle, type: 'youtube' }
+                        });
+                    }
+                } catch (e) {
+                    console.error('Error embedding youtube content', e);
+                }
 
             } else {
                 // Website link - analyze with Gemini and generate flashcards
@@ -828,15 +899,30 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                     category: fc.category || 'General'
                 }));
 
-                await createMaterialWithFlashcards({
+                const materialResult = await createMaterialWithFlashcards({
                     study_set_id: studySet.id,
                     name: webResult.pageTitle || 'Enlace Web',
                     type: 'url',
                     file_url: webResult.sourceUrl,
-                    content_text: webResult.summary,
+                    content_text: (webResult as any).content || webResult.summary, // Use full text
                     summary: webResult.summary,
                     flashcards: flashcardsPayload
                 });
+
+                // Store embeddings
+                try {
+                    const materialId = (materialResult as any)?.id || (materialResult as any)?.data?.id;
+                    if (materialId && (webResult as any).content) {
+                        setUploadProgress('Indexando memoria vectorial...');
+                        await storeDocumentEmbeddings((webResult as any).content, {
+                            materialId,
+                            userId: user.id,
+                            metadata: { source: webResult.pageTitle, type: 'web' }
+                        });
+                    }
+                } catch (e) {
+                    console.error('Error embedding web content', e);
+                }
             }
 
             setUrlInput('');
@@ -1501,12 +1587,8 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                 {activeGuideTab === 'infographic' && (
                                     <div className="max-w-none">
                                         {studySet.infographic ? (
-                                            <StudyGuideRenderer
+                                            <InfographicRenderer
                                                 content={studySet.infographic}
-                                                studySetId={studySet.id}
-                                                studySetName={studySet.name}
-                                                showTOC={false}
-                                                defaultCollapsed={false}
                                             />
                                         ) : (
                                             <EmptyAIBox
@@ -1562,12 +1644,8 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                 {activeGuideTab === 'presentation' && (
                                     <div className="max-w-none">
                                         {studySet.presentation ? (
-                                            <StudyGuideRenderer
+                                            <PresentationRenderer
                                                 content={studySet.presentation}
-                                                studySetId={studySet.id}
-                                                studySetName={studySet.name}
-                                                showTOC={false}
-                                                defaultCollapsed={false}
                                             />
                                         ) : (
                                             <EmptyAIBox

@@ -412,32 +412,54 @@ Genera la guía de estudio más completa, clara y efectiva posible basándote en
 export const generateInfographicFromMaterials = async (materialsContent: string[], studySetName: string): Promise<string | null> => {
   if (materialsContent.length === 0) return null;
 
-  const infographicPrompt = `
+  try {
+    const schema = {
+      type: Type.OBJECT,
+      properties: {
+        title: { type: Type.STRING },
+        centralIdea: { type: Type.STRING },
+        keyConcepts: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING },
+              description: { type: Type.STRING },
+              icon: { type: Type.STRING }
+            },
+            required: ["name", "description", "icon"]
+          }
+        },
+        processSteps: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              step: { type: Type.NUMBER },
+              description: { type: Type.STRING }
+            },
+            required: ["step", "description"]
+          }
+        },
+        conclusion: { type: Type.STRING }
+      },
+      required: ["title", "centralIdea", "keyConcepts", "processSteps", "conclusion"]
+    };
+
+    const infographicPrompt = `
 # ARQUITECTO DE INFOGRAFÍAS PEDAGÓGICAS
-Eres un experto en comunicación visual y síntesis de información. Tu objetivo es transformar materiales académicos en un "blueprint" de infografía de alto impacto.
+Eres un experto en comunicación visual. Tu objetivo es transformar materiales académicos en un diseño JSON estructurado.
 
-## ESTRUCTURA REQUERIDA (MANTENER ESTOS ENCABEZADOS):
-### TÍTULO IMPACTANTE: [Nombre del Tema]
-### IDEA CENTRAL: [Resumen en una frase]
-### DATOS/CONCEPTOS CLAVE:
-- [Concepto 1]: [Explicación breve + Icono sugerido]
-- [Concepto 2]: [Explicación breve + Icono sugerido]
-### PROCESO O FLUJO:
-- Paso 1: [Descripción]
-- Paso 2: [Descripción]
-### CONCLUSIÓN VISUAL:
-- [Punto final clave]
-
----
 NOMBRE DEL SET DE ESTUDIO: ${studySetName}
 CONTENIDO:
-${materialsContent.map(t => t.slice(0, 10000)).join('\n\n')}
----
-Genera el contenido para la infografía más clara y visualmente estructurada posible.
+${materialsContent.map(t => t.slice(0, 50000)).join('\n\n')}
+
+Instrucciones:
+1. "icon" debe ser un nombre de icono de Material Symbols (ej: 'school', 'science', 'lightbulb').
+2. Se conciso y directo.
 `;
 
-  try {
-    return await generateContent(infographicPrompt);
+    return await generateContent(infographicPrompt, { jsonSchema: schema });
   } catch (error) {
     console.error('Error generating infographic:', error);
     return null;
@@ -447,36 +469,39 @@ Genera el contenido para la infografía más clara y visualmente estructurada po
 export const generatePresentationFromMaterials = async (materialsContent: string[], studySetName: string): Promise<string | null> => {
   if (materialsContent.length === 0) return null;
 
-  const presentationPrompt = `
+  try {
+    const schema = {
+      type: Type.OBJECT,
+      properties: {
+        slides: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              content: { type: Type.ARRAY, items: { type: Type.STRING } },
+              speakerNotes: { type: Type.STRING },
+              designSuggestion: { type: Type.STRING }
+            },
+            required: ["title", "content", "speakerNotes"]
+          }
+        }
+      },
+      required: ["slides"]
+    };
+
+    const presentationPrompt = `
 # DISEÑADOR DE PRESENTACIONES EJECUTIVAS
-Eres un experto en oratoria y diseño de presentaciones. Crea una estructura de diapositivas (slides) para una exposición de alto nivel.
+Crea una presentación estructurada en JSON.
 
-## FORMATO REQUERIDA (MANTENER ESTO):
-### SLIDE 1: PORTADA
-- Título: [Nombre]
-- Subtítulo: [Propósito]
-
-### SLIDE 2: AGENDA
-- Puntos que se tratarán.
-
-### SLIDE [N]: [TÍTULO DE LA DIAPOSITIVA]
-- [Punto clave 1]
-- [Punto clave 2]
-- **Nota del orador:** [Explicación para el presentador]
-
-### SLIDE FINAL: CIERRE Y PREGUNTAS
-- Resumen final.
-
----
 NOMBRE DEL SET DE ESTUDIO: ${studySetName}
 CONTENIDO:
-${materialsContent.map(t => t.slice(0, 10000)).join('\n\n')}
----
-Genera una presentación de entre 8 y 12 slides.
+${materialsContent.map(t => t.slice(0, 50000)).join('\n\n')}
+
+Genera de 8 a 12 slides.
 `;
 
-  try {
-    return await generateContent(presentationPrompt);
+    return await generateContent(presentationPrompt, { jsonSchema: schema });
   } catch (error) {
     console.error('Error generating presentation:', error);
     return null;
