@@ -1462,12 +1462,22 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                     try {
                                                         // Include materials
                                                         const materialContents = studySet?.materials
-                                                            .map(m => m.content_text || m.summary || '')
-                                                            .filter(t => (t?.trim().length || 0) > 10) || [];
+                                                            .filter(m => (m.content_text || m.summary || '').trim().length > 10)
+                                                            .map(m => ({
+                                                                title: m.name || 'Material sin título',
+                                                                content: m.content_text || m.summary || '',
+                                                                type: 'material' as const
+                                                            })) || [];
+
                                                         // Include notebooks
                                                         const notebookContents = notebooks
                                                             .filter(n => n.content && n.content.trim().length > 10)
-                                                            .map(n => n.content);
+                                                            .map(n => ({
+                                                                title: n.title || 'Cuaderno sin título',
+                                                                content: n.content,
+                                                                type: 'notebook' as const
+                                                            }));
+
                                                         const contents = [...materialContents, ...notebookContents];
 
                                                         console.log(`[Generation Flow] Found ${materialContents.length} materials and ${notebookContents.length} notebooks.`);
@@ -1509,12 +1519,22 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                     try {
                                                         // Include materials
                                                         const materialContents = studySet?.materials
-                                                            .map(m => m.content_text || m.summary || '')
-                                                            .filter(t => (t?.trim().length || 0) > 10) || [];
+                                                            .filter(m => (m.content_text || m.summary || '').trim().length > 10)
+                                                            .map(m => ({
+                                                                title: m.name || 'Material sin título',
+                                                                content: m.content_text || m.summary || '',
+                                                                type: 'material' as const
+                                                            })) || [];
+
                                                         // Include notebooks
                                                         const notebookContents = notebooks
                                                             .filter(n => n.content && n.content.trim().length > 10)
-                                                            .map(n => n.content);
+                                                            .map(n => ({
+                                                                title: n.title || 'Cuaderno sin título',
+                                                                content: n.content,
+                                                                type: 'notebook' as const
+                                                            }));
+
                                                         const contents = [...materialContents, ...notebookContents];
 
                                                         console.log(`[Generation Flow] Found ${materialContents.length} materials and ${notebookContents.length} notebooks.`);
@@ -1658,12 +1678,22 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                     try {
                                                         // Include materials
                                                         const materialContents = studySet?.materials
-                                                            .map(m => m.content_text || m.summary || '')
-                                                            .filter(t => (t?.trim().length || 0) > 10) || [];
+                                                            .filter(m => (m.content_text || m.summary || '').trim().length > 10)
+                                                            .map(m => ({
+                                                                title: m.name || 'Material sin título',
+                                                                content: m.content_text || m.summary || '',
+                                                                type: 'material' as const
+                                                            })) || [];
+
                                                         // Include notebooks
                                                         const notebookContents = notebooks
                                                             .filter(n => n.content && n.content.trim().length > 10)
-                                                            .map(n => n.content);
+                                                            .map(n => ({
+                                                                title: n.title || 'Cuaderno sin título',
+                                                                content: n.content,
+                                                                type: 'notebook' as const
+                                                            }));
+
                                                         const contents = [...materialContents, ...notebookContents];
 
                                                         console.log(`[Generation Flow] Found ${materialContents.length} materials and ${notebookContents.length} notebooks with text.`);

@@ -396,9 +396,12 @@ Estudiantes universitarios que buscan dominio profundo y preparación para exám
 ---
 NOMBRE DEL SET DE ESTUDIO: ${studySetName}
 CONTENIDO DE LOS MATERIALES:
-${materialsContent.map((t, i) => `[MATERIAL ${i + 1}]:\n${t.slice(0, 100000)}`).join('\n\n')}
+${materialsContent.map((t, i) => `[MATERIAL ${i + 1}]:\n${t}`).join('\n\n')}
 ---
-Genera la guía de estudio más completa, clara y efectiva posible basándote en los materiales anteriores.
+Genera una GUÍA DE ESTUDIO DE NIVEL UNIVERSITARIO/POSGRADO.
+NO RESUMAS NADA. EXPLICA CADA CONCEPTO EN PROFUNDIDAD.
+Si hay diagramas descritos, explícalos. Si hay fórmulas, desglósalas.
+El estudiante quiere APRENDER EL TEMA COMPLETO solo leyendo esto.
 `;
 
   try {
@@ -409,7 +412,10 @@ Genera la guía de estudio más completa, clara y efectiva posible basándote en
   }
 };
 
-export const generateInfographicFromMaterials = async (materialsContent: string[], studySetName: string): Promise<string | null> => {
+export const generateInfographicFromMaterials = async (
+  materialsContent: { title: string; content: string; type: 'notebook' | 'material' }[],
+  studySetName: string
+): Promise<string | null> => {
   if (materialsContent.length === 0) return null;
 
   try {
@@ -441,22 +447,47 @@ export const generateInfographicFromMaterials = async (materialsContent: string[
             required: ["step", "description"]
           }
         },
-        conclusion: { type: Type.STRING }
+        conclusion: { type: Type.STRING },
+        detailedSections: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              content: { type: Type.STRING },
+              icon: { type: Type.STRING },
+              citations: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    sourceType: { type: Type.STRING, enum: ["Notebook", "Material"] },
+                    title: { type: Type.STRING }
+                  },
+                  required: ["sourceType", "title"]
+                }
+              }
+            },
+            required: ["title", "content", "icon"]
+          }
+        }
       },
-      required: ["title", "centralIdea", "keyConcepts", "processSteps", "conclusion"]
+      required: ["title", "centralIdea", "keyConcepts", "processSteps", "detailedSections", "conclusion"]
     };
 
     const infographicPrompt = `
-# ARQUITECTO DE INFOGRAFÍAS PEDAGÓGICAS
-Eres un experto en comunicación visual. Tu objetivo es transformar materiales académicos en un diseño JSON estructurado.
+# ARQUITECTO DE INFOGRAFÍAS PEDAGÓGICAS (MODO DETALLADO)
+Transforma estos materiales en un mapa mental visual GIGANTE y EXHAUSTIVO.
+NO OMITAS DETALLES TÉCNICOS.
 
 NOMBRE DEL SET DE ESTUDIO: ${studySetName}
 CONTENIDO:
-${materialsContent.map(t => t.slice(0, 50000)).join('\n\n')}
+${materialsContent.map(m => `--- FUENTE: [${m.type.toUpperCase()}] "${m.title}" ---\n${m.content}`).join('\n\n')}
 
 Instrucciones:
-1. "icon" debe ser un nombre de icono de Material Symbols (ej: 'school', 'science', 'lightbulb').
-2. Se conciso y directo.
+1. "detailedSections": Crea secciones profundas para cada tema principal del material.
+2. "icon": Usa iconos de Material Symbols.
+3. El objetivo no es solo resumir, sino ESTRUCTURAR todo el conocimiento.
 `;
 
     return await generateContent(infographicPrompt, { jsonSchema: schema });
@@ -466,7 +497,12 @@ Instrucciones:
   }
 };
 
-export const generatePresentationFromMaterials = async (materialsContent: string[], studySetName: string): Promise<string | null> => {
+// Enhanced Signature: Accepts structured content objects
+export const generatePresentationFromMaterials = async (
+  materialsContent: { title: string; content: string; type: 'notebook' | 'material' }[],
+  studySetName: string
+): Promise<string | null> => {
+
   if (materialsContent.length === 0) return null;
 
   try {
@@ -485,6 +521,17 @@ export const generatePresentationFromMaterials = async (materialsContent: string
               content: { type: Type.ARRAY, items: { type: Type.STRING } },
               visualCue: { type: Type.STRING },
               speakerNotes: { type: Type.STRING },
+              citations: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    sourceType: { type: Type.STRING, enum: ["Notebook", "Material"] },
+                    title: { type: Type.STRING }
+                  },
+                  required: ["sourceType", "title"]
+                }
+              }
             },
             required: ["layout", "title", "content", "speakerNotes", "visualCue"]
           }
@@ -516,12 +563,12 @@ REGLAS DE CONTENIDO:
 - "content": Puntos clave breves y contundentes para leer en el slide.
 
 NOMBRE DEL SET: ${studySetName}
-
-MATERIALES (Usa toda la información disponible):
-${materialsContent.join('\n\n')}
-
-Genera la presentación completa en JSON.
-`;
+ 
+ MATERIALES DISPONIBLES (Con títulos):
+ ${materialsContent.map(m => `--- FUENTE: [${m.type.toUpperCase()}] "${m.title}" ---\n${m.content}`).join('\n\n')}
+ 
+ Genera la presentación completa en JSON.
+ `;
 
     return await generateContent(presentationPrompt, { jsonSchema: schema });
   } catch (error) {
