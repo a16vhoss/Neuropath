@@ -23,8 +23,7 @@ interface Props {
     content: string; // JSON string or Markdown
 }
 
-// --- Enhanced Theme Configurations with Gradients and Patterns ---
-// More vibrant, higher contrast themes
+// --- Enhanced Theme Configurations (V3: No Visual Placeholders) ---
 const themes: Record<VisualTheme, {
     bg: string,
     text: string,
@@ -32,88 +31,65 @@ const themes: Record<VisualTheme, {
     secondary: string,
     card: string,
     pattern: string,
-    visualBg: string
+    accentColor: string
 }> = {
     modern_dark: {
-        bg: "bg-slate-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-950 via-slate-950 to-black",
-        text: "text-slate-50",
-        accent: "bg-indigo-500 text-indigo-50 shadow-[0_0_20px_rgba(99,102,241,0.5)]",
-        secondary: "text-slate-400",
-        card: "bg-slate-900/60 backdrop-blur-xl border-white/5 shadow-2xl shadow-black/50 ring-1 ring-white/10",
-        pattern: "opacity-30",
-        visualBg: "bg-gradient-to-br from-indigo-900/50 to-purple-900/50"
+        bg: "bg-[#0A0C10] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-950/40 via-[#0A0C10] to-black",
+        text: "text-white",
+        accent: "bg-indigo-500",
+        accentColor: "#6366f1",
+        secondary: "text-[#8E97A4]",
+        card: "bg-white/5 backdrop-blur-3xl border border-white/10 shadow-2xl",
+        pattern: "opacity-20"
     },
     clean_light: {
-        bg: "bg-white bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-blue-50 via-white to-indigo-50",
-        text: "text-slate-800",
-        accent: "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20",
+        bg: "bg-[#FAFAFB] bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-blue-50/50 via-[#FAFAFB] to-white",
+        text: "text-slate-900",
+        accent: "bg-indigo-600",
+        accentColor: "#4f46e5",
         secondary: "text-slate-500",
-        card: "bg-white/80 backdrop-blur-2xl border-white/40 shadow-xl shadow-slate-200/50 ring-1 ring-slate-100",
-        pattern: "opacity-5",
-        visualBg: "bg-gradient-to-br from-blue-100 to-indigo-100"
+        card: "bg-white/80 backdrop-blur-xl border border-slate-200/60 shadow-xl shadow-indigo-100/20",
+        pattern: "opacity-10"
     },
     professional_blue: {
-        bg: "bg-slate-900 bg-[conic-gradient(at_top_right,_var(--tw-gradient-stops))] from-sky-900 via-slate-900 to-slate-950",
+        bg: "bg-[#020617] bg-[conic-gradient(at_top_right,_var(--tw-gradient-stops))] from-sky-950 via-[#020617] to-black",
         text: "text-white",
-        accent: "bg-sky-500 text-sky-50 shadow-[0_0_20px_rgba(14,165,233,0.5)]",
-        secondary: "text-sky-200/70",
-        card: "bg-slate-900/60 backdrop-blur-xl border-sky-500/10 shadow-2xl ring-1 ring-sky-500/20",
-        pattern: "opacity-15",
-        visualBg: "bg-gradient-to-br from-sky-900/50 to-blue-900/50 text-sky-200"
+        accent: "bg-sky-400",
+        accentColor: "#38bdf8",
+        secondary: "text-sky-200/60",
+        card: "bg-sky-500/5 backdrop-blur-2xl border border-sky-500/20 shadow-2xl shadow-sky-950",
+        pattern: "opacity-20"
     },
     warm_paper: {
-        bg: "bg-[#FDFBF7] bg-[linear-gradient(to_bottom_right,#fff,#f5f5f4)]",
-        text: "text-stone-800",
-        accent: "bg-orange-600 text-white shadow-lg shadow-orange-600/20",
-        secondary: "text-stone-600",
-        card: "bg-white backdrop-blur-sm border-stone-200 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.05)] ring-1 ring-stone-100",
-        pattern: "opacity-5",
-        visualBg: "bg-gradient-to-br from-orange-100 to-stone-200 text-orange-900"
+        bg: "bg-[#FDFBF7]",
+        text: "text-stone-900",
+        accent: "bg-orange-600",
+        accentColor: "#ea580c",
+        secondary: "text-stone-500",
+        card: "bg-white border border-stone-200 shadow-sm",
+        pattern: "opacity-5"
     },
     default: {
         bg: "bg-slate-900",
         text: "text-white",
         accent: "bg-indigo-500",
+        accentColor: "#6366f1",
         secondary: "text-slate-400",
         card: "bg-slate-800",
-        pattern: "opacity-10",
-        visualBg: "bg-slate-800"
+        pattern: "opacity-10"
     }
 };
-
-const VisualPlaceholder = ({ cue, theme }: { cue: string, theme: any }) => (
-    <div className={`w-full h-full min-h-[300px] rounded-2xl overflow-hidden relative group ${theme.card} border-0 transition-transform duration-500 hover:scale-[1.02]`}>
-        {/* Animated Background */}
-        <div className={`absolute inset-0 ${theme.visualBg}`}></div>
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20 animate-pulse"></div>
-
-        {/* Decorative Circles */}
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-black/10 rounded-full blur-2xl"></div>
-
-        <div className="relative z-10 w-full h-full flex flex-col items-center justify-center p-8 text-center">
-            <div className={`w-20 h-20 rounded-2xl ${theme.accent.split(' ')[0]}/20 flex items-center justify-center mb-6 border border-white/10`}>
-                <span className="material-symbols-outlined text-4xl opacity-80">image</span>
-            </div>
-
-            <p className={`text-xs uppercase tracking-[0.2em] font-bold opacity-60 mb-3`}>Visualización Sugerida</p>
-            <p className={`text-lg font-serif italic opacity-90 leading-relaxed max-w-sm`}>
-                "{cue}"
-            </p>
-        </div>
-    </div>
-);
 
 const Citations = ({ citations, theme }: { citations?: { sourceType: string, title: string }[], theme: any }) => {
     if (!citations || citations.length === 0) return null;
     return (
-        <div className="absolute bottom-6 left-8 flex flex-wrap gap-2 pointer-events-none z-20 max-w-[70%]">
+        <div className="absolute bottom-10 left-12 flex flex-wrap gap-2 z-20 max-w-[80%]">
             {citations.map((cite, i) => (
-                <div key={i} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wider font-bold backdrop-blur-md border ${theme.card} ${theme.secondary} shadow-sm`}>
+                <div key={i} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] uppercase tracking-[0.2em] font-black border ${theme.card} ${theme.secondary}`}>
                     <span className="material-symbols-outlined text-xs">
                         {cite.sourceType === 'Notebook' ? 'book' : 'description'}
                     </span>
-                    <span className="truncate max-w-[150px]">{cite.title}</span>
+                    <span className="truncate max-w-[200px]">{cite.title}</span>
                 </div>
             ))}
         </div>
@@ -138,8 +114,8 @@ export default function PresentationRenderer({ content }: Props) {
 
     if (!isJson || !data) {
         return (
-            <div className="prose prose-lg max-w-none bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
-                <pre className="whitespace-pre-wrap font-sans text-sm text-slate-600">{content}</pre>
+            <div className="prose prose-lg max-w-none bg-white p-12 rounded-[2rem] shadow-sm border border-slate-100">
+                <pre className="whitespace-pre-wrap font-sans text-slate-600 leading-relaxed">{content}</pre>
             </div>
         );
     }
@@ -153,22 +129,23 @@ export default function PresentationRenderer({ content }: Props) {
         switch (layout) {
             case 'title_slide':
                 return (
-                    <div className="h-full flex flex-col justify-center items-center text-center p-16 relative overflow-hidden">
-                        <div className="absolute inset-0 flex items-center justify-center opacity-50">
-                            <div className={`w-[800px] h-[800px] bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-full blur-[120px]`}></div>
+                    <div className="h-full flex flex-col justify-center items-center text-center p-24 text-white relative">
+                        {/* Background Accent */}
+                        <div className="absolute inset-0 z-0">
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full blur-[140px] opacity-20" style={{ backgroundColor: theme.accentColor }}></div>
                         </div>
 
-                        <div className="relative z-10 max-w-5xl">
-                            <div className="flex justify-center mb-10">
-                                <span className={`inline-block px-5 py-2 rounded-full text-xs font-bold tracking-[0.3em] uppercase ${theme.card} ${theme.text} border`}>
-                                    Presentación
-                                </span>
+                        <div className="relative z-10 space-y-12">
+                            <div className="flex justify-center mb-16">
+                                <div className="px-6 py-2 rounded-full bg-white/10 border border-white/20 text-[10px] font-black tracking-[0.4em] uppercase">
+                                    Adaptive Education
+                                </div>
                             </div>
-                            <h1 className={`text-6xl md:text-8xl font-black mb-10 leading-none tracking-tight ${theme.text} drop-shadow-2xl`}>
+                            <h1 className={`text-7xl md:text-9xl font-black mb-12 leading-[0.9] tracking-tighter ${theme.text} drop-shadow-2xl`}>
                                 {slide.title}
                             </h1>
                             {slide.subtitle && (
-                                <p className={`text-2xl md:text-3xl font-light ${theme.secondary} max-w-3xl mx-auto leading-relaxed`}>
+                                <p className={`text-2xl md:text-4xl font-serif italic ${theme.secondary} max-w-4xl mx-auto leading-tight`}>
                                     {slide.subtitle}
                                 </p>
                             )}
@@ -178,71 +155,72 @@ export default function PresentationRenderer({ content }: Props) {
 
             case 'section_header':
                 return (
-                    <div className="h-full flex flex-row items-center p-20 gap-20">
-                        {/* Large decorative number/bar */}
-                        <div className="flex items-center justify-center w-24">
-                            <div className={`w-1 h-64 ${theme.accent.split(' ')[0]} rounded-full opacity-80 shadow-[0_0_20px_currentColor]`}></div>
-                        </div>
-
-                        <div className="flex-1">
-                            <span className={`uppercase tracking-[0.4em] text-sm font-bold mb-8 block ${theme.secondary}`}>
-                                Nueva Sección
-                            </span>
-                            <h1 className={`text-7xl font-black ${theme.text} mb-10 leading-tight`}>{slide.title}</h1>
-                            {slide.visualCue && (
-                                <div className="mt-12 max-w-lg h-64">
-                                    <VisualPlaceholder cue={slide.visualCue} theme={theme} />
-                                </div>
+                    <div className="h-full flex flex-col justify-center p-32">
+                        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-white/5 backdrop-blur-3xl border-l border-white/10 hidden md:block"></div>
+                        <div className="relative z-10 max-w-4xl">
+                            <div className="w-24 h-2 rounded-full mb-12" style={{ backgroundColor: theme.accentColor }}></div>
+                            <span className={`uppercase tracking-[0.5em] text-xs font-black mb-8 block opacity-40 ${theme.text}`}>Sección</span>
+                            <h1 className={`text-7xl md:text-8xl font-black ${theme.text} mb-12 leading-none tracking-tight`}>{slide.title}</h1>
+                            {slide.subtitle && (
+                                <p className={`text-3xl font-light leading-relaxed max-w-2xl ${theme.secondary}`}>{slide.subtitle}</p>
                             )}
                         </div>
                     </div>
                 );
 
             case 'two_column':
+            case 'content_list':
+            default:
+                // Redesigned to be content-rich without placeholders
                 return (
-                    <div className="h-full grid grid-cols-2 gap-16 p-16 items-center">
-                        <div className="flex flex-col justify-center h-full overflow-y-auto pr-4 scrollbar-hide">
-                            <h2 className={`text-5xl font-bold mb-10 ${theme.text}`}>{slide.title}</h2>
-                            <ul className="space-y-8">
-                                {slide.content.map((p, i) => (
-                                    <li key={i} className={`text-2xl leading-relaxed flex items-start gap-5 ${theme.text}`}>
-                                        <div className={`mt-3 w-2.5 h-2.5 rounded-full ${theme.accent.split(' ')[0]} shrink-0 shadow-lg`} />
-                                        <span>{p}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                        <div className="h-full flex flex-col gap-6 items-stretch justify-center">
-                            <div className="flex-1 max-h-[60%]">
-                                <VisualPlaceholder cue={slide.visualCue} theme={theme} />
+                    <div className="h-full flex flex-col p-20">
+                        <header className="mb-20">
+                            <div className="flex items-center gap-6 mb-8">
+                                <div className="w-12 h-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }}></div>
+                                <h2 className={`text-2xl font-black uppercase tracking-[0.3em] ${theme.text}`}>{slide.title}</h2>
                             </div>
                             {slide.subtitle && (
-                                <div className={`${theme.card} p-8 rounded-2xl border`}>
-                                    <div className="flex items-center gap-3 mb-3 opacity-50">
-                                        <span className="material-symbols-outlined text-lg">info</span>
-                                        <span className="text-xs uppercase tracking-wider font-bold">Nota</span>
-                                    </div>
-                                    <p className={`text-lg italic ${theme.secondary}`}>{slide.subtitle}</p>
-                                </div>
+                                <p className={`text-3xl font-medium leading-tight ${theme.secondary} max-w-5xl`}>
+                                    {slide.subtitle}
+                                </p>
                             )}
+                        </header>
+
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 overflow-y-auto pr-6 scrollbar-hide pb-20">
+                            {slide.content.map((point, idx) => (
+                                <div key={idx} className={`p-10 rounded-[2.5rem] flex flex-col justify-between transition-all duration-500 hover:-translate-y-2 border border-white/5 ${theme.card} group`}>
+                                    <div>
+                                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-white/5 mb-8 group-hover:bg-white/10 transition-colors">
+                                            <span className="text-xl font-black opacity-30">{idx + 1}</span>
+                                        </div>
+                                        <p className={`text-2xl font-bold leading-snug tracking-tight ${theme.text}`}>{point}</p>
+                                    </div>
+                                    <div className="mt-8 flex justify-end">
+                                        <div className="w-8 h-8 rounded-full opacity-20 group-hover:opacity-100 transition-opacity flex items-center justify-center" style={{ backgroundColor: theme.accentColor }}>
+                                            <span className="material-symbols-outlined text-white text-sm">trending_flat</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 );
 
             case 'quote_visual':
                 return (
-                    <div className="h-full flex flex-col justify-center items-center p-24 text-center relative overflow-hidden">
-                        <span className={`absolute top-20 left-20 text-[12rem] opacity-[0.03] font-serif ${theme.text}`}>"</span>
+                    <div className="h-full flex flex-col justify-center items-center p-32 text-center relative overflow-hidden">
+                        {/* Huge Decorative Quote Marks */}
+                        <div className="absolute top-0 left-0 text-[30rem] font-serif leading-none opacity-[0.03] select-none -translate-x-1/4 -translate-y-1/4" style={{ color: theme.accentColor }}>“</div>
+
                         <div className="relative z-10 max-w-6xl">
-                            <blockquote className={`text-5xl md:text-6xl font-serif italic leading-tight mb-14 ${theme.text} drop-shadow-lg`}>
-                                {slide.content[0] || slide.title}
+                            <blockquote className={`text-6xl md:text-8xl font-serif italic font-light leading-[1.1] mb-20 ${theme.text} drop-shadow-2xl`}>
+                                "{slide.content[0] || slide.title}"
                             </blockquote>
-                            <div className="flex items-center justify-center gap-6">
-                                <div className={`h-px w-20 ${theme.secondary} opacity-30`}></div>
-                                <cite className={`text-xl font-bold not-italic tracking-[0.2em] uppercase ${theme.secondary}`}>
-                                    {slide.subtitle || "Concepto Clave"}
+                            <div className="flex flex-col items-center gap-6">
+                                <div className="w-20 h-1 rounded-full mb-4" style={{ backgroundColor: theme.accentColor }}></div>
+                                <cite className={`text-lg font-black not-italic tracking-[0.4em] uppercase ${theme.secondary}`}>
+                                    {slide.subtitle || "Resumen del Set"}
                                 </cite>
-                                <div className={`h-px w-20 ${theme.secondary} opacity-30`}></div>
                             </div>
                         </div>
                     </div>
@@ -250,52 +228,22 @@ export default function PresentationRenderer({ content }: Props) {
 
             case 'data_highlight':
                 return (
-                    <div className="h-full flex flex-col p-16">
-                        <h2 className={`text-4xl font-bold mb-16 text-center ${theme.text}`}>{slide.title}</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 flex-1 content-center">
+                    <div className="h-full flex flex-col p-24">
+                        <div className="text-center mb-24">
+                            <h2 className={`text-5xl font-black mb-8 ${theme.text} tracking-tight`}>{slide.title}</h2>
+                            <div className="w-32 h-1.5 mx-auto rounded-full" style={{ backgroundColor: theme.accentColor }}></div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 flex-1 content-center">
                             {slide.content.map((item, idx) => (
-                                <div key={idx} className={`${theme.card} p-10 rounded-3xl flex flex-col items-center text-center justify-center hover:scale-105 transition-all duration-300 group cursor-default`}>
-                                    <div className={`w-20 h-20 rounded-2xl ${theme.accent.split(' ')[0]} flex items-center justify-center mb-8 text-3xl font-bold shadow-lg group-hover:shadow-[0_0_30px_currentColor] transition-shadow duration-300`}>
+                                <div key={idx} className={`${theme.card} p-12 rounded-[3rem] flex flex-col items-center text-center justify-center hover:scale-105 transition-all duration-500 relative group`}>
+                                    <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-[3rem]"></div>
+                                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-10 text-3xl font-black shadow-2xl z-10`} style={{ backgroundColor: theme.accentColor }}>
                                         {idx + 1}
                                     </div>
-                                    <span className={`text-2xl font-medium leading-relaxed ${theme.text}`}>{item}</span>
+                                    <span className={`text-2xl font-bold leading-tight tracking-tight z-10 ${theme.text}`}>{item}</span>
                                 </div>
                             ))}
-                        </div>
-                    </div>
-                );
-
-            case 'content_list':
-            default:
-                // FIX: Better scrolling and layout for content list
-                return (
-                    <div className="h-full grid grid-cols-12 gap-12 p-16">
-                        <div className="col-span-7 flex flex-col h-full">
-                            <div className="mb-10 pl-8 border-l-[6px] border-white/10">
-                                <h2 className={`text-5xl md:text-6xl font-black ${theme.text} tracking-tight`}>{slide.title}</h2>
-                            </div>
-
-                            {/* Scrollable area for list items */}
-                            <div className="flex-1 overflow-y-auto pr-6 -mr-6 space-y-4 pb-4 scrollbar-thin scrollbar-thumb-white/20 hover:scrollbar-thumb-white/40">
-                                {slide.content.map((point, idx) => (
-                                    <div key={idx} className={`flex items-center gap-6 p-6 rounded-2xl transition-all duration-300 hover:translate-x-2 ${theme.card}`}>
-                                        <div className={`w-3 h-3 rounded-full ${theme.accent.split(' ')[0]} shrink-0 shadow-[0_0_10px_currentColor]`}></div>
-                                        <p className={`text-xl font-medium leading-snug ${theme.text}`}>{point}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="col-span-5 flex flex-col gap-6 h-full justify-center">
-                            {slide.subtitle && (
-                                <div className={`${theme.card} p-8 rounded-3xl border`}>
-                                    <h3 className={`text-xs font-bold uppercase tracking-[0.2em] mb-4 opacity-50 ${theme.text}`}>Resumen</h3>
-                                    <p className={`text-lg leading-relaxed ${theme.text}`}>{slide.subtitle}</p>
-                                </div>
-                            )}
-                            <div className="flex-1 min-h-[250px] overflow-hidden rounded-3xl shadow-2xl">
-                                <VisualPlaceholder cue={slide.visualCue} theme={theme} />
-                            </div>
                         </div>
                     </div>
                 );
@@ -303,16 +251,16 @@ export default function PresentationRenderer({ content }: Props) {
     };
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8 select-none">
-            {/* Viewport Frame */}
-            <div className={`aspect-video ${theme.bg} rounded-[2rem] shadow-2xl overflow-hidden relative group transition-all duration-700 ring-1 ring-slate-900/10`}>
+        <div className="max-w-7xl mx-auto space-y-12 select-none mb-24">
+            {/* Viewport Frame - Full 16:9 Aspect Ratio Experience */}
+            <div className={`aspect-video ${theme.bg} rounded-[3rem] shadow-2xl overflow-hidden relative group transition-all duration-1000 ring-1 ring-white/10`}>
 
                 {/* Background Pattern */}
-                <div className={`absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] ${theme.pattern} mix-blend-overlay pointer-events-none`}></div>
+                <div className={`absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] ${theme.pattern} mix-blend-overlay pointer-events-none`}></div>
 
-                {/* Floating Gradient Orbs */}
-                <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-gradient-to-br from-indigo-500/20 to-purple-500/0 rounded-full blur-[100px] pointer-events-none animate-pulse"></div>
-                <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-gradient-to-tl from-blue-500/10 to-teal-500/0 rounded-full blur-[100px] pointer-events-none"></div>
+                {/* Dynamic Floating Elements */}
+                <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full blur-[140px] opacity-10 animate-pulse pointer-events-none" style={{ backgroundColor: theme.accentColor }}></div>
+                <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-blue-500/10 rounded-full blur-[140px] pointer-events-none"></div>
 
                 {/* Render Layout */}
                 <div className="absolute inset-0 z-10">
@@ -322,66 +270,65 @@ export default function PresentationRenderer({ content }: Props) {
                 {/* Citations Overlay */}
                 <Citations citations={slide.citations} theme={theme} />
 
-                {/* Slide Counter (Bottom Right) */}
-                <div className="absolute bottom-8 right-10 z-20 font-mono text-sm opacity-30">
-                    <span className={`${theme.text} text-lg font-bold`}>{currentSlide + 1} <span className="mx-2 text-xs opacity-50">/</span> {data.slides.length}</span>
-                </div>
-
-                {/* Navigation Overlay (Hover) */}
-                <div className="absolute inset-0 z-30 pointer-events-none flex justify-between px-6 items-center opacity-0 group-hover:opacity-100 transition-all duration-500">
+                {/* Navigation Controls (Visible on Hover) */}
+                <div className="absolute inset-x-0 bottom-12 z-30 flex justify-center items-center gap-12 opacity-0 group-hover:opacity-100 transition-all duration-500 transform translate-y-4 group-hover:translate-y-0">
                     <button
                         onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
                         disabled={currentSlide === 0}
-                        className="pointer-events-auto w-16 h-16 rounded-full bg-white/5 backdrop-blur-xl border border-white/10 flex items-center justify-center hover:bg-white/10 disabled:opacity-0 transition-all transform hover:scale-110 shadow-lg"
+                        className="w-16 h-16 rounded-3xl bg-white/5 backdrop-blur-2xl border border-white/10 flex items-center justify-center hover:bg-white/10 disabled:opacity-20 transition-all active:scale-95 shadow-2xl"
                     >
-                        <span className={`material-symbols-outlined text-4xl ${theme.text}`}>arrow_back</span>
+                        <span className={`material-symbols-outlined text-3xl ${theme.text}`}>west</span>
                     </button>
+
+                    <div className="px-8 py-3 rounded-full bg-white/5 backdrop-blur-3xl border border-white/10 text-xs font-black tracking-[0.4em]">
+                        <span className={theme.text}>{currentSlide + 1}</span>
+                        <span className="mx-4 opacity-30">/</span>
+                        <span className="opacity-30">{data.slides.length}</span>
+                    </div>
+
                     <button
                         onClick={() => setCurrentSlide(Math.min(data.slides.length - 1, currentSlide + 1))}
                         disabled={currentSlide === data.slides.length - 1}
-                        className="pointer-events-auto w-16 h-16 rounded-full bg-white/5 backdrop-blur-xl border border-white/10 flex items-center justify-center hover:bg-white/10 disabled:opacity-0 transition-all transform hover:scale-110 shadow-lg"
+                        className="w-16 h-16 rounded-3xl bg-white/5 backdrop-blur-2xl border border-white/10 flex items-center justify-center hover:bg-white/10 disabled:opacity-20 transition-all active:scale-95 shadow-2xl"
                     >
-                        <span className={`material-symbols-outlined text-4xl ${theme.text}`}>arrow_forward</span>
+                        <span className={`material-symbols-outlined text-3xl ${theme.text}`}>east</span>
                     </button>
                 </div>
             </div>
 
-            {/* Speaker Notes Console - Refined Visuals */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="md:col-span-2 bg-gradient-to-br from-amber-50 to-orange-50 p-8 rounded-3xl border border-amber-100 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
-                    <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <span className="material-symbols-outlined text-[8rem] text-amber-900 icon-filled">mic</span>
+            {/* Speaker Notes Console - High Contrast & Premium */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div className="md:col-span-3 bg-white p-12 rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-100/50 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-12 opacity-[0.02] transform rotate-12 scale-150 group-hover:opacity-[0.05] transition-opacity">
+                        <span className="material-symbols-outlined text-[10rem] icon-filled">record_voice_over</span>
                     </div>
+
                     <div className="relative z-10">
-                        <div className="flex items-center gap-3 mb-5 text-amber-800 font-bold text-xs uppercase tracking-[0.2em]">
-                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_currentColor]"></span>
-                            Guion del Presentador
+                        <div className="flex items-center gap-4 mb-8">
+                            <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-indigo-50 text-indigo-500">
+                                <span className="material-symbols-outlined text-lg">mic</span>
+                            </div>
+                            <span className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Guion del Presentador</span>
                         </div>
-                        <p className="text-amber-950/80 leading-8 font-serif text-xl border-l-2 border-amber-200 pl-6">
-                            {slide.speakerNotes || "Sin notas para esta diapositiva."}
+                        <p className="text-slate-700 leading-relaxed font-serif text-2xl lg:text-3xl max-w-5xl">
+                            {slide.speakerNotes || "Explica los conceptos clave basándote en la información resaltada en la diapositiva."}
                         </p>
                     </div>
                 </div>
 
-                {/* Controls - Premium Look */}
-                <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-                    <div className="flex items-center gap-5">
-                        <div className={`w-14 h-14 rounded-2xl ${theme.bg} shadow-lg flex items-center justify-center shrink-0`}>
-                            <span className="text-white font-bold text-xl">{currentSlide + 1}</span>
-                        </div>
-                        <div className="overflow-hidden">
-                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1.5">Diapositiva Actual</div>
-                            <div className="text-base font-bold text-slate-700 truncate">{slide.title}</div>
-                        </div>
+                <div className="flex flex-col gap-8">
+                    <div className="bg-slate-900 p-10 rounded-[3rem] text-white flex-1 flex flex-col justify-center text-center relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-transparent"></div>
+                        <span className="text-[10px] font-black uppercase tracking-[0.4em] opacity-40 mb-4 block">Capítulo</span>
+                        <div className="text-4xl font-black mb-2">{currentSlide + 1}</div>
+                        <div className="text-xs font-bold opacity-30 uppercase tracking-widest">de {data.slides.length}</div>
                     </div>
 
-                    <div className="h-px bg-slate-100 w-full my-6"></div>
-
-                    <div className="flex flex-col gap-3">
-                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Tema Visual</div>
-                        <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-xl border border-slate-100">
-                            <span className={`w-4 h-4 rounded-full ${theme.accent.split(' ')[0]} shadow-sm`}></span>
-                            <span className="text-sm font-medium text-slate-600 capitalize">{data.visualTheme.replace('_', ' ')}</span>
+                    <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm text-center">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mb-4 block">Tema Aplicado</span>
+                        <div className="flex justify-center items-center gap-3">
+                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: theme.accentColor }}></div>
+                            <span className="text-sm font-bold text-slate-700 capitalize">{data.visualTheme.replace('_', ' ')}</span>
                         </div>
                     </div>
                 </div>

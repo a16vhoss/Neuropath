@@ -533,7 +533,7 @@ export const generatePresentationFromMaterials = async (
                 }
               }
             },
-            required: ["layout", "title", "content", "speakerNotes", "visualCue"]
+            required: ["layout", "title", "content", "speakerNotes"]
           }
         }
       },
@@ -542,25 +542,20 @@ export const generatePresentationFromMaterials = async (
 
     const presentationPrompt = `
 # ARQUITECTO DE PRESENTACIONES EXPERTO
-Tu misión es transformar el material de estudio en una presentación EDUCACIONAL MAESTRA.
-NO OMITAS INFORMACIÓN. Queremos profundidad y claridad.
+Tu misión es transformar el material de estudio en una presentación EDUCACIONAL MAESTRA con un diseño tipográfico potente.
 
 OBJETIVO:
 Crear una presentación EXHAUSTIVA (10 a 20 diapositivas) que cubra TODO el material provisto.
-Usa los "Notebooks" del estudiante como la guía principal de la narrativa, y los materiales de soporte para los datos duros.
-
-ESTRUCTURA VISUAL (Usa variados 'layout'):
-1. layout: 'title_slide' -> Para la portada.
-2. layout: 'section_header' -> Para dividir temas grandes.
-3. layout: 'two_column' -> Para comparar conceptos o definir términos clave.
-4. layout: 'quote_visual' -> Para frases importantes o conclusiones del estudiante.
-5. layout: 'data_highlight' -> Para números, fechas o reglas críticas.
-6. layout: 'content_list' -> Para procesos o listas de características.
+NO OMITAS INFORMACIÓN. Queremos profundidad y claridad.
 
 REGLAS DE CONTENIDO:
-- "visualCue": Describe brevemente qué imagen iría de fondo o acompañando (ej: "Diagrama de flujo mostrando X", "Foto de laboratorio oscura").
-- "speakerNotes": DEBE SER UN GUIÓN COMPLETO para que el estudiante lo lea mientras estudia. Explica el slide profundamente.
-- "content": Puntos clave breves y contundentes para leer en el slide.
+1. "speakerNotes": DEBE SER UN GUIÓN COMPLETO para que el estudiante lo lea mientras estudia. Explica el slide profundamente.
+2. "content": Puntos clave detallados. Cada punto debe ser una frase completa y contundente que aporte valor real, no solo etiquetas.
+3. "subtitle": Usa esto para añadir una capa extra de profundidad o una pregunta provocativa que guíe la diapositiva.
+
+ESTUDIO DE LAYOUTS:
+- layouts: Usarás "title_slide", "content_list", "two_column", "quote_visual", "data_highlight", "section_header" para mantener el dinamismo.
+- NO generes campos de "visualCue" o sugerencias de imagen; el diseño se enfocará en la tipografía y la estructura de los datos.
 
 NOMBRE DEL SET: ${studySetName}
  
