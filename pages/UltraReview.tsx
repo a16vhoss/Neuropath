@@ -754,7 +754,7 @@ const Phase2Adaptive: React.FC<{ content: AdaptivePhase2Content; phaseConfig: Ph
                         {category.name}
                     </h3>
                     <div className="grid gap-4">
-                        {category.items.map((item, j) => (
+                        {(category.items || []).map((item, j) => (
                             <div key={j} className="bg-white/5 rounded-lg p-4">
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="flex-1">
