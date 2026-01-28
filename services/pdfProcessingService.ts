@@ -39,36 +39,71 @@ const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
  */
 const extractTextWithPDFJS = async (
   pdfBase64: string,
-  onProgress?: (current: number, total: number) => void
+  onProgress?: (message: string) => void
 ): Promise<string> => {
   try {
+    if (onProgress) onProgress('Cargando documento PDF...');
+
     const arrayBuffer = base64ToArrayBuffer(pdfBase64);
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const sizeMB = Math.round(arrayBuffer.byteLength / 1024 / 1024);
 
-    console.log(`PDF has ${pdf.numPages} pages`);
+    if (onProgress) onProgress(`Abriendo PDF (${sizeMB}MB)...`);
+
+    // Load PDF with progress tracking
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+
+    const pdf = await loadingTask.promise;
+    const totalPages = pdf.numPages;
+
+    console.log(`PDF has ${totalPages} pages`);
+    if (onProgress) onProgress(`PDF cargado: ${totalPages} páginas. Extrayendo texto...`);
+
     let fullText = '';
+    const startTime = Date.now();
 
-    for (let i = 1; i <= pdf.numPages; i++) {
-      try {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items
-          .map((item: any) => item.str)
-          .join(' ');
-        fullText += pageText + '\n\n';
+    // Process pages in batches for better performance
+    const BATCH_SIZE = 5;
+    for (let batchStart = 1; batchStart <= totalPages; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, totalPages);
 
-        // Report progress
-        if (onProgress) {
-          onProgress(i, pdf.numPages);
-        }
+      // Process batch of pages in parallel
+      const batchPromises = [];
+      for (let i = batchStart; i <= batchEnd; i++) {
+        batchPromises.push(
+          pdf.getPage(i).then(async (page) => {
+            try {
+              const textContent = await page.getTextContent();
+              const pageText = textContent.items
+                .map((item: any) => item.str)
+                .join(' ');
+              page.cleanup();
+              return { pageNum: i, text: pageText };
+            } catch (e) {
+              console.warn(`Error on page ${i}:`, e);
+              return { pageNum: i, text: '' };
+            }
+          })
+        );
+      }
 
-        // Release page resources
-        page.cleanup();
-      } catch (pageError) {
-        console.warn(`Error extracting page ${i}:`, pageError);
-        // Continue with other pages
+      const results = await Promise.all(batchPromises);
+
+      // Sort by page number and add to full text
+      results.sort((a, b) => a.pageNum - b.pageNum);
+      for (const result of results) {
+        fullText += result.text + '\n\n';
+      }
+
+      // Report progress
+      if (onProgress) {
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        const percent = Math.round((batchEnd / totalPages) * 100);
+        onProgress(`Extrayendo: ${batchEnd}/${totalPages} páginas (${percent}%) - ${elapsed}s`);
       }
     }
+
+    const totalTime = Math.round((Date.now() - startTime) / 1000);
+    console.log(`Extraction complete in ${totalTime}s, ${fullText.length} characters`);
 
     return fullText.trim();
   } catch (error) {
@@ -195,14 +230,9 @@ export const extractTextFromPDF = async (
     console.log('PDF size:', sizeMB, 'MB');
 
     // Step 1: Try PDF.js extraction (handles any size, processes page by page)
-    if (onProgress) onProgress('Analizando PDF...');
     console.log('Attempting local PDF.js text extraction...');
 
-    const pdfJsText = await extractTextWithPDFJS(cleanBase64, (current, total) => {
-      if (onProgress) {
-        onProgress(`Extrayendo texto: página ${current} de ${total}...`);
-      }
-    });
+    const pdfJsText = await extractTextWithPDFJS(cleanBase64, onProgress);
 
     // If PDF.js extracted substantial text, use it
     if (pdfJsText && pdfJsText.length > 200) {
