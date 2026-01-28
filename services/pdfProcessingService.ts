@@ -395,14 +395,15 @@ Tienes acceso a los apuntes y materiales del estudiante. Tu trabajo es convertir
 - Encabezados claros (##, ###).
 - Tablas si son útiles para comparar.
 - Bloques de código para fórmulas o algoritmos.
+- **CRÍTICO: NO envuelvas la respuesta en bloques de código markdown (```markdown).Devuelve el texto RAW.**
 
----
-NOMBRE DEL SET DE ESTUDIO: ${studySetName}
+    ---
+    NOMBRE DEL SET DE ESTUDIO: ${ studySetName }
 CONTENIDO CRUDO DE LOS MATERIALES:
-${materialsContent.map((t, i) => `[FUENTE ${i + 1}]:\n${t}`).join('\n\n')}
----
+${ materialsContent.map((t, i) => `[FUENTE ${i + 1}]:\n${t}`).join('\n\n') }
+  ---
 
-PROCEDE A ESCRIBIR EL TEXTO MAESTRO AHORA.
+    PROCEDE A ESCRIBIR EL TEXTO MAESTRO AHORA.
 `;
 
   try {
@@ -481,16 +482,16 @@ export const generateInfographicFromMaterials = async (
     };
 
     const infographicPrompt = `
-# ARQUITECTO DE INFOGRAFÍAS PEDAGÓGICAS (MODO DETALLADO)
+# ARQUITECTO DE INFOGRAFÍAS PEDAGÓGICAS(MODO DETALLADO)
 Transforma estos materiales en un mapa mental visual GIGANTE y EXHAUSTIVO.
 NO OMITAS DETALLES TÉCNICOS.
 
-NOMBRE DEL SET DE ESTUDIO: ${studySetName}
-CONTENIDO:
-${materialsContent.map(m => `--- FUENTE: [${m.type.toUpperCase()}] "${m.title}" ---\n${m.content}`).join('\n\n')}
+NOMBRE DEL SET DE ESTUDIO: ${ studySetName }
+  CONTENIDO:
+${ materialsContent.map(m => `--- FUENTE: [${m.type.toUpperCase()}] "${m.title}" ---\n${m.content}`).join('\n\n') }
 
-Instrucciones:
-1. "detailedSections": Crea secciones profundas para cada tema principal del material.
+  Instrucciones:
+  1. "detailedSections": Crea secciones profundas para cada tema principal del material.
 2. "icon": Usa iconos de Material Symbols.
 3. El objetivo no es solo resumir, sino ESTRUCTURAR todo el conocimiento.
 `;
@@ -549,23 +550,23 @@ export const generatePresentationFromMaterials = async (
 # ARQUITECTO DE PRESENTACIONES EXPERTO
 Tu misión es transformar el material de estudio en una presentación EDUCACIONAL MAESTRA con un diseño tipográfico potente.
 
-OBJETIVO:
-Crear una presentación EXHAUSTIVA (10 a 20 diapositivas) que cubra TODO el material provisto.
-NO OMITAS INFORMACIÓN. Queremos profundidad y claridad.
+    OBJETIVO:
+Crear una presentación EXHAUSTIVA(10 a 20 diapositivas) que cubra TODO el material provisto.
+NO OMITAS INFORMACIÓN.Queremos profundidad y claridad.
 
 REGLAS DE CONTENIDO:
-1. "speakerNotes": DEBE SER UN GUIÓN COMPLETO para que el estudiante lo lea mientras estudia. Explica el slide profundamente.
-2. "content": Puntos clave detallados. Cada punto debe ser una frase completa y contundente que aporte valor real, no solo etiquetas.
+  1. "speakerNotes": DEBE SER UN GUIÓN COMPLETO para que el estudiante lo lea mientras estudia.Explica el slide profundamente.
+2. "content": Puntos clave detallados.Cada punto debe ser una frase completa y contundente que aporte valor real, no solo etiquetas.
 3. "subtitle": Usa esto para añadir una capa extra de profundidad o una pregunta provocativa que guíe la diapositiva.
 
 ESTUDIO DE LAYOUTS:
-- layouts: Usarás "title_slide", "content_list", "two_column", "quote_visual", "data_highlight", "section_header" para mantener el dinamismo.
+  - layouts: Usarás "title_slide", "content_list", "two_column", "quote_visual", "data_highlight", "section_header" para mantener el dinamismo.
 - NO generes campos de "visualCue" o sugerencias de imagen; el diseño se enfocará en la tipografía y la estructura de los datos.
 
-NOMBRE DEL SET: ${studySetName}
+NOMBRE DEL SET: ${ studySetName }
  
- MATERIALES DISPONIBLES (Con títulos):
- ${materialsContent.map(m => `--- FUENTE: [${m.type.toUpperCase()}] "${m.title}" ---\n${m.content}`).join('\n\n')}
+ MATERIALES DISPONIBLES(Con títulos):
+ ${ materialsContent.map(m => `--- FUENTE: [${m.type.toUpperCase()}] "${m.title}" ---\n${m.content}`).join('\n\n') }
  
  Genera la presentación completa en JSON.
  `;
@@ -581,7 +582,7 @@ export const generateMaterialSummary = async (content: string, type: 'pdf' | 'te
   if (!content) return null;
 
   try {
-    const summaryPrompt = `Resume esto (${type}): ${content.slice(0, 50000)}`;
+    const summaryPrompt = `Resume esto(${ type }): ${ content.slice(0, 50000) } `;
     return await generateContent(summaryPrompt);
   } catch (error) {
     console.error('Error generating material summary:', error);
@@ -612,7 +613,7 @@ export const generateQuizFromText = async (
       }
     };
 
-    const prompt = `Genera ${count} preguntas de quiz sobre "${topic}". JSON.`;
+    const prompt = `Genera ${ count } preguntas de quiz sobre "${topic}".JSON.`;
     const result = await generateContent(prompt, { jsonSchema: schema });
     return JSON.parse(result);
   } catch (error) {
@@ -626,7 +627,7 @@ export const generateQuizFromText = async (
  */
 export const generateStudySummary = async (text: string, topic: string): Promise<string | null> => {
   try {
-    const prompt = `Resume esto: ${text.slice(0, 5000)}`;
+    const prompt = `Resume esto: ${ text.slice(0, 5000) } `;
     return await generateContent(prompt);
   } catch (error) {
     console.error('Error generating study summary:', error);

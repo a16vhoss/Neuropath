@@ -43,7 +43,13 @@ const getSectionType = (title: string): SectionType => {
 
 // Parse markdown content into sections with nested H3/H4 inside H2
 const parseContent = (text: string): ParsedSection[] => {
-  const lines = text.split('\n');
+  // Clean markdown code blocks if present
+  const cleanText = text
+    .replace(/^```markdown\s*/i, '') // Remove start block
+    .replace(/^```\s*/i, '')         // Remove generic start block
+    .replace(/```\s*$/, '');         // Remove end block
+
+  const lines = cleanText.split('\n');
   const sections: ParsedSection[] = [];
   let sectionIndex = 0;
 
@@ -166,7 +172,16 @@ const parseContent = (text: string): ParsedSection[] => {
   if (currentIntro) sections.push(currentIntro);
   if (currentH2) sections.push(currentH2);
 
-  return sections;
+  // Filter out empty H1/H2 sections that might be artifacts
+  return sections.filter(section => {
+    // Keep intro sections
+    if (section.type === 'intro') return section.content.some(l => l.trim().length > 0);
+
+    // For main sections (H1/H2), keep if they have content OR children
+    const hasContent = section.content.some(l => l.trim().length > 0);
+    const hasChildren = section.children && section.children.length > 0;
+    return hasContent || hasChildren;
+  });
 };
 
 const StudyGuideRenderer: React.FC<StudyGuideRendererProps> = ({
