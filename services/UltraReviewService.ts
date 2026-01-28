@@ -682,8 +682,8 @@ export async function generateAdaptivePhase2(
         },
         business: {
             type: 'principles',
-            title: 'Fórmulas y Frameworks de Negocio',
-            instruction: 'Extrae TODAS las fórmulas financieras, KPIs, frameworks y modelos. Para cada uno: nombre, fórmula/estructura, interpretación, aplicación práctica.'
+            title: 'Conceptos y Estrategias de Negocio',
+            instruction: 'Extrae TODAS las estrategias, conceptos clave, fórmulas financieras, KPIs, frameworks y modelos. Para cada uno: nombre, definición/fórmula, interpretación, aplicación práctica y ejemplo.'
         },
         general: {
             type: 'keyPoints',
