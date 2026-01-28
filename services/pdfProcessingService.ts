@@ -2,8 +2,8 @@ import { Type } from "@google/genai";
 import { getBestGeminiModel, getGeminiSDK } from "./geminiModelManager";
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Configure PDF.js worker - use unpkg CDN with specific version
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.4.530/build/pdf.worker.min.mjs';
 
 // Max file size for Gemini (approximately 20MB)
 const MAX_GEMINI_FILE_SIZE = 20 * 1024 * 1024;
