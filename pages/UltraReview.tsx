@@ -40,7 +40,50 @@ const DEFAULT_PHASES: PhaseConfig[] = [
     { phase: 6, name: 'Tips', icon: 'lightbulb', description: '', color: 'bg-cyan-500' }
 ];
 
-const UltraReview: React.FC = () => {
+// Error Boundary
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
+    constructor(props: { children: React.ReactNode }) {
+        super(props);
+        this.state = { hasError: false, error: null };
+    }
+
+    static getDerivedStateFromError(error: Error) {
+        return { hasError: true, error };
+    }
+
+    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+        console.error("UltraReview Error:", error, errorInfo);
+    }
+
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="min-h-screen bg-slate-900 flex items-center justify-center p-8">
+                    <div className="bg-red-500/10 border border-red-500 rounded-xl p-6 max-w-2xl w-full">
+                        <h2 className="text-2xl font-bold text-red-500 mb-4">Algo salió mal</h2>
+                        <p className="text-white/80 mb-4">Se produjo un error al cargar el Ultra Repaso.</p>
+                        <pre className="bg-black/30 p-4 rounded text-red-300 text-xs overflow-auto font-mono mb-4">
+                            {this.state.error?.message}
+                            {'\n'}
+                            {this.state.error?.stack}
+                        </pre>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition"
+                        >
+                            Recargar Página
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        return this.props.children;
+    }
+}
+
+const UltraReviewContent: React.FC = () => {
+    console.log('UltraReview: Component Mounting');
     const { studySetId } = useParams<{ studySetId: string }>();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -299,8 +342,8 @@ const UltraReview: React.FC = () => {
                                 key={option.mode}
                                 onClick={() => setSelectedDuration(option.mode)}
                                 className={`w-full p-4 rounded-xl border-2 transition-all flex items-center gap-4 ${selectedDuration === option.mode
-                                        ? 'border-purple-500 bg-purple-50'
-                                        : 'border-slate-200 hover:border-purple-300'
+                                    ? 'border-purple-500 bg-purple-50'
+                                    : 'border-slate-200 hover:border-purple-300'
                                     }`}
                             >
                                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selectedDuration === option.mode ? 'bg-purple-500 text-white' : 'bg-slate-100 text-slate-500'
@@ -452,22 +495,21 @@ const UltraReview: React.FC = () => {
                             {/* Subject Type Badge */}
                             {session?.generated_content?.subjectType && (
                                 <div className="hidden sm:flex bg-white/10 px-3 py-2 rounded-xl items-center gap-2">
-                                    <span className={`material-symbols-outlined text-sm ${
-                                        session.generated_content.subjectType === 'mathematical' ? 'text-purple-400' :
+                                    <span className={`material-symbols-outlined text-sm ${session.generated_content.subjectType === 'mathematical' ? 'text-purple-400' :
                                         session.generated_content.subjectType === 'historical' ? 'text-amber-400' :
-                                        session.generated_content.subjectType === 'programming' ? 'text-cyan-400' :
-                                        session.generated_content.subjectType === 'scientific' ? 'text-green-400' :
-                                        session.generated_content.subjectType === 'linguistic' ? 'text-blue-400' :
-                                        session.generated_content.subjectType === 'business' ? 'text-orange-400' :
-                                        'text-white/60'
-                                    }`}>
+                                            session.generated_content.subjectType === 'programming' ? 'text-cyan-400' :
+                                                session.generated_content.subjectType === 'scientific' ? 'text-green-400' :
+                                                    session.generated_content.subjectType === 'linguistic' ? 'text-blue-400' :
+                                                        session.generated_content.subjectType === 'business' ? 'text-orange-400' :
+                                                            'text-white/60'
+                                        }`}>
                                         {session.generated_content.subjectType === 'mathematical' ? 'function' :
-                                         session.generated_content.subjectType === 'historical' ? 'history_edu' :
-                                         session.generated_content.subjectType === 'programming' ? 'code' :
-                                         session.generated_content.subjectType === 'scientific' ? 'biotech' :
-                                         session.generated_content.subjectType === 'linguistic' ? 'translate' :
-                                         session.generated_content.subjectType === 'business' ? 'trending_up' :
-                                         'school'}
+                                            session.generated_content.subjectType === 'historical' ? 'history_edu' :
+                                                session.generated_content.subjectType === 'programming' ? 'code' :
+                                                    session.generated_content.subjectType === 'scientific' ? 'biotech' :
+                                                        session.generated_content.subjectType === 'linguistic' ? 'translate' :
+                                                            session.generated_content.subjectType === 'business' ? 'trending_up' :
+                                                                'school'}
                                     </span>
                                     <span className="text-white/70 text-sm">Adaptado</span>
                                 </div>
@@ -486,10 +528,10 @@ const UltraReview: React.FC = () => {
                                 <button
                                     onClick={() => goToPhase(phase.phase)}
                                     className={`flex items-center gap-2 px-4 py-2 rounded-xl transition whitespace-nowrap ${currentPhase === phase.phase
-                                            ? `${phase.color} text-white shadow-lg`
-                                            : currentPhase > phase.phase
-                                                ? 'bg-white/20 text-white'
-                                                : 'bg-white/5 text-white/50'
+                                        ? `${phase.color} text-white shadow-lg`
+                                        : currentPhase > phase.phase
+                                            ? 'bg-white/20 text-white'
+                                            : 'bg-white/5 text-white/50'
                                         }`}
                                 >
                                     <span className="material-symbols-outlined text-lg">{phase.icon}</span>
@@ -568,8 +610,8 @@ const UltraReview: React.FC = () => {
                             onClick={prevPhase}
                             disabled={currentPhase === 1}
                             className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition ${currentPhase === 1
-                                    ? 'bg-white/5 text-white/30 cursor-not-allowed'
-                                    : 'bg-white/10 text-white hover:bg-white/20'
+                                ? 'bg-white/5 text-white/30 cursor-not-allowed'
+                                : 'bg-white/10 text-white hover:bg-white/20'
                                 }`}
                         >
                             <span className="material-symbols-outlined">arrow_back</span>
@@ -1173,5 +1215,11 @@ const Phase6Tips: React.FC<{ content: AdaptiveTipsContent }> = ({ content }) => 
         </div>
     );
 };
+
+const UltraReview: React.FC = () => (
+    <ErrorBoundary>
+        <UltraReviewContent />
+    </ErrorBoundary>
+);
 
 export default UltraReview;
