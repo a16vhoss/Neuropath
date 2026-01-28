@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { X, Book, Brain, Award, Check } from 'lucide-react';
 
 interface StudySet {
     id: string;
@@ -13,7 +12,7 @@ interface AdaptiveConfigModalProps {
     onClose: () => void;
     onStartSession: (selectedSetIds: string[], mode: string) => void;
     availableSets: StudySet[];
-    initialMode?: 'adaptive' | 'review_due' | 'learn_new';
+    initialMode?: 'adaptive' | 'review_due' | 'learn_new' | 'cramming';
 }
 
 const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
@@ -24,7 +23,7 @@ const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
     initialMode = 'adaptive'
 }) => {
     const [selectedSetIds, setSelectedSetIds] = useState<string[]>([]);
-    const [sessionMode, setSessionMode] = useState<'adaptive' | 'review_due' | 'learn_new'>(initialMode);
+    const [sessionMode, setSessionMode] = useState<'adaptive' | 'review_due' | 'learn_new' | 'cramming'>(initialMode);
 
     useEffect(() => {
         if (isOpen) {
@@ -59,16 +58,16 @@ const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
                 <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gradient-to-r from-indigo-50 to-white">
                     <div>
                         <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                            <Brain className="w-6 h-6 text-indigo-600" />
+                            <span className="material-symbols-outlined text-indigo-600">psychology</span>
                             Configurar Sesión de Estudio
                         </h2>
                         <p className="text-sm text-gray-500 mt-1">Personaliza tu experiencia de aprendizaje</p>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-white rounded-full transition-colors text-gray-400 hover:text-gray-600"
+                        className="p-2 hover:bg-white rounded-full transition-colors text-gray-400 hover:text-gray-600 flex items-center justify-center"
                     >
-                        <X className="w-5 h-5" />
+                        <span className="material-symbols-outlined">close</span>
                     </button>
                 </div>
 
@@ -108,7 +107,7 @@ const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
                                             ? 'bg-indigo-500 border-indigo-500 text-white'
                                             : 'border-gray-300 bg-white'}
                   `}>
-                                        {selectedSetIds.includes(set.id) && <Check className="w-3 h-3" />}
+                                        {selectedSetIds.includes(set.id) && <span className="material-symbols-outlined text-xs">check</span>}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="font-medium text-gray-900 truncate">{set.name}</p>
@@ -145,7 +144,7 @@ const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
                 `}
                             >
                                 <div className="mb-3 w-10 h-10 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
-                                    <Brain className="w-5 h-5" />
+                                    <span className="material-symbols-outlined">psychology</span>
                                 </div>
                                 <h4 className="font-bold text-gray-900 mb-1">Adaptativo IA</h4>
                                 <p className="text-xs text-gray-500 leading-relaxed">
@@ -153,7 +152,7 @@ const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
                                 </p>
                                 {sessionMode === 'adaptive' && (
                                     <div className="absolute top-2 right-2 text-indigo-600">
-                                        <Check className="w-4 h-4" />
+                                        <span className="material-symbols-outlined text-sm">check</span>
                                     </div>
                                 )}
                             </button>
@@ -168,7 +167,7 @@ const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
                 `}
                             >
                                 <div className="mb-3 w-10 h-10 rounded-lg bg-red-100 text-red-600 flex items-center justify-center">
-                                    <Award className="w-5 h-5" />
+                                    <span className="material-symbols-outlined">emoji_events</span>
                                 </div>
                                 <h4 className="font-bold text-gray-900 mb-1">Repaso Urgente</h4>
                                 <p className="text-xs text-gray-500 leading-relaxed">
@@ -176,7 +175,7 @@ const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
                                 </p>
                                 {sessionMode === 'review_due' && (
                                     <div className="absolute top-2 right-2 text-indigo-600">
-                                        <Check className="w-4 h-4" />
+                                        <span className="material-symbols-outlined text-sm">check</span>
                                     </div>
                                 )}
                             </button>
@@ -191,7 +190,7 @@ const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
                 `}
                             >
                                 <div className="mb-3 w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
-                                    <Book className="w-5 h-5" />
+                                    <span className="material-symbols-outlined">menu_book</span>
                                 </div>
                                 <h4 className="font-bold text-gray-900 mb-1">Aprender Nuevo</h4>
                                 <p className="text-xs text-gray-500 leading-relaxed">
@@ -199,7 +198,7 @@ const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
                                 </p>
                                 {sessionMode === 'learn_new' && (
                                     <div className="absolute top-2 right-2 text-indigo-600">
-                                        <Check className="w-4 h-4" />
+                                        <span className="material-symbols-outlined text-sm">check</span>
                                     </div>
                                 )}
                             </button>
@@ -230,7 +229,7 @@ const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
                                     : 'bg-gray-300 cursor-not-allowed'}
               `}
                         >
-                            <Brain className="w-4 h-4" />
+                            <span className="material-symbols-outlined text-sm">psychology</span>
                             Comenzar Sesión
                         </button>
                     </div>
