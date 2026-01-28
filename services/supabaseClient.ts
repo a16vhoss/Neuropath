@@ -508,12 +508,26 @@ export const getClassMaterials = async (classId: string) => {
 export const getClassStudySets = async (classId: string) => {
     const { data, error } = await supabase
         .from('study_sets')
-        .select('*')
+        .select(`
+            *,
+            study_set_materials (
+                material: materials (
+                    flashcards_generated
+                )
+            )
+        `)
         .eq('class_id', classId)
         .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data;
+
+    // Calculate total count from linked materials
+    return data.map(set => ({
+        ...set,
+        // Calculate count summing flashcards_generated of each material
+        count: set.study_set_materials?.reduce((acc: number, curr: any) =>
+            acc + (curr.material?.flashcards_generated || 0), 0) || 0
+    }));
 };
 
 // Study Sets helpers (for student self-study)
