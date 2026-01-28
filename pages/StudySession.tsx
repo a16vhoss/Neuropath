@@ -16,7 +16,7 @@ import StudySetStatistics from '../components/StudySetStatistics';
 import { generateAdaptiveQuiz, saveQuizSession, QuizQuestion as AdaptiveQuizQuestion, QuizResult, QuizReport, QuestionType, QuizConfig, QuizGameMode, QuizPersona } from '../services/QuizService';
 import QuizConfigModal from '../components/QuizConfigModal';
 
-type StudyMode = 'flashcards' | 'quiz' | 'cramming' | 'podcast' | 'daily';
+type StudyMode = 'flashcards' | 'quiz' | 'cramming' | 'podcast' | 'daily' | 'exam';
 
 interface Flashcard {
   id: string;
@@ -1652,9 +1652,9 @@ const StudySession: React.FC = () => {
                           <span className="font-bold text-amber-700">
                             {quizQuestions[currentQuizIndex].exerciseType === 'mathematical' ? 'Problema Matemático' :
                               quizQuestions[currentQuizIndex].exerciseType === 'programming' ? 'Ejercicio de Programación' :
-                              quizQuestions[currentQuizIndex].exerciseType === 'case_study' ? 'Caso de Estudio' :
-                              quizQuestions[currentQuizIndex].exerciseType === 'conceptual' ? 'Ejercicio Conceptual' :
-                              quizQuestions[currentQuizIndex].exerciseType === 'practical' ? 'Ejercicio Práctico' : 'Ejercicio'}
+                                quizQuestions[currentQuizIndex].exerciseType === 'case_study' ? 'Caso de Estudio' :
+                                  quizQuestions[currentQuizIndex].exerciseType === 'conceptual' ? 'Ejercicio Conceptual' :
+                                    quizQuestions[currentQuizIndex].exerciseType === 'practical' ? 'Ejercicio Práctico' : 'Ejercicio'}
                           </span>
                         </div>
                         <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">
@@ -1686,7 +1686,7 @@ const StudySession: React.FC = () => {
                           className={`w-full py-4 font-bold rounded-xl transition-all ${exerciseAnswer.trim()
                             ? 'bg-amber-600 text-white hover:bg-amber-700 shadow-md'
                             : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                          }`}
+                            }`}
                         >
                           Ver Solución
                         </button>

@@ -523,25 +523,29 @@ export async function getCardsForSession(
         if (dueOrLearningIds.length > 0) {
             let reviewQuery = supabase.from('flashcards').select('*').in('id', dueOrLearningIds);
 
-            // Apply Material Filter if present (derived from sets)
-            if (allowedMaterialIds.length > 0) {
-                reviewQuery = reviewQuery.in('material_id', allowedMaterialIds);
-            } else if (ownedSetIds.length > 0) {
-                // Sets exist but have no materials? Return empty result for clarity
-                reviewQuery = reviewQuery.eq('id', '00000000-0000-0000-0000-000000000000'); // Force empty
+            // Apply Set/Material Filter
+            if (ownedSetIds.length > 0) {
+                if (allowedMaterialIds.length > 0) {
+                    reviewQuery = reviewQuery.or(`study_set_id.in.(${ownedSetIds.join(',')}),material_id.in.(${allowedMaterialIds.join(',')})`);
+                } else {
+                    reviewQuery = reviewQuery.in('study_set_id', ownedSetIds);
+                }
             }
 
             promises.push(reviewQuery.limit(maxReviewCards + 20));
         }
 
-        // Fetch 2: Potential New Cards (from eligible Materials)
-        if (maxNewCards > 0 && allowedMaterialIds.length > 0) {
-            promises.push(
-                supabase.from('flashcards')
-                    .select('*')
-                    .in('material_id', allowedMaterialIds)
-                    .limit(maxNewCards + 50)
-            );
+        // Fetch 2: Potential New Cards (from eligible Sets/Materials)
+        if (maxNewCards > 0 && ownedSetIds.length > 0) {
+            let newCardsQuery = supabase.from('flashcards').select('*');
+
+            if (allowedMaterialIds.length > 0) {
+                newCardsQuery = newCardsQuery.or(`study_set_id.in.(${ownedSetIds.join(',')}),material_id.in.(${allowedMaterialIds.join(',')})`);
+            } else {
+                newCardsQuery = newCardsQuery.in('study_set_id', ownedSetIds);
+            }
+
+            promises.push(newCardsQuery.limit(maxNewCards + 50));
         }
 
         const results = await Promise.all(promises);
@@ -562,7 +566,7 @@ export async function getCardsForSession(
         let flashcardsQuery = supabase.from('flashcards').select('*');
 
         if (studySetId && !Array.isArray(studySetId)) {
-            // [FIX] Get materials for this set first
+            // Check for cards directly in the set OR via its materials
             const { data: mats } = await supabase
                 .from('study_set_materials')
                 .select('material_id')
@@ -571,9 +575,9 @@ export async function getCardsForSession(
             const matIds = mats?.map(m => m.material_id) || [];
 
             if (matIds.length > 0) {
-                flashcardsQuery = flashcardsQuery.in('material_id', matIds);
+                flashcardsQuery = flashcardsQuery.or(`study_set_id.eq.${studySetId},material_id.in.(${matIds.join(',')})`);
             } else {
-                return []; // No materials in set
+                flashcardsQuery = flashcardsQuery.eq('study_set_id', studySetId);
             }
         } else if (classId) {
             flashcardsQuery = flashcardsQuery.eq('class_id', classId);
