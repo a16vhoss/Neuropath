@@ -146,17 +146,27 @@ const StudentClassDetail: React.FC = () => {
 
     // [NEW HANDLER]
     const handleStudyClick = async () => {
-        if (!classId) return;
+        console.log('Study button clicked');
+        if (!classId) {
+            console.error('No classId found');
+            return;
+        }
         try {
+            console.log('Fetching study sets for class:', classId);
             const sets = await getClassStudySets(classId);
+            console.log('Study sets fetched:', sets);
+
             const formattedSets = sets.map((s: any) => ({
                 id: s.id,
                 name: s.name,
                 type: 'class' as const,
-                count: s.flashcard_count || 0
+                count: s.count || 0 // Correct property from service
             }));
+
+            console.log('Formatted sets:', formattedSets);
             setClassStudySets(formattedSets);
             setShowStudyModal(true);
+            console.log('Modal state set to true');
         } catch (err) {
             console.error('Error loading study sets:', err);
         }
