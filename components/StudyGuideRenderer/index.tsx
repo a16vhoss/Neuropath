@@ -11,7 +11,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { StudyGuideRendererProps, ParsedSection, SectionType } from './types';
 import StudyGuideTOC from './StudyGuideTOC';
 import StudyGuideSection from './StudyGuideSection';
-import StudyGuideMindMap from './StudyGuideMindMap';
+// import StudyGuideMindMap from './StudyGuideMindMap';
 import { useStudyGuideProgress } from './useStudyGuideProgress';
 
 // Determine section type based on title content
@@ -218,7 +218,7 @@ const StudyGuideRenderer: React.FC<StudyGuideRendererProps> = ({
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
 
   // Mind map visibility
-  const [isMindMapVisible, setIsMindMapVisible] = useState(showMindMap);
+  // const [isMindMapVisible, setIsMindMapVisible] = useState(showMindMap);
 
   // Mobile TOC visibility
   const [showMobileTOC, setShowMobileTOC] = useState(false);
@@ -325,7 +325,8 @@ const StudyGuideRenderer: React.FC<StudyGuideRendererProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Mind Map toggle */}
+          {/* Mind Map toggle removed temporarily */}
+          {/*
           <button
             onClick={() => setIsMindMapVisible(!isMindMapVisible)}
             className={`
@@ -338,6 +339,7 @@ const StudyGuideRenderer: React.FC<StudyGuideRendererProps> = ({
             <span className="material-symbols-outlined text-lg">hub</span>
             <span className="hidden sm:inline">Mapa Mental</span>
           </button>
+          */}
 
           {/* Expand/Collapse buttons */}
           <button
@@ -357,7 +359,7 @@ const StudyGuideRenderer: React.FC<StudyGuideRendererProps> = ({
         </div>
       </div>
 
-      {/* Mind Map (conditionally visible) */}
+      {/* Mind Map (conditionally visible) - Removed temporarily
       {isMindMapVisible && (
         <div className="mb-6 animate-in fade-in slide-in-from-top-4 duration-300">
           <StudyGuideMindMap
@@ -367,6 +369,7 @@ const StudyGuideRenderer: React.FC<StudyGuideRendererProps> = ({
           />
         </div>
       )}
+      */}
 
       {/* Main layout with TOC */}
       <div className="flex gap-6">
