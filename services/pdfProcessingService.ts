@@ -22,90 +22,75 @@ const base64ToBlob = (base64: string, mimeType: string): Blob => {
 };
 
 /**
- * Convert base64 to ArrayBuffer
+ * Extract text from PDF using PDF.js - FAST version using File directly
  */
-const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes.buffer;
-};
-
-/**
- * Extract text from PDF using PDF.js (local, no API needed)
- * Processes page by page to handle large PDFs
- */
-const extractTextWithPDFJS = async (
-  pdfBase64: string,
+const extractTextFromFile = async (
+  file: File,
   onProgress?: (message: string) => void
 ): Promise<string> => {
   try {
-    if (onProgress) onProgress('Cargando documento PDF...');
-
-    const arrayBuffer = base64ToArrayBuffer(pdfBase64);
-    const sizeMB = Math.round(arrayBuffer.byteLength / 1024 / 1024);
-
+    const sizeMB = Math.round(file.size / 1024 / 1024);
     if (onProgress) onProgress(`Abriendo PDF (${sizeMB}MB)...`);
 
-    // Load PDF with progress tracking
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    // Use file URL directly - much faster than base64 conversion
+    const fileUrl = URL.createObjectURL(file);
 
-    const pdf = await loadingTask.promise;
-    const totalPages = pdf.numPages;
+    try {
+      const loadingTask = pdfjsLib.getDocument(fileUrl);
+      const pdf = await loadingTask.promise;
+      const totalPages = pdf.numPages;
 
-    console.log(`PDF has ${totalPages} pages`);
-    if (onProgress) onProgress(`PDF cargado: ${totalPages} páginas. Extrayendo texto...`);
+      console.log(`PDF has ${totalPages} pages`);
+      if (onProgress) onProgress(`${totalPages} páginas encontradas. Extrayendo...`);
 
-    let fullText = '';
-    const startTime = Date.now();
+      let fullText = '';
+      const startTime = Date.now();
 
-    // Process pages in batches for better performance
-    const BATCH_SIZE = 5;
-    for (let batchStart = 1; batchStart <= totalPages; batchStart += BATCH_SIZE) {
-      const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, totalPages);
+      // Process pages in larger batches for speed
+      const BATCH_SIZE = 10;
+      for (let batchStart = 1; batchStart <= totalPages; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, totalPages);
 
-      // Process batch of pages in parallel
-      const batchPromises = [];
-      for (let i = batchStart; i <= batchEnd; i++) {
-        batchPromises.push(
-          pdf.getPage(i).then(async (page) => {
-            try {
-              const textContent = await page.getTextContent();
-              const pageText = textContent.items
-                .map((item: any) => item.str)
-                .join(' ');
-              page.cleanup();
-              return { pageNum: i, text: pageText };
-            } catch (e) {
-              console.warn(`Error on page ${i}:`, e);
-              return { pageNum: i, text: '' };
-            }
-          })
-        );
+        // Process batch of pages in parallel
+        const batchPromises = [];
+        for (let i = batchStart; i <= batchEnd; i++) {
+          batchPromises.push(
+            pdf.getPage(i).then(async (page) => {
+              try {
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items
+                  .map((item: any) => item.str)
+                  .join(' ');
+                page.cleanup();
+                return { pageNum: i, text: pageText };
+              } catch (e) {
+                return { pageNum: i, text: '' };
+              }
+            })
+          );
+        }
+
+        const results = await Promise.all(batchPromises);
+        results.sort((a, b) => a.pageNum - b.pageNum);
+        for (const result of results) {
+          fullText += result.text + '\n\n';
+        }
+
+        // Report progress
+        if (onProgress) {
+          const elapsed = Math.round((Date.now() - startTime) / 1000);
+          const percent = Math.round((batchEnd / totalPages) * 100);
+          onProgress(`Página ${batchEnd}/${totalPages} (${percent}%) - ${elapsed}s`);
+        }
       }
 
-      const results = await Promise.all(batchPromises);
+      const totalTime = Math.round((Date.now() - startTime) / 1000);
+      console.log(`Extraction complete in ${totalTime}s, ${fullText.length} chars`);
 
-      // Sort by page number and add to full text
-      results.sort((a, b) => a.pageNum - b.pageNum);
-      for (const result of results) {
-        fullText += result.text + '\n\n';
-      }
-
-      // Report progress
-      if (onProgress) {
-        const elapsed = Math.round((Date.now() - startTime) / 1000);
-        const percent = Math.round((batchEnd / totalPages) * 100);
-        onProgress(`Extrayendo: ${batchEnd}/${totalPages} páginas (${percent}%) - ${elapsed}s`);
-      }
+      return fullText.trim();
+    } finally {
+      URL.revokeObjectURL(fileUrl);
     }
-
-    const totalTime = Math.round((Date.now() - startTime) / 1000);
-    console.log(`Extraction complete in ${totalTime}s, ${fullText.length} characters`);
-
-    return fullText.trim();
   } catch (error) {
     console.error('PDF.js extraction error:', error);
     return '';
@@ -204,35 +189,19 @@ const generateContent = async (
 };
 
 /**
- * Extract text content from a PDF file
- * Strategy:
- * 1. Use PDF.js for local extraction (works for text-based PDFs, handles large files)
- * 2. If PDF.js returns little/no text (scanned PDF) AND file is small enough, use Gemini OCR
+ * Extract text content from a PDF File object (FAST - no base64 conversion)
  */
-export const extractTextFromPDF = async (
-  pdfBase64: string,
+export const extractTextFromPDFFile = async (
+  file: File,
   onProgress?: (message: string) => void
 ): Promise<string | null> => {
   try {
-    // Clean base64 string - remove data URI prefix and any whitespace/newlines
-    let cleanBase64 = pdfBase64
-      .replace(/^data:application\/pdf;base64,/, '')
-      .replace(/\s/g, ''); // Remove all whitespace including newlines
-
-    // Validate base64
-    if (!cleanBase64 || cleanBase64.length < 100) {
-      throw new Error('PDF data is too small or empty');
-    }
-
-    // Calculate approximate file size
-    const approximateSize = (cleanBase64.length * 3) / 4;
-    const sizeMB = Math.round(approximateSize / 1024 / 1024);
+    const sizeMB = Math.round(file.size / 1024 / 1024);
     console.log('PDF size:', sizeMB, 'MB');
 
     // Step 1: Try PDF.js extraction (handles any size, processes page by page)
     console.log('Attempting local PDF.js text extraction...');
-
-    const pdfJsText = await extractTextWithPDFJS(cleanBase64, onProgress);
+    const pdfJsText = await extractTextFromFile(file, onProgress);
 
     // If PDF.js extracted substantial text, use it
     if (pdfJsText && pdfJsText.length > 200) {
@@ -242,9 +211,7 @@ export const extractTextFromPDF = async (
 
     // Step 2: PDF.js didn't extract much - likely a scanned PDF
     // For scanned PDFs, we need Gemini OCR but there's a size limit
-    if (approximateSize > MAX_GEMINI_FILE_SIZE) {
-      // For large scanned PDFs, we can't use Gemini
-      // Return whatever PDF.js got (might be empty) with a warning
+    if (file.size > MAX_GEMINI_FILE_SIZE) {
       console.warn('Large scanned PDF detected - OCR not available for files > 20MB');
       if (pdfJsText && pdfJsText.length > 0) {
         return pdfJsText;
@@ -252,23 +219,34 @@ export const extractTextFromPDF = async (
       throw new Error(`Este PDF parece ser escaneado (imágenes) y es muy grande (${sizeMB}MB) para OCR. Por favor:\n• Usa un PDF con texto seleccionable, o\n• Comprime el PDF a menos de 20MB para usar OCR`);
     }
 
-    if (onProgress) onProgress('PDF escaneado detectado, usando OCR...');
+    // Convert to base64 only for Gemini OCR (small scanned PDFs)
+    if (onProgress) onProgress('PDF escaneado detectado, preparando OCR...');
     console.log('PDF appears to be scanned, using Gemini OCR...');
+
+    const pdfBase64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result.split(',')[1]);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    if (onProgress) onProgress('Ejecutando OCR con IA...');
 
     const prompt = `
       TASK: Extract all text from this PDF document.
       CRITICAL INSTRUCTIONS:
-      1. This document may be a SCANNED IMAGE or contain key text in images/diagrams.
-      2. YOU MUST PERFORM OCR on all images/scans to transcribe the text.
+      1. This document is a SCANNED IMAGE.
+      2. YOU MUST PERFORM OCR to transcribe ALL visible text.
       3. Do NOT summarize. Return the FULL TRANSCRIPT.
-      4. If the document is purely visual but contains text, transcribe that text.
-      5. Output ONLY the raw extracted text. No markdown formatting, no "Here is the text:", just the content.
+      5. Output ONLY the raw extracted text. No markdown, no commentary.
     `;
-    const text = await generateContent(prompt, { pdfBase64: cleanBase64 });
+    const text = await generateContent(prompt, { pdfBase64 });
 
-    // Check if the model returned a refusal or empty string despite no error
     if (!text || text.trim().length === 0) {
-      throw new Error('Gemini API returned empty response.');
+      throw new Error('OCR no pudo extraer texto.');
     }
 
     return text;
@@ -276,6 +254,20 @@ export const extractTextFromPDF = async (
     console.error('Error extracting PDF text:', e);
     throw new Error(`Error procesando PDF: ${e.message || e}`);
   }
+};
+
+/**
+ * Legacy function for base64 input (slower, avoid if possible)
+ */
+export const extractTextFromPDF = async (
+  pdfBase64: string,
+  onProgress?: (message: string) => void
+): Promise<string | null> => {
+  // Convert base64 to File for the fast path
+  const cleanBase64 = pdfBase64.replace(/^data:application\/pdf;base64,/, '');
+  const blob = base64ToBlob(cleanBase64, 'application/pdf');
+  const file = new File([blob], 'document.pdf', { type: 'application/pdf' });
+  return extractTextFromPDFFile(file, onProgress);
 };
 
 /**

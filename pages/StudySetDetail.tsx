@@ -20,7 +20,7 @@ import {
 import MergeSetModal from '../components/MergeSetModal';
 import ExercisesTab from '../components/ExercisesTab';
 import { processUploadedContent } from '../services/ExerciseService';
-import { generateFlashcardsFromText, extractTextFromPDF, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary, generateInfographicFromMaterials, generatePresentationFromMaterials } from '../services/pdfProcessingService';
+import { generateFlashcardsFromText, extractTextFromPDFFile, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary, generateInfographicFromMaterials, generatePresentationFromMaterials } from '../services/pdfProcessingService';
 import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL, autoCategorizeFlashcards } from '../services/geminiService';
 import CumulativeReportsCard from '../components/CumulativeReportsCard';
 import VisualProgressionMap from '../components/VisualProgressionMap';
@@ -601,27 +601,10 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                 console.log('Storage not available, continuing without it');
             }
 
-            setUploadProgress('Leyendo archivo PDF...');
             console.log('Extracting text from PDF...');
 
-            // Convert File to base64 for processing
-            const fileToBase64 = (file: File): Promise<string> => {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.readAsDataURL(file);
-                    reader.onload = () => {
-                        const base64 = (reader.result as string).split(',')[1];
-                        resolve(base64);
-                    };
-                    reader.onerror = reject;
-                });
-            };
-
-            const pdfBase64 = await fileToBase64(file);
-            console.log('PDF converted to base64, length:', pdfBase64.length);
-
-            // Extract text with progress updates
-            const extractedText = await extractTextFromPDF(pdfBase64, (progress) => {
+            // Extract text directly from File (fast - no base64 conversion)
+            const extractedText = await extractTextFromPDFFile(file, (progress) => {
                 setUploadProgress(progress);
             });
 
