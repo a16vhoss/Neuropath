@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { extractTextFromPDF } from '../services/pdfProcessingService';
+import { extractTextFromPDFFile } from '../services/pdfProcessingService';
 import { generateStudySetFromContext, generateFlashcardsFromYouTubeURL } from '../services/geminiService';
 import { useAuth } from '../contexts/AuthContext';
 import { createStudySet, addFlashcardsBatch, addMaterialToStudySet, createClassStudySet, supabase } from '../services/supabaseClient';
@@ -45,15 +45,16 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess,
 
             // 1. Extract content based on source
             if (activeTab === 'pdf' && selectedFile) {
-                setStatus('Extrayendo texto del PDF...');
-                const base64File = await fileToBase64(selectedFile);
-                const base64Data = base64File.split(',')[1];
-                processedContent = await extractTextFromPDF(base64Data) || '';
+                // Extract text directly from File (fast - no base64 conversion needed)
+                processedContent = await extractTextFromPDFFile(selectedFile, (progress) => {
+                    setStatus(progress);
+                }) || '';
 
                 if (!processedContent) throw new Error("No se pudo extraer texto del PDF.");
 
                 setStatus(`Analizando ${processedContent.length} caracteres con Gemini...`);
-                cardData = await generateStudySetFromContext(processedContent);
+                // Pass 0 for unlimited flashcards - covers all content
+                cardData = await generateStudySetFromContext(processedContent, 0);
 
             } else if (activeTab === 'text') {
                 processedContent = inputValue;
@@ -61,7 +62,8 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess,
                 if (!processedContent.trim()) throw new Error("Escribe o pega el texto a analizar.");
 
                 setStatus(`Analizando ${processedContent.length} caracteres con Gemini...`);
-                cardData = await generateStudySetFromContext(processedContent);
+                // Pass 0 for unlimited flashcards - covers all content
+                cardData = await generateStudySetFromContext(processedContent, 0);
 
             } else if (activeTab === 'youtube') {
                 if (!inputValue.trim()) throw new Error("Ingresa un enlace de YouTube.");
