@@ -505,6 +505,17 @@ export const getClassMaterials = async (classId: string) => {
     return data;
 };
 
+export const getClassStudySets = async (classId: string) => {
+    const { data, error } = await supabase
+        .from('study_sets')
+        .select('*')
+        .eq('class_id', classId)
+        .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+};
+
 // Study Sets helpers (for student self-study)
 export const createStudySet = async (studentId: string, studySetData: {
     name: string;

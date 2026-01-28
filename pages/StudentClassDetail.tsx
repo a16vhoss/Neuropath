@@ -22,6 +22,8 @@ import AnnouncementCard from '../components/AnnouncementCard';
 import AssignmentCard from '../components/AssignmentCard';
 import TopicSection from '../components/TopicSection';
 import CalendarView from '../components/CalendarView';
+import AdaptiveConfigModal from '../components/AdaptiveConfigModal'; // [NEW IMPORT]
+import { getClassStudySets } from '../services/supabaseClient'; // [NEW IMPORT]
 
 interface ClassData {
     id: string;
@@ -51,6 +53,10 @@ const StudentClassDetail: React.FC = () => {
     const [materials, setMaterials] = useState<any[]>([]); // Using 'any' for now as Material type is defined in component
     const [topics, setTopics] = useState<ClassTopic[]>([]);
     const [progress, setProgress] = useState<any>(null);
+
+    // [NEW STATE]
+    const [showStudyModal, setShowStudyModal] = useState(false);
+    const [classStudySets, setClassStudySets] = useState<any[]>([]);
 
     useEffect(() => {
         if (classId && user) {
@@ -138,6 +144,24 @@ const StudentClassDetail: React.FC = () => {
         return submissions.find(s => s.assignment_id === assignmentId);
     };
 
+    // [NEW HANDLER]
+    const handleStudyClick = async () => {
+        if (!classId) return;
+        try {
+            const sets = await getClassStudySets(classId);
+            const formattedSets = sets.map((s: any) => ({
+                id: s.id,
+                name: s.name,
+                type: 'class' as const,
+                count: s.flashcard_count || 0
+            }));
+            setClassStudySets(formattedSets);
+            setShowStudyModal(true);
+        } catch (err) {
+            console.error('Error loading study sets:', err);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-[#F9FAFB] flex flex-col md:flex-row">
             {/* Sidebar */}
@@ -190,9 +214,18 @@ const StudentClassDetail: React.FC = () => {
                 {/* Home Tab */}
                 {activeTab === 'home' && (
                     <div className="max-w-4xl mx-auto space-y-8">
-                        <header>
-                            <h1 className="text-3xl font-black text-slate-900 mb-2">{classData.name}</h1>
-                            <p className="text-slate-600 text-lg">{classData.description || 'Sin descripción'}</p>
+                        <header className="flex justify-between items-start">
+                            <div>
+                                <h1 className="text-3xl font-black text-slate-900 mb-2">{classData.name}</h1>
+                                <p className="text-slate-600 text-lg">{classData.description || 'Sin descripción'}</p>
+                            </div>
+                            <button
+                                onClick={handleStudyClick}
+                                className="bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-violet-200 flex items-center gap-2 transform transition-all hover:-translate-y-1"
+                            >
+                                <span className="material-symbols-outlined">school</span>
+                                Estudiar
+                            </button>
                         </header>
 
                         {/* Recent Activity / Overview */}
@@ -426,6 +459,21 @@ const StudentClassDetail: React.FC = () => {
                 )}
 
             </main>
+
+            {/* [NEW MODAL] */}
+            <AdaptiveConfigModal
+                isOpen={showStudyModal}
+                onClose={() => setShowStudyModal(false)}
+                availableSets={classStudySets}
+                initialMode="adaptive"
+                onStartSession={(sets, mode) => {
+                    let url = `/student/adaptive-study?mode=${mode}`;
+                    if (sets.length > 0 && sets.length < classStudySets.length) {
+                        url += `&sets=${sets.join(',')}`;
+                    }
+                    navigate(url);
+                }}
+            />
         </div>
     );
 };

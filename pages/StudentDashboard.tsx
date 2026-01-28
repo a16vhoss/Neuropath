@@ -8,6 +8,7 @@ import { getOrGenerateTodaySummary, markSummaryViewed, DailySummary } from '../s
 
 import StudySetManager from '../components/StudySetManager';
 import MagicImportModal from '../components/MagicImportModal';
+import AdaptiveConfigModal from '../components/AdaptiveConfigModal';
 import AdaptiveProgressCard from '../components/AdaptiveProgressCard';
 import FolderBrowser from '../components/FolderBrowser';
 import NotificationBell from '../components/NotificationBell';
@@ -631,8 +632,8 @@ const StudentDashboard: React.FC = () => {
                   // Always open config modal to let user choose sets
                   // Pre-fill available sets
                   const allSets = [
-                    ...classes.map(c => ({ id: c.id, name: c.name, type: 'class', count: 0 })),
-                    ...studySets.map(s => ({ id: s.id, name: s.name, type: 'personal', count: s.flashcard_count || 0 }))
+                    ...classes.map(c => ({ id: c.id, name: c.name, type: 'class' as const, count: 0 })),
+                    ...studySets.map(s => ({ id: s.id, name: s.name, type: 'personal' as const, count: s.flashcard_count || 0 }))
                   ];
                   // Uniqueness check just in case
                   const uniqueSets = Array.from(new Map(allSets.map(item => [item.id, item])).values());
@@ -929,117 +930,20 @@ const StudentDashboard: React.FC = () => {
         )}
 
         {/* Adaptive Session Configuration Modal */}
-        {showAdaptiveConfigModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
-              <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                <h3 className="font-bold text-lg flex items-center gap-2">
-                  <span className="material-symbols-outlined text-violet-600">tune</span>
-                  Configurar Sesión
-                </h3>
-                <button
-                  onClick={() => setShowAdaptiveConfigModal(false)}
-                  className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600"
-                >
-                  <span className="material-symbols-outlined text-lg">close</span>
-                </button>
-              </div>
-
-              <div className="p-6 overflow-y-auto flex-1">
-                <p className="text-sm text-slate-500 mb-4">
-                  Elige qué temas quieres estudiar hoy. La IA seleccionará las mejores tarjetas para ti.
-                </p>
-
-                {/* Select All Toggle */}
-                <div
-                  onClick={() => {
-                    if (selectedSetIds.length === availableSets.length) {
-                      setSelectedSetIds([]);
-                    } else {
-                      setSelectedSetIds(availableSets.map(s => s.id));
-                    }
-                  }}
-                  className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-50 mb-4 transition-colors"
-                >
-                  <div className={`w-5 h-5 rounded border flex items-center justify-center ${selectedSetIds.length === availableSets.length && availableSets.length > 0
-                    ? 'bg-violet-600 border-violet-600 text-white'
-                    : 'border-slate-300 bg-white'
-                    }`}>
-                    {selectedSetIds.length === availableSets.length && availableSets.length > 0 &&
-                      <span className="material-symbols-outlined text-sm">check</span>
-                    }
-                  </div>
-                  <span className="font-bold text-slate-700">Estudiar Todo</span>
-                </div>
-
-                <div className="space-y-2">
-                  {availableSets.map(set => (
-                    <div
-                      key={set.id}
-                      onClick={() => {
-                        if (selectedSetIds.includes(set.id)) {
-                          setSelectedSetIds(prev => prev.filter(id => id !== set.id));
-                        } else {
-                          setSelectedSetIds(prev => [...prev, set.id]);
-                        }
-                      }}
-                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${selectedSetIds.includes(set.id)
-                        ? 'bg-violet-50 border-violet-200 shadow-sm'
-                        : 'border-slate-100 hover:bg-slate-50'
-                        }`}
-                    >
-                      <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedSetIds.includes(set.id)
-                        ? 'bg-violet-600 border-violet-600 text-white'
-                        : 'border-slate-300 bg-white'
-                        }`}>
-                        {selectedSetIds.includes(set.id) && <span className="material-symbols-outlined text-sm">check</span>}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h4 className={`text-sm font-semibold truncate ${selectedSetIds.includes(set.id) ? 'text-violet-900' : 'text-slate-700'}`}>
-                          {set.name}
-                        </h4>
-                        <p className="text-xs text-slate-400 flex items-center gap-1">
-                          {set.type === 'class' && <span className="material-symbols-outlined text-[10px]">school</span>}
-                          {set.type === 'personal' && <span className="material-symbols-outlined text-[10px]">person</span>}
-                          {set.count || 0} tarjetas
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-
-                  {availableSets.length === 0 && (
-                    <div className="text-center py-8 text-slate-400">
-                      <span className="material-symbols-outlined text-3xl mb-2">folder_off</span>
-                      <p className="text-sm">No tienes sets disponibles para estudiar.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
-                <button
-                  onClick={() => setShowAdaptiveConfigModal(false)}
-                  className="px-4 py-2 text-slate-600 font-bold text-sm hover:bg-slate-200 rounded-lg transition"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => {
-                    let url = `/student/adaptive-study?mode=${sessionMode}`;
-                    if (selectedSetIds.length > 0 && selectedSetIds.length < availableSets.length) {
-                      url += `&sets=${selectedSetIds.join(',')}`;
-                    }
-                    // If all selected (or none explicitly selected implying all), sending no params implies global (all) in service
-                    navigate(url);
-                  }} disabled={selectedSetIds.length === 0}
-                  className="px-6 py-2 bg-violet-600 text-white font-bold text-sm rounded-lg hover:bg-violet-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-200"
-                >
-                  Comenzar Sesión ({selectedSetIds.length})
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Adaptive Session Configuration Modal */}
+        <AdaptiveConfigModal
+          isOpen={showAdaptiveConfigModal}
+          onClose={() => setShowAdaptiveConfigModal(false)}
+          availableSets={availableSets}
+          initialMode={sessionMode}
+          onStartSession={(sets, mode) => {
+            let url = `/student/adaptive-study?mode=${mode}`;
+            if (sets.length > 0 && sets.length < availableSets.length) {
+              url += `&sets=${sets.join(',')}`;
+            }
+            navigate(url);
+          }}
+        />
       </div>
     </div>
   );
