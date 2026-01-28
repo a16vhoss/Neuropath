@@ -473,32 +473,54 @@ export const generatePresentationFromMaterials = async (materialsContent: string
     const schema = {
       type: Type.OBJECT,
       properties: {
+        visualTheme: { type: Type.STRING, enum: ["modern_dark", "clean_light", "professional_blue", "warm_paper"] },
         slides: {
           type: Type.ARRAY,
           items: {
             type: Type.OBJECT,
             properties: {
+              layout: { type: Type.STRING, enum: ["title_slide", "content_list", "two_column", "quote_visual", "data_highlight", "section_header"] },
               title: { type: Type.STRING },
+              subtitle: { type: Type.STRING },
               content: { type: Type.ARRAY, items: { type: Type.STRING } },
+              visualCue: { type: Type.STRING },
               speakerNotes: { type: Type.STRING },
-              designSuggestion: { type: Type.STRING }
             },
-            required: ["title", "content", "speakerNotes"]
+            required: ["layout", "title", "content", "speakerNotes", "visualCue"]
           }
         }
       },
-      required: ["slides"]
+      required: ["visualTheme", "slides"]
     };
 
     const presentationPrompt = `
-# DISEÑADOR DE PRESENTACIONES EJECUTIVAS
-Crea una presentación estructurada en JSON.
+# ARQUITECTO DE PRESENTACIONES EXPERTO
+Tu misión es transformar el material de estudio en una presentación EDUCACIONAL MAESTRA.
+NO OMITAS INFORMACIÓN. Queremos profundidad y claridad.
 
-NOMBRE DEL SET DE ESTUDIO: ${studySetName}
-CONTENIDO:
-${materialsContent.map(t => t.slice(0, 50000)).join('\n\n')}
+OBJETIVO:
+Crear una presentación EXHAUSTIVA (10 a 20 diapositivas) que cubra TODO el material provisto.
+Usa los "Notebooks" del estudiante como la guía principal de la narrativa, y los materiales de soporte para los datos duros.
 
-Genera de 8 a 12 slides.
+ESTRUCTURA VISUAL (Usa variados 'layout'):
+1. layout: 'title_slide' -> Para la portada.
+2. layout: 'section_header' -> Para dividir temas grandes.
+3. layout: 'two_column' -> Para comparar conceptos o definir términos clave.
+4. layout: 'quote_visual' -> Para frases importantes o conclusiones del estudiante.
+5. layout: 'data_highlight' -> Para números, fechas o reglas críticas.
+6. layout: 'content_list' -> Para procesos o listas de características.
+
+REGLAS DE CONTENIDO:
+- "visualCue": Describe brevemente qué imagen iría de fondo o acompañando (ej: "Diagrama de flujo mostrando X", "Foto de laboratorio oscura").
+- "speakerNotes": DEBE SER UN GUIÓN COMPLETO para que el estudiante lo lea mientras estudia. Explica el slide profundamente.
+- "content": Puntos clave breves y contundentes para leer en el slide.
+
+NOMBRE DEL SET: ${studySetName}
+
+MATERIALES (Usa toda la información disponible):
+${materialsContent.join('\n\n')}
+
+Genera la presentación completa en JSON.
 `;
 
     return await generateContent(presentationPrompt, { jsonSchema: schema });
