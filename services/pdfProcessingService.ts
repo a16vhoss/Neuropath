@@ -347,65 +347,70 @@ export const generateStudyGuideFromMaterials = async (materialsContent: string[]
   if (materialsContent.length === 0) return null;
 
   const masterPrompt = `
-# PROMPT MAESTRO: GENERADOR DE GUÍAS DE ESTUDIO ADAPTATIVAS MULTIDISCIPLINARIAS
+# PROMPT MAESTRO: GENERADOR DE "TEXTO MAESTRO" (NO RESUMEN)
 
-## CONTEXT
-Eres un experto pedagógico universitario con más de 20 años de experiencia en diseño curricular, didáctica avanzada y síntesis de conocimiento multidisciplinario.
+## CONTEXTO
+Eres el autor de un libro de texto universitario definitivo. Tu objetivo NO ES RESUMIR, sino **ENSEÑAR EXHAUSTIVAMENTE**.
+Tienes acceso a los apuntes y materiales del estudiante. Tu trabajo es convertir esos materiales (quizás desordenados o dispersos) en un **CAPÍTULO DE LIBRO DE TEXTO COHESIVO Y PROFUNDO**.
 
-## ROLE
-Asumes el rol de **Arquitecto Pedagógico Adaptativo**.
+## DIRECTIVA DE PRIMERA PRIORIDAD: "ANTI-RESUMEN"
+- **PROHIBIDO RESUMIR**. Si el material menciona un concepto, TÚ LO DESARROLLAS COMPLETAMENTE.
+- Si hay una lista de 3 puntos en el material, TÚ escribes 3 párrafos explicando cada punto.
+- Si hay una fórmula, TÚ explicas cada variable, el porqué de la fórmula y das un ejemplo.
+- Extensión esperada: Mínimo 2000-4000 palabras (o lo máximo que permitas). Queremos DETALLE.
 
-## ACTION
-### PASO 1: ANÁLISIS PROFUNDO
-1. Lee y procesa todos los materiales proporcionados.
-2. Identifica automáticamente la(s) disciplina(s), nivel de profundidad, conceptos centrales y relaciones entre temas.
+## ESTRUCTURA DEL TEXTO MAESTRO
 
-### PASO 2: ARQUITECTURA DE LA GUÍA
-Diseña una estructura que incluya las siguientes secciones:
-#### SECCIÓN 1: PANORAMA GENERAL
-- Resumen ejecutivo y objetivos de aprendizaje.
+### SECCIÓN 1: FUNDAMENTACIÓN PROFUNDA
+- No des una intro ligera. Define el tema con rigor académico.
+- Contexto histórico o teórico si aplica.
 
-#### SECCIÓN 2: DESARROLLO CONCEPTUAL PROFUNDO
-- Definiciones precisas con contexto académico.
-- Explicaciones detalladas adaptadas a la disciplina.
+### SECCIÓN 2: CUERPO DE CONOCIMIENTO (EL NÚCLEO)
+- Esta es la sección más larga.
+- Divide por temas lógicos.
+- **EXPLICACIÓN TIPO TUTOR**: "Imagina que..." , "Es crucial entender que..."
+- Usa **Negritas** para conceptos clave.
+- Incorpora *ejemplos concretos* para cada concepto abstracto encontrado.
 
-#### SECCIÓN 3: INTEGRACIÓN INTERDISCIPLINARIA
-- Explica las conexiones entre diferentes materias si aplica.
+### SECCIÓN 3: INTEGRACIÓN Y RELACIONES
+- Cómo se conecta el tema A con el tema B dentro de este material.
+- Causalidades, contrastes, jerarquías.
 
-#### SECCIÓN 4: HERRAMIENTAS PEDAGÓGICAS
-- Mnemotecnias, analogías, ejemplos del mundo real y mapas conceptuales textuales.
+### SECCIÓN 4: LABORATORIO DE PRÁCTICA (PREGUNTAS)
+- Genera un banco de preguntas **EXTENSO** (Mínimo 10-15 preguntas).
+- No solo preguntas simples. Incluye:
+    1. Preguntas de memoria/definición.
+    2. Preguntas de aplicación (casos).
+    3. Preguntas de análisis "¿Qué pasaría si...?".
+- **INCLUYE LAS RESPUESTAS** al final de esta sección (quizás colapsables o separadas).
 
-#### SECCIÓN 5: PRÁCTICA Y APLICACIÓN
-- Banco de ejercicios clasificados por dificultad con resolución paso a paso.
+### SECCIÓN 5: ESTRATEGIAS DE DOMINIO Y RECOMENDACIONES
+- ¿Cómo recomiendas estudiar este tema específico?
+- Mnemotecnias sugeridas para este contenido.
+- "Trampas comunes": Dónde suelen fallar los estudiantes en este tema.
+- Recomendaciones de enfoque: "¿Debería memorizar esto o entender la lógica?".
 
-#### SECCIÓN 6: AUTOEVALUACIÓN
-- Preguntas de comprensión, aplicación y síntesis con respuestas justificadas.
-
-#### SECCIÓN 7: PUNTOS CRÍTICOS Y ERRORES COMUNES
-- Conceptos confusos y advertencias importantes.
-
-## FORMAT
-- Usa jerarquía de encabezados (##, ###, ####).
-- **Negritas** para términos clave, *cursivas* para énfasis.
-- \`Código\` para elementos técnicos (fórmulas, sintaxis).
-- Listas y separadores visuales (---).
-
-## TARGET AUDIENCE
-Estudiantes universitarios que buscan dominio profundo y preparación para exámenes de alto nivel.
+## FORMATO
+- Markdown limpio.
+- Encabezados claros (##, ###).
+- Tablas si son útiles para comparar.
+- Bloques de código para fórmulas o algoritmos.
 
 ---
 NOMBRE DEL SET DE ESTUDIO: ${studySetName}
-CONTENIDO DE LOS MATERIALES:
-${materialsContent.map((t, i) => `[MATERIAL ${i + 1}]:\n${t}`).join('\n\n')}
+CONTENIDO CRUDO DE LOS MATERIALES:
+${materialsContent.map((t, i) => `[FUENTE ${i + 1}]:\n${t}`).join('\n\n')}
 ---
-Genera una GUÍA DE ESTUDIO DE NIVEL UNIVERSITARIO/POSGRADO.
-NO RESUMAS NADA. EXPLICA CADA CONCEPTO EN PROFUNDIDAD.
-Si hay diagramas descritos, explícalos. Si hay fórmulas, desglósalas.
-El estudiante quiere APRENDER EL TEMA COMPLETO solo leyendo esto.
+
+PROCEDE A ESCRIBIR EL TEXTO MAESTRO AHORA.
 `;
 
   try {
-    return await generateContent(masterPrompt);
+    // Increase output tokens for detailed guide
+    return await generateContent(masterPrompt, {
+      maxTokens: 8192,
+      temperature: 0.5 // Lower temperature for more focused, less hallucinated but detailed content
+    });
   } catch (error) {
     console.error('Error generating study guide:', error);
     return null;

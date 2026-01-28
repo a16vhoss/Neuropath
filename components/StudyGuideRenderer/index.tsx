@@ -15,16 +15,29 @@ import StudyGuideMindMap from './StudyGuideMindMap';
 import { useStudyGuideProgress } from './useStudyGuideProgress';
 
 // Determine section type based on title content
+// Determine section type based on title content
 const getSectionType = (title: string): SectionType => {
-  if (title.includes('PANORAMA GENERAL') || title.includes('SECCIÓN 1')) return 'overview';
-  if (title.includes('DESARROLLO CONCEPTUAL') || title.includes('SECCIÓN 2')) return 'concept';
-  if (title.includes('INTEGRACIÓN') || title.includes('SECCIÓN 3')) return 'integration';
-  if (title.includes('HERRAMIENTAS') || title.includes('SECCIÓN 4')) return 'tools';
-  if (title.includes('PRÁCTICA') || title.includes('SECCIÓN 5')) return 'practice';
-  if (title.includes('AUTOEVALUACIÓN') || title.includes('SECCIÓN 6')) return 'exam';
-  if (title.includes('PUNTOS CRÍTICOS') || title.includes('SECCIÓN 7')) return 'warning';
-  if (title.includes('INFOGRAFÍA') || title.includes('TÍTULO IMPACTANTE')) return 'infographic';
-  if (title.includes('SLIDE') || title.includes('DIAPOSITIVA')) return 'presentation';
+  const upperTitle = title.toUpperCase();
+
+  // New Prompt Headers Handling
+  if (upperTitle.includes('FUNDAMENTACIÓN') || upperTitle.includes('PANORAMA') || upperTitle.includes('SECCIÓN 1')) return 'overview';
+  if (upperTitle.includes('CUERPO DE CONOCIMIENTO') || upperTitle.includes('DESARROLLO CONCEPTUAL') || upperTitle.includes('SECCIÓN 2')) return 'concept';
+  if (upperTitle.includes('INTEGRACIÓN') || upperTitle.includes('RELACIONES') || upperTitle.includes('SECCIÓN 3')) return 'integration';
+
+  // Specific Keyword Matching for improved accuracy
+  if (upperTitle.includes('LABORATORIO') || upperTitle.includes('PREGUNTAS') || upperTitle.includes('EJERCICIOS')) return 'practice';
+  if (upperTitle.includes('ESTRATEGIAS') || upperTitle.includes('HERRAMIENTAS') || upperTitle.includes('RECOMENDACIONES')) return 'tools';
+  if (upperTitle.includes('AUTOEVALUACIÓN') || upperTitle.includes('EXAMEN') || upperTitle.includes('SECCIÓN 6')) return 'exam';
+
+  // Fallbacks
+  if (upperTitle.includes('SECCIÓN 4')) return 'tools'; // Default fallback if no specific keyword
+  if (upperTitle.includes('SECCIÓN 5')) return 'practice'; // Default fallback if no specific keyword
+
+  if (upperTitle.includes('PUNTOS CRÍTICOS') || upperTitle.includes('ERRORES') || upperTitle.includes('SECCIÓN 7')) return 'warning';
+
+  if (upperTitle.includes('INFOGRAFÍA') || upperTitle.includes('TÍTULO IMPACTANTE')) return 'infographic';
+  if (upperTitle.includes('SLIDE') || upperTitle.includes('DIAPOSITIVA')) return 'presentation';
+
   return 'general';
 };
 
