@@ -361,7 +361,7 @@ Tienes acceso a los apuntes y materiales del estudiante. Tu trabajo es convertir
 
 ## ESTRUCTURA DEL TEXTO MAESTRO
 
-### SECCIÓN 1: FUNDAMENTACIÓN PROFUNDA
+## SECCIÓN 1: FUNDAMENTACIÓN PROFUNDA
 - No des una intro ligera. Define el tema con rigor académico.
 - Contexto histórico o teórico si aplica.
 
