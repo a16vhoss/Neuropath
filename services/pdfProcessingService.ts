@@ -392,7 +392,9 @@ Tienes acceso a los apuntes y materiales del estudiante. Tu trabajo es convertir
 
 ## FORMATO
 - Markdown limpio.
-- Encabezados claros (##, ###).
+- **USO ESTRICTO DE ENCABEZADOS**:
+  - Usa "##" (H2) para los Títulos de las 5 Secciones principales.
+  - Usa "###" (H3) SOLO para subtítulos DENTRO de las secciones.
 - Tablas si son útiles para comparar.
 - Bloques de código para fórmulas o algoritmos.
 - **CRÍTICO: NO envuelvas la respuesta en bloques de código markdown (\\\`\\\`\\\`markdown).Devuelve el texto RAW.**
