@@ -1086,7 +1086,7 @@ export const getFolderStudySets = async (
 ) => {
     let query = supabase
         .from('study_sets')
-        .select('*')
+        .select('*, flashcards(count)')
         .eq('student_id', ownerId);
 
     if (folderId) {
@@ -1103,7 +1103,12 @@ export const getFolderStudySets = async (
     // Assuming personal sets for now.
 
     if (error) throw error;
-    return data;
+
+    // Map to flatten the count structure
+    return data.map(set => ({
+        ...set,
+        flashcards_count: set.flashcards ? set.flashcards[0]?.count : 0
+    }));
 };
 
 export const updateFolder = async (folderId: string, updates: Partial<Folder>) => {
