@@ -365,18 +365,18 @@ Tienes acceso a los apuntes y materiales del estudiante. Tu trabajo es convertir
 - No des una intro ligera. Define el tema con rigor académico.
 - Contexto histórico o teórico si aplica.
 
-### SECCIÓN 2: CUERPO DE CONOCIMIENTO (EL NÚCLEO)
+## SECCIÓN 2: CUERPO DE CONOCIMIENTO (EL NÚCLEO)
 - Esta es la sección más larga.
 - Divide por temas lógicos.
 - **EXPLICACIÓN TIPO TUTOR**: "Imagina que..." , "Es crucial entender que..."
 - Usa **Negritas** para conceptos clave.
 - Incorpora *ejemplos concretos* para cada concepto abstracto encontrado.
 
-### SECCIÓN 3: INTEGRACIÓN Y RELACIONES
+## SECCIÓN 3: INTEGRACIÓN Y RELACIONES
 - Cómo se conecta el tema A con el tema B dentro de este material.
 - Causalidades, contrastes, jerarquías.
 
-### SECCIÓN 4: LABORATORIO DE PRÁCTICA (PREGUNTAS)
+## SECCIÓN 4: LABORATORIO DE PRÁCTICA (PREGUNTAS)
 - Genera un banco de preguntas **EXTENSO** (Mínimo 10-15 preguntas).
 - No solo preguntas simples. Incluye:
     1. Preguntas de memoria/definición.
@@ -384,7 +384,7 @@ Tienes acceso a los apuntes y materiales del estudiante. Tu trabajo es convertir
     3. Preguntas de análisis "¿Qué pasaría si...?".
 - **INCLUYE LAS RESPUESTAS** al final de esta sección (quizás colapsables o separadas).
 
-### SECCIÓN 5: ESTRATEGIAS DE DOMINIO Y RECOMENDACIONES
+## SECCIÓN 5: ESTRATEGIAS DE DOMINIO Y RECOMENDACIONES
 - ¿Cómo recomiendas estudiar este tema específico?
 - Mnemotecnias sugeridas para este contenido.
 - "Trampas comunes": Dónde suelen fallar los estudiantes en este tema.
