@@ -1,6 +1,8 @@
 import { Type } from "@google/genai";
 import { getBestGeminiModel, getGeminiSDK } from "./geminiModelManager";
 import * as pdfjsLib from 'pdfjs-dist';
+import mammoth from 'mammoth';
+import JSZip from 'jszip';
 
 // Configure PDF.js worker - use unpkg CDN with specific version
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.4.530/build/pdf.worker.min.mjs';
@@ -22,9 +24,111 @@ const base64ToBlob = (base64: string, mimeType: string): Blob => {
 };
 
 /**
- * Extract text from PDF using PDF.js - FAST version using File directly
+ * Extract text from DOCX using Mammoth
  */
-const extractTextFromFile = async (
+const extractTextFromDocx = async (file: File): Promise<string> => {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value.trim();
+  } catch (error) {
+    console.error('Error extracting text from DOCX:', error);
+    throw new Error('No se pudo leer el archivo DOCX.');
+  }
+};
+
+/**
+ * Extract text from PPTX using JSZip (simple slide text extraction)
+ */
+const extractTextFromPptx = async (file: File): Promise<string> => {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    let text = '';
+
+    // Find all slide XML files
+    const slideFiles = Object.keys(zip.files).filter(fileName =>
+      fileName.match(/ppt\/slides\/slide\d+\.xml/)
+    );
+
+    // Sort naturally (slide1, slide2, ..., slide10)
+    slideFiles.sort((a, b) => {
+      const numA = parseInt(a.match(/slide(\d+)\.xml/)?.[1] || '0');
+      const numB = parseInt(b.match(/slide(\d+)\.xml/)?.[1] || '0');
+      return numA - numB;
+    });
+
+    for (const fileName of slideFiles) {
+      const content = await zip.file(fileName)?.async('string');
+      if (content) {
+        // Simple regex to remove xml tags and get text
+        // This is a basic extraction, might improperly merge words depending on XML structure
+        const slideText = content
+          .replace(/<[^>]+>/g, ' ') // Replace tags with space
+          .replace(/\s+/g, ' ')     // Collapse whitespace
+          .trim();
+
+        if (slideText) {
+          text += `[DIAPOSITIVA ${fileName.match(/\d+/)?.[0] || '?'}]\n${slideText}\n\n`;
+        }
+      }
+    }
+    return text.trim();
+  } catch (error) {
+    console.error('Error extracting text from PPTX:', error);
+    throw new Error('No se pudo leer el archivo PPTX.');
+  }
+};
+
+/**
+ * Read plain text file
+ */
+const extractTextFromTxt = async (file: File): Promise<string> => {
+  return await file.text();
+};
+
+
+/**
+ * Process any supported file content
+ */
+export const processFileContent = async (
+  file: File,
+  onProgress?: (message: string) => void
+): Promise<string> => {
+  const type = file.type;
+  const name = file.name.toLowerCase();
+
+  if (type === 'application/pdf' || name.endsWith('.pdf')) {
+    return extractTextFromPdf(file, onProgress);
+  } else if (
+    type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    name.endsWith('.docx')
+  ) {
+    if (onProgress) onProgress('Procesando documento Word...');
+    return extractTextFromDocx(file);
+  } else if (
+    type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+    name.endsWith('.pptx')
+  ) {
+    if (onProgress) onProgress('Procesando presentación PowerPoint...');
+    return extractTextFromPptx(file);
+  } else if (
+    type === 'text/plain' ||
+    name.endsWith('.txt') ||
+    name.endsWith('.md')
+  ) {
+    if (onProgress) onProgress('Leyendo archivo de texto...');
+    return extractTextFromTxt(file);
+  } else {
+    throw new Error(`Formato de archivo no soportado: ${file.name}`);
+  }
+}
+
+/**
+ * Extract text from PDF using PDF.js - FAST version using File directly
+ * RENAMED internally to be used by processFileContent
+ */
+const extractTextFromPdf = async (
   file: File,
   onProgress?: (message: string) => void
 ): Promise<string> => {
@@ -201,7 +305,7 @@ export const extractTextFromPDFFile = async (
 
     // Step 1: Try PDF.js extraction (handles any size, processes page by page)
     console.log('Attempting local PDF.js text extraction...');
-    const pdfJsText = await extractTextFromFile(file, onProgress);
+    const pdfJsText = await extractTextFromPdf(file, onProgress);
 
     // If PDF.js extracted substantial text, use it
     if (pdfJsText && pdfJsText.length > 200) {

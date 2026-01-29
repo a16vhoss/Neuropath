@@ -20,7 +20,7 @@ import {
 import MergeSetModal from '../components/MergeSetModal';
 import ExercisesTab from '../components/ExercisesTab';
 import { processUploadedContent } from '../services/ExerciseService';
-import { generateFlashcardsFromText, extractTextFromPDFFile, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary, generateInfographicFromMaterials, generatePresentationFromMaterials } from '../services/pdfProcessingService';
+import { generateFlashcardsFromText, processFileContent, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary, generateInfographicFromMaterials, generatePresentationFromMaterials } from '../services/pdfProcessingService';
 import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL, autoCategorizeFlashcards } from '../services/geminiService';
 import { storeDocumentEmbeddings } from '../services/embeddingService';
 import CumulativeReportsCard from '../components/CumulativeReportsCard';
@@ -583,7 +583,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
 
         try {
             setUploading(true);
-            setUploadProgress('Procesando PDF...');
+            setUploadProgress('Procesando archivo...');
 
             // Try to upload to storage (optional - may fail if bucket doesn't exist)
             let fileUrl = '';
@@ -604,10 +604,10 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                 console.log('Storage not available, continuing without it');
             }
 
-            console.log('Extracting text from PDF...');
+            console.log('Extracting text from file...');
 
-            // Extract text directly from File (fast - no base64 conversion)
-            const extractedText = await extractTextFromPDFFile(file, (progress) => {
+            // Extract text generic function
+            const extractedText = await processFileContent(file, (progress) => {
                 setUploadProgress(progress);
             });
 
@@ -1354,9 +1354,9 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                     <label className={`flex flex-col items-center gap-2 p-4 rounded-xl cursor-pointer transition border border-dashed border-emerald-200 ${uploading ? 'bg-slate-50' : 'bg-emerald-50 hover:bg-emerald-100'}`}>
                                         <span className="material-symbols-outlined text-3xl text-emerald-600">upload_file</span>
                                         <span className="font-medium text-sm text-emerald-700 text-center">
-                                            {uploading ? uploadProgress : 'Subir PDF'}
+                                            {uploading ? uploadProgress : 'Subir Archivo'}
                                         </span>
-                                        <input type="file" accept=".pdf" onChange={handleFileUpload} className="hidden" disabled={uploading} />
+                                        <input type="file" accept=".pdf,.docx,.pptx,.txt,.md" onChange={handleFileUpload} className="hidden" disabled={uploading} />
                                     </label>
 
                                     <button
@@ -1621,12 +1621,20 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                     try {
                                                         // Include materials
                                                         const materialContents = studySet?.materials
-                                                            .map(m => m.content_text || m.summary || '')
-                                                            .filter(t => (t?.trim().length || 0) > 10) || [];
+                                                            .filter(m => (m.content_text || m.summary || '').trim().length > 10)
+                                                            .map(m => ({
+                                                                title: m.name || 'Material',
+                                                                content: m.content_text || m.summary || '',
+                                                                type: 'material' as const
+                                                            })) || [];
                                                         // Include notebooks
                                                         const notebookContents = notebooks
                                                             .filter(n => n.content && n.content.trim().length > 10)
-                                                            .map(n => n.content);
+                                                            .map(n => ({
+                                                                title: n.title || 'Cuaderno',
+                                                                content: n.content,
+                                                                type: 'notebook' as const
+                                                            }));
                                                         const contents = [...materialContents, ...notebookContents];
 
                                                         console.log(`[Generation Flow] Found ${materialContents.length} materials and ${notebookContents.length} notebooks.`);
