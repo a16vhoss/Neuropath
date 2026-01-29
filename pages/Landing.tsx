@@ -77,7 +77,7 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
           </div>
           <div className="lg:w-2/5 animate-fade-in hidden lg:block">
             <div className="bg-slate-900/40 p-2 rounded-2xl backdrop-blur-md border border-white/20 shadow-2xl rotate-3">
-              <img src="https://picsum.photos/seed/neuropath-ui/600/800" className="rounded-xl shadow-inner w-full h-[500px] object-cover" alt="MHS UI" />
+              <img src="/mhs_hero_icon.png" className="rounded-xl shadow-inner w-full h-[500px] object-cover" alt="MHS AI Brain and School" />
             </div>
           </div>
         </div>
