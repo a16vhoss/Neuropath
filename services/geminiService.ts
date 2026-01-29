@@ -402,16 +402,64 @@ export const generateFlashcardsFromYouTubeURL = async (url: string, count: numbe
       throw new Error("No se pudo obtener el contenido del video.");
     }
 
-    const { transcript, title, description, isMetadataOnly } = result;
+    // Destructure rich content
+    const {
+      fullTranscriptText,
+      transcript: structuredTranscript,
+      title,
+      description,
+      metadata,
+      comments,
+      chapters,
+      isMetadataOnly
+    } = result;
 
-    let promptContext = transcript;
-    if (isMetadataOnly || !transcript) {
-      promptContext = `
-        TÍTULO DEL VIDEO: ${title}
-        DESCRIPCIÓN DEL VIDEO: ${description}
-        (Nota: Los subtítulos no están disponibles, genera flashcards basadas en esta descripción).
+    // --- DEEP ANALYSIS PROMPT CONSTRUCTION ---
+    let promptContext = "";
+
+    // 1. Metadata Header
+    promptContext += `
+      [METADATA DEL VIDEO]
+      TÍTULO: ${title}
+      CANAL: ${metadata?.channelTitle || 'Desconocido'}
+      DURACIÓN: ${metadata?.duration || 'Desconocida'}
+      TAGS: ${metadata?.tags?.join(', ') || 'N/A'}
+      FECHA: ${metadata?.publishedAt || 'N/A'}
+    `.trim() + "\n\n";
+
+    // 2. Chapters (if available)
+    if (chapters && chapters.length > 0) {
+      promptContext += `
+      [TABLA DE CONTENIDOS / CAPÍTULOS]
+      ${chapters.map(c => `- ${c.time} ${c.title}`).join('\n')}
+        `.trim() + "\n\n";
+    }
+
+    // 3. Community Notes (Comments)
+    if (comments && comments.length > 0) {
+      promptContext += `
+      [NOTAS DE LA COMUNIDAD (Sabiduría Colectiva)]
+      (Usa estos comentarios para identificar puntos clave que la comunidad consideró valiosos o correcciones)
+      ${comments.map(c => `- ${c}`).join('\n')}
+        `.trim() + "\n\n";
+    }
+
+    // 4. Content (Transcript or Description)
+    if (isMetadataOnly || !fullTranscriptText) {
+      promptContext += `
+      [CONTENIDO (Solo Descripción disponible)]
+      ${description}
+      (Nota: Los subtítulos no están disponibles, genera flashcards basadas fuertemente en esta descripción y en lo que puedas inferir de los metadatos y comentarios).
+      `.trim();
+    } else {
+      promptContext += `
+      [TRANSCRIPCIÓN COMPLETA CON TIEMPOS]
+      (Usa las marcas de tiempo [MM:SS] para entender la secuencia lógica y el ritmo de la explicación. inferir contexto visual cuando se diga "aquí", "esto", "en la gráfica" basándote en el tema).
+      ${fullTranscriptText}
       `.trim();
     }
+
+    console.log(`[Deep Analysis] Created context of length ${promptContext.length}`);
 
     const flashcards = await generateStudySetFromContext(promptContext, count);
 
@@ -419,11 +467,11 @@ export const generateFlashcardsFromYouTubeURL = async (url: string, count: numbe
 
     return {
       flashcards,
-      summary: (isMetadataOnly || !transcript) ? description.slice(0, 1000) : transcript.slice(0, 1000) + "...",
+      summary: (isMetadataOnly || !fullTranscriptText) ? description.slice(0, 1000) : fullTranscriptText.slice(0, 1000) + "...",
       videoUrl: url,
       videoTitle,
-      channelName: "YouTube",
-      content: isMetadataOnly ? description : transcript // Return full content for vector indexing
+      channelName: metadata?.channelTitle || "YouTube",
+      content: promptContext // Return full constructed context for vector indexing
     };
 
   } catch (error) {

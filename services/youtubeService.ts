@@ -6,15 +6,32 @@
  * Uses serverless API in production for better reliability.
  */
 
-export interface YoutubeContent {
-    success: boolean;
-    transcript: string;
-    title: string;
-    description: string;
-    isMetadataOnly?: boolean;
+
+export interface AnnotatedTranscript {
+    offset: number;
+    duration: number;
+    text: string;
+    formattedTime?: string;
 }
 
-export const getYoutubeTranscript = async (url: string): Promise<YoutubeContent> => {
+export interface YoutubeRichContent {
+    transcript: AnnotatedTranscript[];
+    fullTranscriptText: string;
+    title: string;
+    description: string;
+    metadata: {
+        duration?: string;
+        viewCount?: string;
+        tags?: string[];
+        channelTitle?: string;
+        publishedAt?: string;
+    };
+    comments?: string[];
+    chapters?: { time: string; title: string }[];
+    isMetadataOnly: boolean;
+}
+
+export const getYoutubeTranscript = async (url: string): Promise<YoutubeRichContent | null> => {
     const videoId = extractVideoID(url);
     if (!videoId) throw new Error('ID de video inválido');
 
@@ -22,12 +39,12 @@ export const getYoutubeTranscript = async (url: string): Promise<YoutubeContent>
     if (import.meta.env.PROD) {
         try {
             const response = await fetch(`/api/youtube-proxy?videoId=${videoId}`);
-            const data = await response.json();
+            const result = await response.json();
 
-            if (data.success) {
-                return data; // Returns { success, transcript, title, description, isMetadataOnly }
+            if (result.success && result.data) {
+                return result.data as YoutubeRichContent;
             } else {
-                throw new Error(data.error || 'No se pudo obtener el contenido del video');
+                throw new Error(result.error || 'No se pudo obtener el contenido del video');
             }
         } catch (error: any) {
             console.error('YouTube API Error:', error);
@@ -35,14 +52,17 @@ export const getYoutubeTranscript = async (url: string): Promise<YoutubeContent>
         }
     }
 
-    // In Development: Use the Vite proxy
+    // In Development: Use the Vite proxy (Legacy/Fallback mode)
+    // We wrap the legacy string result into our new structure for compatibility
     try {
-        const transcript = await fetchTranscriptViaDev(videoId);
+        const legacyTranscript = await fetchTranscriptViaDev(videoId);
         return {
-            success: true,
-            transcript,
-            title: 'Video de YouTube (Dev)',
-            description: ''
+            transcript: [], // Empty structured transcript
+            fullTranscriptText: legacyTranscript,
+            title: 'Video de YouTube (Dev Mode)',
+            description: 'Descripción no disponible en modo dev',
+            metadata: {},
+            isMetadataOnly: false
         };
     } catch (error: any) {
         console.error('Dev transcript error:', error);
@@ -95,8 +115,8 @@ async function fetchTranscriptViaDev(videoId: string): Promise<string> {
     }
 
     if (captionTracks.length > 0) {
-        const track = captionTracks.find((t: any) => t.languageCode === 'es')
-            || captionTracks.find((t: any) => t.languageCode === 'en')
+        const track = captionTracks.find((t: any) => t.languageCode?.startsWith('es'))
+            || captionTracks.find((t: any) => t.languageCode?.startsWith('en'))
             || captionTracks[0];
 
         if (track?.baseUrl) {
