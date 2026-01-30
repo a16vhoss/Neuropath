@@ -598,8 +598,9 @@ ${materialsContent.map(m => `--- FUENTE: [${m.type.toUpperCase()}] "${m.title}" 
 
   Instrucciones:
   1. "detailedSections": Crea secciones profundas para cada tema principal del material.
-2. "icon": Usa iconos de Material Symbols.
-3. El objetivo no es solo resumir, sino ESTRUCTURAR todo el conocimiento.
+  2. "icon": Usa iconos de Material Symbols.
+  3. El objetivo no es solo resumir, sino ESTRUCTURAR todo el conocimiento.
+  4. IDIOMA DE SALIDA: SIEMPRE ESPAÑOL (incluso si el contenido original está en otro idioma).
 `;
 
     return await generateContent(infographicPrompt, { jsonSchema: schema });
