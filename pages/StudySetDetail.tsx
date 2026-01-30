@@ -14,6 +14,7 @@ import {
     addFlashcardsBatch,
     supabase,
     createMaterialWithFlashcards,
+    updateStudySetMaterial,
     getClassEnrollments,
     toggleStudySetEditor
 } from '../services/supabaseClient';
@@ -352,36 +353,85 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
     });
 
     const handleOpenMaterial = async (material: Material) => {
+        // Prepare initial modal state
+        const initialSummary = material.summary && material.summary.length > 50
+            ? material.summary
+            : null;
+
         setViewContentModal({
             isOpen: true,
             content: material.content_text || '',
             title: material.name,
-            summary: null,
-            activeTab: 'summary',
-            isGenerating: true
+            summary: initialSummary,
+            activeTab: 'summary', // Always start on summary tab
+            isGenerating: !initialSummary // Only generate if no valid summary exists
         });
 
-        // Generate summary if content exists
+        // If we already have a detailed summary, we are done
+        if (initialSummary) {
+            console.log('Using existing detailed summary for:', material.name);
+            return;
+        }
+
+        // Generate comprehensive summary if missing
         if (material.content_text && material.content_text.length > 50) {
+            console.log('Generating comprehensive summary for:', material.name);
             try {
-                const summary = await generateStudySummary(material.content_text, material.name);
-                setViewContentModal(prev => ({
-                    ...prev,
-                    summary: summary,
-                    isGenerating: false
-                }));
+                // Determine the correct type for generation
+                let genType: 'pdf' | 'text' | 'url' | 'video' = 'text';
+                if (material.type === 'pdf') genType = 'pdf';
+                else if (material.type === 'notes' || material.type === 'manual') genType = 'text';
+                else if (material.type === 'url') {
+                    if (material.file_url && (material.file_url.includes('youtube.com') || material.file_url.includes('youtu.be'))) {
+                        genType = 'video';
+                    } else {
+                        genType = 'url';
+                    }
+                }
+
+                // Use the enhanced generateMaterialSummary which now uses the "Textbook Author" prompt
+                const summary = await generateMaterialSummary(material.content_text, genType);
+
+                if (summary) {
+                    // 1. Update the UI Modal
+                    setViewContentModal(prev => ({
+                        ...prev,
+                        summary: summary,
+                        isGenerating: false
+                    }));
+
+                    // 2. Persist to Database so we don't regenerate next time
+                    await updateStudySetMaterial(material.id, { summary });
+
+                    // 3. Update Local State (StudySet) to reflect the new summary
+                    setStudySet(prev => {
+                        if (!prev) return null;
+                        return {
+                            ...prev,
+                            materials: prev.materials.map(m =>
+                                m.id === material.id
+                                    ? { ...m, summary: summary }
+                                    : m
+                            )
+                        };
+                    });
+                    console.log('Summary generated and saved successfully');
+                } else {
+                    throw new Error('Summary generation returned empty');
+                }
+
             } catch (error) {
                 console.error('Error generating summary:', error);
                 setViewContentModal(prev => ({
                     ...prev,
-                    summary: 'No se pudo generar el resumen. Intenta de nuevo más tarde.',
+                    summary: 'No se pudo generar la guía de estudio detallada. Por favor intenta de nuevo.',
                     isGenerating: false
                 }));
             }
         } else {
             setViewContentModal(prev => ({
                 ...prev,
-                summary: 'El contenido es demasiado corto para generar un resumen.',
+                summary: 'El contenido es demasiado corto para generar una guía de estudio.',
                 isGenerating: false
             }));
         }

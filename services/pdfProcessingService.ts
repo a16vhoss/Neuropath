@@ -684,12 +684,59 @@ NOMBRE DEL SET: ${studySetName}
   }
 };
 
+const getComprehensivePrompt = (content: string, type: string) => `
+# PROMPT MAESTRO: GENERADOR DE "TEXTO MAESTRO" (NO RESUMEN)
+
+## CONTEXTO
+Eres el autor de un libro de texto universitario definitivo. Tu objetivo NO ES RESUMIR, sino **ENSEÑAR EXHAUSTIVAMENTE**.
+Estás analizando un material de tipo "${type}". Tu trabajo es convertir ese material en un **CAPÍTULO DE LIBRO DE TEXTO COHESIVO Y PROFUNDO**.
+
+## DIRECTIVA DE PRIMERA PRIORIDAD: "ANTI-RESUMEN"
+- **PROHIBIDO RESUMIR**. Si el material menciona un concepto, TÚ LO DESARROLLAS COMPLETAMENTE.
+- Si hay una lista de puntos, explica cada uno.
+- Si hay ejemplos en el texto, úsalos y mejóralos.
+- Extensión esperada: Mínimo 1500 palabras (o lo necesario para cubrir TODO).
+
+## ESTRUCTURA DEL TEXTO MAESTRO
+
+### 1. INTRODUCCIÓN Y CONTEXTO
+- Define el tema central con rigor académico.
+- ¿Cuál es la tesis o argumento principal de este material?
+
+### 2. DESARROLLO PROFUNDO (EL NÚCLEO)
+- Divide por temas lógicos encontrados en el texto.
+- **EXPLICACIÓN TIPO TUTOR**: Usa un tono explicativo, claro y detallado.
+- Usa **Negritas** para conceptos clave.
+
+### 3. ELEMENTOS CLAVE DETALLADOS
+- Si hay fórmulas, explícalas variable por variable.
+- Si hay fechas o eventos, dales contexto.
+- Si hay argumentos, desglósalos en premisas y conclusiones.
+
+### 4. CONCLUSIONES Y PUNTOS DE RETENCIÓN
+- Resumen ejecutivo de lo aprendido.
+- "Takeaways" principales.
+
+## NOTE SOBRE FORMATO
+- Markdown limpio.
+- Usa H3 (###) para títulos de sección.
+- NO uses bloques de código para el texto principal.
+
+CONTENIDO A PROCESAR:
+${content.slice(0, 90000)}
+`;
+
 export const generateMaterialSummary = async (content: string, type: 'pdf' | 'text' | 'url' | 'video'): Promise<string | null> => {
   if (!content) return null;
 
   try {
-    const summaryPrompt = `Resume esto(${type}): ${content.slice(0, 50000)} `;
-    return await generateContent(summaryPrompt);
+    const summaryPrompt = getComprehensivePrompt(content, type);
+
+    // Use a high token limit to ensure we get the full "textbook chapter"
+    return await generateContent(summaryPrompt, {
+      maxTokens: 8192,
+      temperature: 0.4 // Lower temperature for accuracy
+    });
   } catch (error) {
     console.error('Error generating material summary:', error);
     return null;
@@ -733,8 +780,9 @@ export const generateQuizFromText = async (
  */
 export const generateStudySummary = async (text: string, topic: string): Promise<string | null> => {
   try {
-    const prompt = `Resume esto: ${text.slice(0, 5000)} `;
-    return await generateContent(prompt);
+    // Reuse the comprehensive prompt logic logic, treating it as text
+    const prompt = getComprehensivePrompt(text, 'study_text');
+    return await generateContent(prompt, { maxTokens: 8192, temperature: 0.4 });
   } catch (error) {
     console.error('Error generating study summary:', error);
     return null;

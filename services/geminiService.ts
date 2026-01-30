@@ -3,6 +3,7 @@ import { getBestGeminiModel, getGeminiSDK, getSearchModel } from "./geminiModelM
 import { getYoutubeTranscript } from "./youtubeService";
 import { searchRelevantContext } from "./embeddingService";
 import { supabase } from "./supabaseClient";
+import { generateMaterialSummary } from "./pdfProcessingService";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -463,11 +464,16 @@ export const generateFlashcardsFromYouTubeURL = async (url: string, count: numbe
 
     const flashcards = await generateStudySetFromContext(promptContext, count);
 
+    // Generate comprehensive summary using the new engine
+    // Use the full context (including metadata/comments) for the summary, not just transcript
+    const summaryInput = fullTranscriptText || description;
+    const detailedSummary = await generateMaterialSummary(promptContext, 'video');
+
     const videoTitle = title || "Video de YouTube (" + (new URL(url).searchParams.get('v') || 'ID desconocido') + ")";
 
     return {
       flashcards,
-      summary: (isMetadataOnly || !fullTranscriptText) ? description.slice(0, 1000) : fullTranscriptText.slice(0, 1000) + "...",
+      summary: detailedSummary || ((isMetadataOnly || !fullTranscriptText) ? description.slice(0, 1000) : fullTranscriptText.slice(0, 1000) + "..."),
       videoUrl: url,
       videoTitle,
       channelName: metadata?.channelTitle || "YouTube",
@@ -491,9 +497,12 @@ export const generateFlashcardsFromWebURL = async (url: string, count: number = 
 
     const flashcards = await generateStudySetFromContext(cleanText, count);
 
+    // Generate comprehensive summary
+    const detailedSummary = await generateMaterialSummary(cleanText, 'url');
+
     return {
       flashcards,
-      summary: cleanText.slice(0, 1000) + "...",
+      summary: detailedSummary || cleanText.slice(0, 1000) + "...",
       pageTitle: "Página Web (" + new URL(url).hostname + ")",
       sourceUrl: url,
       content: cleanText // Return full content for vector indexing
