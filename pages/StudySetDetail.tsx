@@ -159,6 +159,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
     const [refreshReports, setRefreshReports] = useState(0);
     const [flashcardProgress, setFlashcardProgress] = useState<Map<string, FlashcardProgress>>(new Map());
     const [viewingStatsFlashcard, setViewingStatsFlashcard] = useState<Flashcard | null>(null);
+    const [availableForStudy, setAvailableForStudy] = useState(0);
 
     // Edit states
     const [isEditingName, setIsEditingName] = useState(false);
@@ -313,6 +314,8 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
             // Fetch flashcard progress for mastery display
             if (user && data.flashcards.length > 0) {
                 const flashcardIds = data.flashcards.map((f: Flashcard) => f.id);
+
+                // Fetch progress (difficulty/mastery)
                 const { data: progress, error } = await supabase
                     .from('flashcard_progress')
                     .select('flashcard_id, difficulty_level, mastery_percent, correct_at_level, attempts_at_level')
@@ -323,6 +326,29 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                     const progressMap = new Map<string, FlashcardProgress>();
                     progress.forEach((p: any) => progressMap.set(p.flashcard_id, p));
                     setFlashcardProgress(progressMap);
+                }
+
+                // Fetch SRS data for "Ready to Study" count
+                const { data: srsData, error: srsError } = await supabase
+                    .from('flashcard_srs_data')
+                    .select('flashcard_id, next_review_at')
+                    .eq('user_id', user.id)
+                    .in('flashcard_id', flashcardIds);
+
+                if (!srsError) {
+                    const now = new Date();
+                    const srsMap = new Map();
+                    (srsData || []).forEach(d => srsMap.set(d.flashcard_id, d));
+
+                    let readyCount = 0;
+                    data.flashcards.forEach((fc: Flashcard) => {
+                        const srs = srsMap.get(fc.id);
+                        // Condition: No SRS (New) OR No scheduled date (New) OR Due Date <= Now
+                        if (!srs || !srs.next_review_at || new Date(srs.next_review_at) <= now) {
+                            readyCount++;
+                        }
+                    });
+                    setAvailableForStudy(readyCount);
                 }
             }
         } catch (error) {
@@ -1384,7 +1410,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                         {/* Stats Card */}
                         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
                             <h3 className="font-bold text-slate-900 mb-4">📊 Estadísticas</h3>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                 <div className="bg-violet-50 rounded-xl p-4 text-center">
                                     <div className="text-3xl font-black text-violet-600">{studySet.flashcard_count}</div>
                                     <div className="text-xs text-violet-500 font-medium">Flashcards</div>
@@ -1392,6 +1418,10 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                 <div className="bg-amber-50 rounded-xl p-4 text-center">
                                     <div className="text-3xl font-black text-amber-600">{studySet.material_count}</div>
                                     <div className="text-xs text-amber-500 font-medium">Materiales</div>
+                                </div>
+                                <div className="bg-emerald-50 rounded-xl p-4 text-center col-span-2 md:col-span-1">
+                                    <div className="text-3xl font-black text-emerald-600">{availableForStudy}</div>
+                                    <div className="text-xs text-emerald-500 font-medium">Para estudiar</div>
                                 </div>
                             </div>
                             <div className="mt-4 pt-4 border-t border-slate-100 flex justify-center">
