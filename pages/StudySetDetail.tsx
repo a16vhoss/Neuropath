@@ -26,6 +26,7 @@ import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL, autoCat
 import { storeDocumentEmbeddings } from '../services/embeddingService';
 import CumulativeReportsCard from '../components/CumulativeReportsCard';
 import VisualProgressionMap from '../components/VisualProgressionMap';
+import StudySetStatistics from '../components/StudySetStatistics';
 import StudyGuideRenderer from '../components/StudyGuideRenderer/index';
 import InfographicRenderer from '../components/InfographicRenderer';
 import PresentationRenderer from '../components/PresentationRenderer';
@@ -332,6 +333,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
     };
 
     const [generatingGuide, setGeneratingGuide] = useState(false);
+    const [showStatsModal, setShowStatsModal] = useState(false);
     const [generatingInfographic, setGeneratingInfographic] = useState(false);
     const [generatingPresentation, setGeneratingPresentation] = useState(false);
     const [activeGuideTab, setActiveGuideTab] = useState<'guide' | 'infographic' | 'presentation' | 'mindmap'>('guide');
@@ -1391,6 +1393,15 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                     <div className="text-3xl font-black text-amber-600">{studySet.material_count}</div>
                                     <div className="text-xs text-amber-500 font-medium">Materiales</div>
                                 </div>
+                            </div>
+                            <div className="mt-4 pt-4 border-t border-slate-100 flex justify-center">
+                                <button
+                                    onClick={() => setShowStatsModal(true)}
+                                    className="text-sm font-bold text-violet-600 hover:text-violet-700 bg-violet-50 hover:bg-violet-100 px-4 py-2 rounded-lg transition-colors w-full flex items-center justify-center gap-2"
+                                >
+                                    Ver más estadísticas
+                                    <span className="material-symbols-outlined text-lg">arrow_forward</span>
+                                </button>
                             </div>
                         </div>
 
@@ -2502,6 +2513,29 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                     currentSetName={studySet.name}
                     userId={user.id}
                 />
+            )}
+
+            {/* Detailed Stats Modal */}
+            {showStatsModal && studySet && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-indigo-600">analytics</span>
+                                Estadísticas del Set
+                            </h3>
+                            <button
+                                onClick={() => setShowStatsModal(false)}
+                                className="p-2 hover:bg-slate-200 rounded-full text-slate-400 transition"
+                            >
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto bg-slate-50/30">
+                            <StudySetStatistics studySetId={studySet.id} />
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* ZpBot Chat Integration */}
