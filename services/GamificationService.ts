@@ -103,7 +103,10 @@ export const GamificationService = {
     },
 
     async updateStreak(userId: string): Promise<number> {
-        const today = new Date().toISOString().split('T')[0];
+        // Obtener fecha actual normalizada a medianoche local
+        const now = new Date();
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const todayString = todayMidnight.toISOString().split('T')[0];
 
         const { data: profile, error: fetchError } = await supabase
             .from('profiles')
@@ -117,23 +120,28 @@ export const GamificationService = {
         const lastStudy = profile?.last_study_date;
 
         if (lastStudy) {
-            const lastDate = new Date(lastStudy);
-            const todayDate = new Date(today);
-            const diffDays = Math.floor((todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+            // Normalizar la última fecha de estudio a medianoche
+            const lastStudyDate = new Date(lastStudy);
+            const lastMidnight = new Date(lastStudyDate.getFullYear(), lastStudyDate.getMonth(), lastStudyDate.getDate());
+
+            // Calcular diferencia en días calendario
+            const diffDays = Math.floor((todayMidnight.getTime() - lastMidnight.getTime()) / (1000 * 60 * 60 * 24));
 
             if (diffDays === 0) {
-                // Same day, streak unchanged
+                // Mismo día, mantener racha
                 newStreak = profile.streak_days || 1;
             } else if (diffDays === 1) {
-                // Consecutive day, increment streak
+                // Día consecutivo, incrementar racha
                 newStreak = (profile.streak_days || 0) + 1;
+            } else {
+                // Si pasó más de 1 día sin práctica, resetear racha a 0
+                newStreak = 0;
             }
-            // if diffDays > 1, streak resets to 1
         }
 
         const { error: updateError } = await supabase
             .from('profiles')
-            .update({ streak_days: newStreak, last_study_date: today })
+            .update({ streak_days: newStreak, last_study_date: todayString })
             .eq('id', userId);
 
         if (updateError) throw updateError;
@@ -172,7 +180,7 @@ export const GamificationService = {
         // 4. Calculate today's minutes
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
-        
+
         const { data: todaySessions } = await supabase
             .from('study_sessions')
             .select('duration_seconds')
@@ -202,23 +210,23 @@ export const GamificationService = {
     async checkAndUnlockAchievements(userId: string) {
         // 1. Get current stats
         const stats = await this.getDetailedUserStats(userId);
-        
+
         // 2. Get unearned achievements
         const { data: allAchievements } = await supabase.from('achievements').select('*');
         const { data: earnedAchievements } = await supabase
             .from('student_achievements')
             .select('achievement_id')
             .eq('student_id', userId);
-            
+
         const earnedIds = new Set((earnedAchievements || []).map(a => a.achievement_id));
         const unearned = (allAchievements || []).filter(a => !earnedIds.has(a.id));
-        
+
         const unlocked: Achievement[] = [];
 
         // 3. Check criteria
         for (const achievement of unearned) {
             let thresholdMet = false;
-            
+
             switch (achievement.requirement_type) {
                 case 'streak_days':
                     if (stats.streak_days >= achievement.requirement_value) thresholdMet = true;
@@ -235,7 +243,7 @@ export const GamificationService = {
                 case 'topics_mastered':
                     if (stats.topics_mastered >= achievement.requirement_value) thresholdMet = true;
                     break;
-                 // Add more cases as needed
+                // Add more cases as needed
             }
 
             if (thresholdMet) {
@@ -244,14 +252,14 @@ export const GamificationService = {
                     student_id: userId,
                     achievement_id: achievement.id
                 });
-                
+
                 // Award XP
                 await this.awardXP(userId, achievement.xp_reward);
-                
+
                 unlocked.push(achievement);
             }
         }
-        
+
         return unlocked;
     }
 };
