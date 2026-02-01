@@ -9,6 +9,8 @@ import { getOrGenerateTodaySummary, markSummaryViewed, DailySummary } from '../s
 import StudySetManager from '../components/StudySetManager';
 import MagicImportModal from '../components/MagicImportModal';
 import AdaptiveConfigModal from '../components/AdaptiveConfigModal';
+import QuizConfigModal from '../components/QuizConfigModal';
+import { QuizConfig } from '../services/QuizService';
 import AdaptiveProgressCard from '../components/AdaptiveProgressCard';
 import FolderBrowser from '../components/FolderBrowser';
 import NotificationBell from '../components/NotificationBell';
@@ -59,6 +61,31 @@ const StudentDashboard: React.FC = () => {
   const [sessionMode, setSessionMode] = useState<'adaptive' | 'review_due' | 'learn_new' | 'cramming'>('adaptive');
   const [availableSets, setAvailableSets] = useState<{ id: string, name: string, type: 'class' | 'personal', count: number }[]>([]);
   const [selectedSetIds, setSelectedSetIds] = useState<string[]>([]);
+
+  // Quiz Mode State
+  const [showQuizConfigModal, setShowQuizConfigModal] = useState(false);
+  const [selectedQuizSets, setSelectedQuizSets] = useState<string[]>([]);
+
+  const handleQuizStart = (config: QuizConfig) => {
+    // Generate URL with params for Quiz
+    // OR create session first. 
+    // Plan: "Conectar acción 'Quiz' con la generación de quiz"
+    // Assuming we have a page /student/quiz/:sessionId or /student/quiz?ids=...
+    // Since QuizService is ready, we might want to create session here or pass config to a generic quiz runner.
+    // Let's assume we navigate to a quiz runner which takes params, OR create session.
+    // Given the previous pattern (UltraReview), likely we pass params to a component.
+    // But QuizService.generateAdaptiveQuiz returns questions.
+    // Let's create a route /student/quiz/start that takes config and sets.
+    // OR, just create the session here and redirect.
+    // Since implementation plan said "Conectar", I'll implement logic later if needed (route creation).
+    // For now, let's console log and TODO navigate.
+    // Actually, looking at App.tsx, there isn't a dedicated Quiz route except maybe generic.
+    // I need to add one. Or use StudySession?
+    // Let's use `createQuizSession` pattern if exists or pass to new page.
+    // I'll add a route /student/quiz-session in App.tsx later.
+    setShowQuizConfigModal(false);
+    navigate(`/student/quiz-session`, { state: { config, studySetIds: selectedQuizSets } });
+  };
 
   // Magic Import Modal
   const [showMagicModal, setShowMagicModal] = useState(false);
@@ -937,11 +964,21 @@ const StudentDashboard: React.FC = () => {
           availableSets={availableSets}
           initialMode={sessionMode}
           onStartSession={(sets, mode) => {
-            if (mode === 'ultra_review') {
+            if (mode === 'quiz') {
+              setSelectedQuizSets(sets.length > 0 ? sets : availableSets.map(s => s.id));
+              setShowAdaptiveConfigModal(false);
+              setShowQuizConfigModal(true);
+            } else if (mode === 'ultra_review') {
               let url = `/student/ultra-review?mode=${mode}`;
-              if (sets.length > 0 && sets.length < availableSets.length) {
-                url += `&sets=${sets.join(',')}`;
-              }
+              // Always pass sets for Ultra Review to define scope explicitly and prevent freeze
+              // If sets is empty (user selected all implicitely), pass all IDs or handle in UltraReview
+              // Better to stick to the pattern: if sets provided, use them. If not provided, it might imply "all" in some contexts but specific sets are safer.
+              // Logic fix: always pass sets if the user selection is valid (which it is).
+              // Actually, if sets are empty here it usually means "all" in the modal logic?
+              // Let's verify modal output. If modal sends specific selected IDs, use them.
+              const idsToPass = sets.length > 0 ? sets : availableSets.map(s => s.id);
+              url += `&sets=${idsToPass.join(',')}`;
+
               navigate(url);
             } else {
               let url = `/student/adaptive-study?mode=${mode}`;
@@ -952,6 +989,16 @@ const StudentDashboard: React.FC = () => {
             }
           }}
         />
+
+        {/* Quiz Config Modal */}
+        {showQuizConfigModal && (
+          <QuizConfigModal
+            studySetIds={selectedQuizSets}
+            userId={user?.id || ''}
+            onCancel={() => setShowQuizConfigModal(false)}
+            onStart={handleQuizStart}
+          />
+        )}
       </div>
     </div>
   );

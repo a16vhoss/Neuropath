@@ -12,7 +12,7 @@ interface AdaptiveConfigModalProps {
     onClose: () => void;
     onStartSession: (selectedSetIds: string[], mode: string) => void;
     availableSets: StudySet[];
-    initialMode?: 'adaptive' | 'review_due' | 'learn_new' | 'cramming' | 'ultra_review';
+    initialMode?: 'adaptive' | 'review_due' | 'learn_new' | 'cramming' | 'ultra_review' | 'quiz';
 }
 
 const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
@@ -23,7 +23,7 @@ const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
     initialMode = 'adaptive'
 }) => {
     const [selectedSetIds, setSelectedSetIds] = useState<string[]>([]);
-    const [sessionMode, setSessionMode] = useState<'adaptive' | 'review_due' | 'learn_new' | 'cramming' | 'ultra_review'>(initialMode);
+    const [sessionMode, setSessionMode] = useState<'adaptive' | 'review_due' | 'learn_new' | 'cramming' | 'ultra_review' | 'quiz'>(initialMode);
 
     useEffect(() => {
         if (isOpen) {
@@ -202,6 +202,31 @@ const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
                                     </div>
                                 )}
                             </button>
+
+                            <button
+                                onClick={() => setSessionMode('quiz')}
+                                className={`
+                  p-4 rounded-xl border-2 text-left transition-all relative overflow-hidden group
+                  ${sessionMode === 'quiz'
+                                        ? 'border-amber-500 bg-amber-50 shadow-sm'
+                                        : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'}
+                `}
+                            >
+                                <div className="mb-3 w-10 h-10 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center">
+                                    <span className="material-symbols-outlined">quiz</span>
+                                </div>
+                                <h4 className="font-bold text-gray-900 mb-1">Quiz</h4>
+                                <p className="text-xs text-gray-500 leading-relaxed">
+                                    Evalúa tus conocimientos con preguntas de opción múltiple, verdadero/falso y análisis.
+                                </p>
+                                {sessionMode === 'quiz' && (
+                                    <div className="absolute top-2 right-2 text-amber-600">
+                                        <span className="material-symbols-outlined text-sm">check</span>
+                                    </div>
+                                )}
+                            </button>
+
+
 
                             <button
                                 onClick={() => setSessionMode('learn_new')}

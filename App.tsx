@@ -22,6 +22,7 @@ import MockExamPage from './pages/MockExamPage';
 import CreateAssignment from './pages/CreateAssignment';
 import TeacherSettings from './pages/TeacherSettings';
 import ExerciseSession from './pages/ExerciseSession';
+import QuizSession from './pages/QuizSession';
 import { UserRole } from './types';
 
 // Protected Route component
@@ -152,6 +153,11 @@ const AppRoutes: React.FC = () => {
       <Route path="/student/exercise-session" element={
         <ProtectedRoute allowedRole="student">
           <ExerciseSession />
+        </ProtectedRoute>
+      } />
+      <Route path="/student/quiz-session" element={
+        <ProtectedRoute allowedRole="student">
+          <QuizSession />
         </ProtectedRoute>
       } />
       <Route path="/student/study/adaptive/set/:studySetId" element={

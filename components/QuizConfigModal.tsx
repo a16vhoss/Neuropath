@@ -3,13 +3,13 @@ import { supabase } from '../services/supabaseClient';
 import { QuizConfig, QuestionType, getUserMasteryLevel } from '../services/QuizService';
 
 interface QuizConfigModalProps {
-    studySetId: string;
+    studySetIds: string[];
     userId: string;
     onStart: (config: QuizConfig) => void;
     onCancel: () => void;
 }
 
-const QuizConfigModal: React.FC<QuizConfigModalProps> = ({ studySetId, userId, onStart, onCancel }) => {
+const QuizConfigModal: React.FC<QuizConfigModalProps> = ({ studySetIds, userId, onStart, onCancel }) => {
     // State for configuration
     const [questionCount, setQuestionCount] = useState<number>(10);
     const [selectedTypes, setSelectedTypes] = useState<QuestionType[]>(['multiple_choice', 'true_false', 'analysis', 'practical']);
@@ -35,7 +35,7 @@ const QuizConfigModal: React.FC<QuizConfigModalProps> = ({ studySetId, userId, o
         const fetchInfo = async () => {
             try {
                 // Get user current level
-                const level = await getUserMasteryLevel(studySetId, userId);
+                const level = await getUserMasteryLevel(studySetIds, userId);
                 setUserLevel(level);
                 setSelectedDifficulty(level);
 
@@ -43,7 +43,7 @@ const QuizConfigModal: React.FC<QuizConfigModalProps> = ({ studySetId, userId, o
                 const { data: flashcards } = await supabase
                     .from('flashcards')
                     .select('category')
-                    .eq('study_set_id', studySetId);
+                    .in('study_set_id', studySetIds);
 
                 if (flashcards) {
                     const topics = Array.from(new Set(flashcards.map(f => f.category || 'General').filter(Boolean)));
@@ -56,7 +56,7 @@ const QuizConfigModal: React.FC<QuizConfigModalProps> = ({ studySetId, userId, o
             }
         };
         fetchInfo();
-    }, [studySetId, userId]);
+    }, [JSON.stringify(studySetIds), userId]);
 
     // Handlers
     const handleTypeToggle = (type: QuestionType) => {
