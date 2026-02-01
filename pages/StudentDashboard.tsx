@@ -937,11 +937,19 @@ const StudentDashboard: React.FC = () => {
           availableSets={availableSets}
           initialMode={sessionMode}
           onStartSession={(sets, mode) => {
-            let url = `/student/adaptive-study?mode=${mode}`;
-            if (sets.length > 0 && sets.length < availableSets.length) {
-              url += `&sets=${sets.join(',')}`;
+            if (mode === 'ultra_review') {
+              let url = `/student/ultra-review?mode=${mode}`;
+              if (sets.length > 0 && sets.length < availableSets.length) {
+                url += `&sets=${sets.join(',')}`;
+              }
+              navigate(url);
+            } else {
+              let url = `/student/adaptive-study?mode=${mode}`;
+              if (sets.length > 0 && sets.length < availableSets.length) {
+                url += `&sets=${sets.join(',')}`;
+              }
+              navigate(url);
             }
-            navigate(url);
           }}
         />
       </div>

@@ -89,6 +89,11 @@ const UltraReviewContent: React.FC = () => {
     const [searchParams] = useSearchParams();
     const { user } = useAuth();
 
+    // Derived state for multi-set IDs
+    const setsParam = searchParams.get('sets');
+    const targetSetIds = setsParam ? setsParam.split(',') : (studySetId ? [studySetId] : []);
+    const isMultiSet = targetSetIds.length > 1;
+
     // State
     const [session, setSession] = useState<UltraReviewSession | null>(null);
     const [currentPhase, setCurrentPhase] = useState<PhaseNumber>(1);
@@ -116,31 +121,36 @@ const UltraReviewContent: React.FC = () => {
     const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
     const [showExerciseSolution, setShowExerciseSolution] = useState(false);
 
-    // Fetch study set name
+    // Fetch study set name(s)
     useEffect(() => {
-        const fetchStudySet = async () => {
-            if (!studySetId) return;
-            const { data } = await supabase
-                .from('study_sets')
-                .select('name')
-                .eq('id', studySetId)
-                .single();
-            if (data) setStudySetName(data.name);
+        const fetchStudySetInfo = async () => {
+            if (targetSetIds.length === 0) return;
+
+            if (targetSetIds.length === 1) {
+                const { data } = await supabase
+                    .from('study_sets')
+                    .select('name')
+                    .eq('id', targetSetIds[0])
+                    .single();
+                if (data) setStudySetName(data.name);
+            } else {
+                setStudySetName(`${targetSetIds.length} sets seleccionados`);
+            }
         };
-        fetchStudySet();
-    }, [studySetId]);
+        fetchStudySetInfo();
+    }, [JSON.stringify(targetSetIds)]);
 
     // Check for existing session
     useEffect(() => {
         const checkExistingSession = async () => {
-            if (!user || !studySetId) return;
+            if (!user || targetSetIds.length === 0) return;
 
             const mode = searchParams.get('mode') as DurationMode;
             if (mode) {
                 // Starting fresh with specified mode
                 setSelectedDuration(mode);
                 setShowConfig(false);
-                const newSession = await startFreshSession(user.id, studySetId, mode);
+                const newSession = await startFreshSession(user.id, targetSetIds, mode);
                 setSession(newSession);
                 setCurrentPhase(1);
                 setTimerActive(true);
@@ -151,17 +161,9 @@ const UltraReviewContent: React.FC = () => {
                 loadPhaseContent(newSession.id, 1, mode);
             } else {
                 // Check for existing in-progress session
-                const { data: existing } = await supabase
-                    .from('ultra_review_sessions')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .eq('study_set_id', studySetId)
-                    .eq('status', 'in_progress')
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
+                const existing = await getOrCreateSession(user.id, targetSetIds);
 
-                if (existing) {
+                if (existing && existing.status === 'in_progress') {
                     setSession(existing);
                     setCurrentPhase(existing.current_phase as PhaseNumber);
                     setSelectedDuration(existing.duration_mode as DurationMode);
@@ -179,7 +181,7 @@ const UltraReviewContent: React.FC = () => {
         };
 
         checkExistingSession();
-    }, [user, studySetId, searchParams]);
+    }, [user, JSON.stringify(targetSetIds), searchParams]);
 
     // Timer effect
     useEffect(() => {
@@ -214,7 +216,7 @@ const UltraReviewContent: React.FC = () => {
         setPhaseContent(null);
 
         try {
-            const content = await generatePhaseContent(sessionId, studySetId!, phase, duration);
+            const content = await generatePhaseContent(sessionId, targetSetIds, phase, duration);
             setPhaseContent(content);
 
             // Reset phase-specific state
@@ -231,16 +233,16 @@ const UltraReviewContent: React.FC = () => {
         } finally {
             setGeneratingContent(false);
         }
-    }, [studySetId]);
+    }, [JSON.stringify(targetSetIds)]);
 
     // Start session
     const handleStartSession = async () => {
-        if (!user || !studySetId) return;
+        if (!user || targetSetIds.length === 0) return;
 
         setShowConfig(false);
         setLoading(true);
 
-        const newSession = await startFreshSession(user.id, studySetId, selectedDuration);
+        const newSession = await startFreshSession(user.id, targetSetIds, selectedDuration);
         setSession(newSession);
         setCurrentPhase(1);
         setElapsedSeconds(0);
@@ -253,6 +255,16 @@ const UltraReviewContent: React.FC = () => {
 
         await loadPhaseContent(newSession.id, 1, selectedDuration);
         setLoading(false);
+    };
+
+    const handleBack = () => {
+        if (isMultiSet) {
+            navigate('/student/dashboard');
+        } else if (studySetId) {
+            navigate(`/student/set/${studySetId}`);
+        } else {
+            navigate('/student/dashboard');
+        }
     };
 
     // Navigate phases
@@ -370,10 +382,10 @@ const UltraReviewContent: React.FC = () => {
                     </button>
 
                     <button
-                        onClick={() => navigate(-1)}
+                        onClick={handleBack}
                         className="w-full mt-4 py-3 text-slate-500 font-medium hover:text-slate-700 transition"
                     >
-                        Volver al Set
+                        {isMultiSet ? 'Volver al Dashboard' : 'Volver al Set'}
                     </button>
                 </div>
             </div>
@@ -460,10 +472,10 @@ const UltraReviewContent: React.FC = () => {
                             Hacer otro Ultra Repaso
                         </button>
                         <button
-                            onClick={() => navigate(`/student/set/${studySetId}`)}
+                            onClick={handleBack}
                             className="w-full py-3 text-slate-600 font-medium hover:text-slate-800 transition"
                         >
-                            Volver al Set de Estudio
+                            {isMultiSet ? 'Volver al Dashboard' : 'Volver al Set'}
                         </button>
                     </div>
                 </div>
@@ -480,7 +492,7 @@ const UltraReviewContent: React.FC = () => {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
                             <button
-                                onClick={() => navigate(`/student/set/${studySetId}`)}
+                                onClick={handleBack}
                                 className="p-2 hover:bg-white/10 rounded-lg transition text-white/70 hover:text-white"
                             >
                                 <span className="material-symbols-outlined">arrow_back</span>

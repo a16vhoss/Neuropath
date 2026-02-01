@@ -12,7 +12,7 @@ interface AdaptiveConfigModalProps {
     onClose: () => void;
     onStartSession: (selectedSetIds: string[], mode: string) => void;
     availableSets: StudySet[];
-    initialMode?: 'adaptive' | 'review_due' | 'learn_new' | 'cramming';
+    initialMode?: 'adaptive' | 'review_due' | 'learn_new' | 'cramming' | 'ultra_review';
 }
 
 const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
@@ -23,7 +23,7 @@ const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
     initialMode = 'adaptive'
 }) => {
     const [selectedSetIds, setSelectedSetIds] = useState<string[]>([]);
-    const [sessionMode, setSessionMode] = useState<'adaptive' | 'review_due' | 'learn_new' | 'cramming'>(initialMode);
+    const [sessionMode, setSessionMode] = useState<'adaptive' | 'review_due' | 'learn_new' | 'cramming' | 'ultra_review'>(initialMode);
 
     useEffect(() => {
         if (isOpen) {
@@ -133,7 +133,7 @@ const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
                             Elige el modo de estudio
                         </h3>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <button
                                 onClick={() => setSessionMode('adaptive')}
                                 className={`
@@ -152,6 +152,29 @@ const AdaptiveConfigModal: React.FC<AdaptiveConfigModalProps> = ({
                                 </p>
                                 {sessionMode === 'adaptive' && (
                                     <div className="absolute top-2 right-2 text-indigo-600">
+                                        <span className="material-symbols-outlined text-sm">check</span>
+                                    </div>
+                                )}
+                            </button>
+
+                            <button
+                                onClick={() => setSessionMode('ultra_review')}
+                                className={`
+                  p-4 rounded-xl border-2 text-left transition-all relative overflow-hidden group
+                  ${sessionMode === 'ultra_review'
+                                        ? 'border-purple-500 bg-purple-50 shadow-sm'
+                                        : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'}
+                `}
+                            >
+                                <div className="mb-3 w-10 h-10 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center">
+                                    <span className="material-symbols-outlined">bolt</span>
+                                </div>
+                                <h4 className="font-bold text-gray-900 mb-1">Ultra Repaso</h4>
+                                <p className="text-xs text-gray-500 leading-relaxed">
+                                    Sesión intensiva completa: resumen, fórmulas, flashcards y ejercicios. Ideal antes de exámenes.
+                                </p>
+                                {sessionMode === 'ultra_review' && (
+                                    <div className="absolute top-2 right-2 text-purple-600">
                                         <span className="material-symbols-outlined text-sm">check</span>
                                     </div>
                                 )}

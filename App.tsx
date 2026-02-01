@@ -129,6 +129,11 @@ const AppRoutes: React.FC = () => {
           <UltraReview />
         </ProtectedRoute>
       } />
+      <Route path="/student/ultra-review" element={
+        <ProtectedRoute allowedRole="student">
+          <UltraReview />
+        </ProtectedRoute>
+      } />
       <Route path="/student/adaptive-study/:classId" element={
         <ProtectedRoute allowedRole="student">
           <AdaptiveStudySession />

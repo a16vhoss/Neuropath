@@ -64,7 +64,8 @@ export interface QuizResult {
 export interface QuizSession {
     id: string;
     userId: string;
-    studySetId: string;
+    studySetId?: string;    // Kept for legacy single-set sessions
+    studySetIds: string[];  // For multi-set sessions
     score: number;
     totalQuestions: number;
     percentCorrect: number;
@@ -85,15 +86,17 @@ export interface QuizReport {
  * Get user's average mastery level for a study set (1-4 scale)
  */
 export async function getUserMasteryLevel(
-    studySetId: string,
+    studySetIds: string | string[],
     userId: string
 ): Promise<number> {
     try {
-        // Get flashcard IDs in this study set
+        const ids = Array.isArray(studySetIds) ? studySetIds : [studySetIds];
+
+        // Get flashcard IDs in these study sets
         const { data: flashcards } = await supabase
             .from('flashcards')
             .select('id')
-            .eq('study_set_id', studySetId);
+            .in('study_set_id', ids);
 
         if (!flashcards || flashcards.length === 0) return 1;
 
@@ -183,33 +186,43 @@ export interface QuizConfig {
  * Generate an adaptive quiz based on study set content and previous performance
  */
 export async function generateAdaptiveQuiz(
-    studySetId: string,
+    studySetIds: string | string[],
     userId: string,
     config?: QuizConfig // Now optional/customizable
 ): Promise<QuizQuestion[]> {
     try {
+        const targetSetIds = Array.isArray(studySetIds) ? studySetIds : [studySetIds];
         const questionCount = config?.questionCount || 5;
 
-        // 0. Get learning stats and exercises for adaptive balance
-        const [learningStats, exerciseTemplates] = await Promise.all([
-            getLearningStats(userId, studySetId),
-            getExercisesForStudySet(studySetId)
+        // 0. Get learning stats and exercises per set and aggregate
+        const statsPromises = targetSetIds.map(id => getLearningStats(userId, id));
+        const exercisesPromises = targetSetIds.map(id => getExercisesForStudySet(id));
+
+        const [statsResults, exercisesResults] = await Promise.all([
+            Promise.all(statsPromises),
+            Promise.all(exercisesPromises)
         ]);
 
+        // Aggregate templates
+        const exerciseTemplates = exercisesResults.flat();
+
+        // Aggregate stats (avg recommended ratio)
+        const avgRecommendedRatio = statsResults.reduce((sum, s) => sum + s.recommendedExerciseRatio, 0) / (statsResults.length || 1);
+
         // Calculate how many exercise-based questions to include
-        const exerciseRatio = learningStats.recommendedExerciseRatio / 100;
+        const exerciseRatio = avgRecommendedRatio / 100;
         const exerciseQuestionCount = exerciseTemplates.length > 0
             ? Math.round(questionCount * exerciseRatio * 0.5) // Up to 50% of ratio can be exercises
             : 0;
         const theoryQuestionCount = questionCount - exerciseQuestionCount;
 
-        console.log(`[Quiz] Adaptive ratio: ${learningStats.recommendedExerciseRatio}%, Exercises: ${exerciseQuestionCount}/${questionCount}, Theory: ${theoryQuestionCount}/${questionCount}`);
+        console.log(`[Quiz] Adaptive ratio: ${avgRecommendedRatio}%, Exercises: ${exerciseQuestionCount}/${questionCount}, Theory: ${theoryQuestionCount}/${questionCount}`);
 
-        // 1. Fetch flashcards from study set for content
+        // 1. Fetch flashcards from study sets for content
         let flashcardsQuery = supabase
             .from('flashcards')
             .select('question, answer, category')
-            .eq('study_set_id', studySetId);
+            .in('study_set_id', targetSetIds);
 
         // Filter by topic if requested
         if (config?.contentScope === 'specific_topics' && config.selectedTopics && config.selectedTopics.length > 0) {
@@ -218,11 +231,11 @@ export async function generateAdaptiveQuiz(
 
         const { data: flashcards, error: flashcardsError } = await flashcardsQuery;
 
-        // 1b. Fetch notebooks content from study set
+        // 1b. Fetch notebooks content from study sets
         const { data: notebooks } = await supabase
             .from('notebooks')
             .select('title, content, last_saved_content')
-            .eq('study_set_id', studySetId);
+            .in('study_set_id', targetSetIds);
 
         // Allow quiz generation even if no flashcards, as long as there's notebook content
         const hasFlashcards = flashcards && flashcards.length > 0;
@@ -239,28 +252,25 @@ export async function generateAdaptiveQuiz(
             userLevel = config.difficultyLevel;
             console.log(`[Quiz] Using MANUAL difficulty level: ${userLevel}`);
         } else {
-            userLevel = await getUserMasteryLevel(studySetId, userId);
+            userLevel = await getUserMasteryLevel(targetSetIds, userId);
             console.log(`[Quiz] Using AUTO difficulty level: ${userLevel}`);
         }
 
         // 3. Get weak topics logic (only if scope is not specific)
         let weakTopics: string[] = [];
         if (config?.contentScope === 'weak_topics') {
-            weakTopics = await getWeakTopics(studySetId, userId);
-            // If no weak topics found but requested, warn or fallback? 
-            // Logic below handles empty weakTopics by just not adding the specific prompt context, 
-            // but for "weak_topics" scope we might want to prioritize differently.
-            // For now, we'll let the prompt handle the emphasis.
+            weakTopics = await getWeakTopics(targetSetIds, userId);
+
             if (weakTopics.length === 0) {
                 console.log('[Quiz] No weak topics found for review mode, defaulting to general mix');
             }
         } else if (config?.contentScope === 'all') {
             // Still fetch them to possibly weight them, but not exclusively
-            weakTopics = await getWeakTopics(studySetId, userId);
+            weakTopics = await getWeakTopics(targetSetIds, userId);
         }
 
         // 4. Get previously asked questions to avoid repetition
-        const previousQuestions = await getPreviousQuestions(studySetId, userId);
+        const previousQuestions = await getPreviousQuestions(targetSetIds, userId);
 
         // 5. Build context for Gemini (flashcards + notebooks)
         const flashcardsSummary = (flashcards || [])
@@ -556,18 +566,20 @@ Return as JSON array. IMPORTANT: Include specific fields for each type:
  * Get topics the user has struggled with in past quizzes
  */
 export async function getWeakTopics(
-    studySetId: string,
+    studySetIds: string | string[],
     userId: string
 ): Promise<string[]> {
     try {
-        // Get recent quiz question results
+        const ids = Array.isArray(studySetIds) ? studySetIds : [studySetIds];
+
+        // Get recent quiz question results for these sets
         const { data: sessions } = await supabase
             .from('quiz_sessions')
             .select('id')
-            .eq('study_set_id', studySetId)
+            .or(`study_set_id.in.(${ids.join(',')}),study_set_ids.cs.{${ids.join(',')}}`)
             .eq('user_id', userId)
             .order('completed_at', { ascending: false })
-            .limit(5);
+            .limit(10); // Check last 10 sessions
 
         if (!sessions || sessions.length === 0) return [];
 
@@ -608,14 +620,16 @@ export async function getWeakTopics(
  * Get previously asked questions to avoid repetition
  */
 async function getPreviousQuestions(
-    studySetId: string,
+    studySetIds: string | string[],
     userId: string
 ): Promise<string[]> {
     try {
+        const ids = Array.isArray(studySetIds) ? studySetIds : [studySetIds];
+
         const { data: sessions } = await supabase
             .from('quiz_sessions')
             .select('id')
-            .eq('study_set_id', studySetId)
+            .or(`study_set_id.in.(${ids.join(',')}),study_set_ids.cs.{${ids.join(',')}}`)
             .eq('user_id', userId)
             .order('completed_at', { ascending: false })
             .limit(3);
@@ -638,12 +652,13 @@ async function getPreviousQuestions(
  */
 export async function saveQuizSession(
     userId: string,
-    studySetId: string,
+    studySetIds: string | string[],
     questions: QuizQuestion[],
     results: QuizResult[],
     durationSeconds?: number
 ): Promise<QuizReport | null> {
     try {
+        const ids = Array.isArray(studySetIds) ? studySetIds : [studySetIds];
         const correctCount = results.filter(r => r.isCorrect).length;
         const totalCount = results.length;
         const percentCorrect = totalCount > 0 ? (correctCount / totalCount) * 100 : 0;
@@ -666,7 +681,8 @@ export async function saveQuizSession(
             .from('quiz_sessions')
             .insert({
                 user_id: userId,
-                study_set_id: studySetId,
+                study_set_id: ids.length === 1 ? ids[0] : null, // Set main ID if only one logic
+                study_set_ids: ids,
                 score: correctCount,
                 total_questions: totalCount,
                 percent_correct: percentCorrect,
@@ -736,7 +752,8 @@ export async function saveQuizSession(
             };
 
             if (theoryStats.total > 0 || exerciseStats.total > 0) {
-                await updateLearningStats(userId, studySetId, theoryStats, exerciseStats);
+                // Update stats for ALL involved sets
+                await Promise.all(ids.map(id => updateLearningStats(userId, id, theoryStats, exerciseStats)));
             }
         } catch (e) {
             console.error('Error updating learning stats from quiz:', e);
@@ -746,7 +763,8 @@ export async function saveQuizSession(
             session: {
                 id: session.id,
                 userId: session.user_id,
-                studySetId: session.study_set_id,
+                studySetId: session.study_set_id, // May be null
+                studySetIds: session.study_set_ids || (session.study_set_id ? [session.study_set_id] : []),
                 score: correctCount,
                 totalQuestions: totalCount,
                 percentCorrect,
@@ -769,15 +787,17 @@ export async function saveQuizSession(
  * Get quiz history for a study set
  */
 export async function getQuizHistory(
-    studySetId: string,
+    studySetIds: string | string[],
     userId: string,
     limit: number = 10
 ): Promise<QuizSession[]> {
     try {
+        const ids = Array.isArray(studySetIds) ? studySetIds : [studySetIds];
+
         const { data, error } = await supabase
             .from('quiz_sessions')
             .select('*')
-            .eq('study_set_id', studySetId)
+            .or(`study_set_id.in.(${ids.join(',')}),study_set_ids.cs.{${ids.join(',')}}`)
             .eq('user_id', userId)
             .order('completed_at', { ascending: false })
             .limit(limit);
@@ -788,6 +808,7 @@ export async function getQuizHistory(
             id: s.id,
             userId: s.user_id,
             studySetId: s.study_set_id,
+            studySetIds: s.study_set_ids || (s.study_set_id ? [s.study_set_id] : []),
             score: s.score,
             totalQuestions: s.total_questions,
             percentCorrect: s.percent_correct,

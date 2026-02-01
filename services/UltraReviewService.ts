@@ -55,7 +55,8 @@ export interface PhaseConfig {
 export interface UltraReviewSession {
     id: string;
     user_id: string;
-    study_set_id: string;
+    study_set_id?: string;  // Legacy support
+    study_set_ids: string[]; // Multi-set support
     duration_mode: DurationMode;
     current_phase: PhaseNumber;
     phase_progress: Record<string, { completed: boolean; time_spent: number }>;
@@ -216,15 +217,19 @@ async function generateWithGemini(
 // SUBJECT DETECTION
 // ============================================
 
-export async function analyzeSubjectType(studySetId: string): Promise<SubjectAnalysis> {
-    const { allContent, flashcardContent } = await getStudySetContent(studySetId);
+export async function analyzeSubjectType(studySetIds: string | string[]): Promise<SubjectAnalysis> {
+    const ids = Array.isArray(studySetIds) ? studySetIds : [studySetIds];
+    const { allContent, flashcardContent } = await getStudySetContent(ids);
 
-    // Get study set name for context
-    const { data: studySet } = await supabase
+    // Get study set names for context
+    const { data: studySets } = await supabase
         .from('study_sets')
         .select('name, description, topics')
-        .eq('id', studySetId)
-        .single();
+        .in('id', ids);
+
+    const studySetsInfo = studySets?.map(s =>
+        `NOMBRE: ${s.name}\nDESCRIPCIÓN: ${s.description}\nTEMAS: ${s.topics?.join(', ')}`
+    ).join('\n\n') || 'Sin información de sets';
 
     const schema = {
         type: Type.OBJECT,
@@ -246,9 +251,8 @@ export async function analyzeSubjectType(studySetId: string): Promise<SubjectAna
     const prompt = `
 Analiza el siguiente contenido de estudio y determina qué tipo de materia es.
 
-NOMBRE DEL SET: ${studySet?.name || 'Sin nombre'}
-DESCRIPCIÓN: ${studySet?.description || 'Sin descripción'}
-TEMAS: ${studySet?.topics?.join(', ') || 'No especificados'}
+SETS DE ESTUDIO:
+${studySetsInfo}
 
 CONTENIDO:
 ${allContent.slice(0, 15000)}
@@ -368,28 +372,44 @@ export function getPhaseConfigForSubject(subjectType: SubjectType): PhaseConfig[
 
 export async function getOrCreateSession(
     userId: string,
-    studySetId: string,
+    studySetIds: string | string[],
     durationMode: DurationMode = 'normal'
 ): Promise<UltraReviewSession> {
+    const ids = Array.isArray(studySetIds) ? studySetIds : [studySetIds];
+
+    // Check for existing active session with same sets
     const { data: existing } = await supabase
         .from('ultra_review_sessions')
         .select('*')
         .eq('user_id', userId)
-        .eq('study_set_id', studySetId)
         .eq('status', 'in_progress')
+        .or(`study_set_id.in.(${ids.join(',')}),study_set_ids.cs.{${ids.join(',')}}`)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+        .limit(1);
 
-    if (existing) {
-        return existing;
+    // Filter manually if needed to be strict about exact set match, 
+    // but for now, if it contains the sets, we might resume it.
+    // Ideally we want exact match on the array.
+    if (existing && existing.length > 0) {
+        // Simple check: match length and content (if careful)
+        // For MVP, just returning the most recent active session for these might be okay, 
+        // but let's try to find one where IDs match.
+        const match = existing.find(s => {
+            const sessionIds = s.study_set_ids || (s.study_set_id ? [s.study_set_id] : []);
+            if (sessionIds.length !== ids.length) return false;
+            return ids.every(id => sessionIds.includes(id));
+        });
+
+        if (match) return match as UltraReviewSession;
     }
 
+    // Create new
     const { data: newSession, error } = await supabase
         .from('ultra_review_sessions')
         .insert({
             user_id: userId,
-            study_set_id: studySetId,
+            study_set_id: ids.length === 1 ? ids[0] : null,
+            study_set_ids: ids,
             duration_mode: durationMode,
             current_phase: 1,
             phase_progress: {},
@@ -399,29 +419,33 @@ export async function getOrCreateSession(
         .single();
 
     if (error) throw error;
-    return newSession;
+    return newSession as UltraReviewSession;
 }
 
 export async function startFreshSession(
     userId: string,
-    studySetId: string,
+    studySetIds: string | string[],
     durationMode: DurationMode
 ): Promise<UltraReviewSession> {
+    const ids = Array.isArray(studySetIds) ? studySetIds : [studySetIds];
+
+    // Abandon previous sessions for these sets
     await supabase
         .from('ultra_review_sessions')
         .update({ status: 'abandoned' })
         .eq('user_id', userId)
-        .eq('study_set_id', studySetId)
-        .eq('status', 'in_progress');
+        .eq('status', 'in_progress')
+        .or(`study_set_id.in.(${ids.join(',')}),study_set_ids.cs.{${ids.join(',')}}`);
 
     // Analyze subject type
-    const subjectAnalysis = await analyzeSubjectType(studySetId);
+    const subjectAnalysis = await analyzeSubjectType(ids);
 
     const { data: newSession, error } = await supabase
         .from('ultra_review_sessions')
         .insert({
             user_id: userId,
-            study_set_id: studySetId,
+            study_set_id: ids.length === 1 ? ids[0] : null,
+            study_set_ids: ids,
             duration_mode: durationMode,
             current_phase: 1,
             phase_progress: {},
@@ -435,7 +459,7 @@ export async function startFreshSession(
         .single();
 
     if (error) throw error;
-    return newSession;
+    return newSession as UltraReviewSession;
 }
 
 export async function updateSessionProgress(
@@ -479,24 +503,26 @@ export async function completeSession(sessionId: string, totalTimeSeconds: numbe
 // CONTENT FETCHING
 // ============================================
 
-async function getStudySetContent(studySetId: string) {
+async function getStudySetContent(studySetIds: string | string[]) {
+    const ids = Array.isArray(studySetIds) ? studySetIds : [studySetIds];
+
     const [materials, notebooks, flashcards, exercises] = await Promise.all([
         supabase
             .from('study_set_materials')
             .select('name, content_text, summary')
-            .eq('study_set_id', studySetId),
+            .in('study_set_id', ids),
         supabase
             .from('notebooks')
             .select('title, content, last_saved_content')
-            .eq('study_set_id', studySetId),
+            .in('study_set_id', ids),
         supabase
             .from('flashcards')
             .select('id, question, answer, category')
-            .eq('study_set_id', studySetId),
+            .in('study_set_id', ids),
         supabase
             .from('exercise_templates')
             .select('id, problem_statement, solution, step_by_step_explanation, exercise_type, topic, difficulty')
-            .eq('study_set_id', studySetId)
+            .in('study_set_id', ids)
     ]);
 
     const extractTextFromHtml = (html: string): string => {
@@ -555,12 +581,12 @@ async function getStudySetContent(studySetId: string) {
 // ============================================
 
 export async function generateAdaptiveSummary(
-    studySetId: string,
+    studySetIds: string | string[],
     durationMode: DurationMode,
     subjectType: SubjectType
 ): Promise<AdaptiveSummaryContent> {
     const config = DURATION_CONFIG[durationMode];
-    const { allContent, flashcardContent } = await getStudySetContent(studySetId);
+    const { allContent, flashcardContent } = await getStudySetContent(studySetIds);
 
     const schema = {
         type: Type.OBJECT,
@@ -647,12 +673,12 @@ Idioma: Español
 // ============================================
 
 export async function generateAdaptivePhase2(
-    studySetId: string,
+    studySetIds: string | string[],
     durationMode: DurationMode,
     subjectType: SubjectType
 ): Promise<AdaptivePhase2Content> {
     const config = DURATION_CONFIG[durationMode];
-    const { allContent, flashcardContent } = await getStudySetContent(studySetId);
+    const { allContent, flashcardContent } = await getStudySetContent(studySetIds);
 
     const phase2Config: Record<SubjectType, { type: string; title: string; instruction: string }> = {
         mathematical: {
@@ -776,12 +802,12 @@ Idioma: Español
 // ============================================
 
 export async function generateAdaptiveMethodologies(
-    studySetId: string,
+    studySetIds: string | string[],
     durationMode: DurationMode,
     subjectType: SubjectType
 ): Promise<AdaptiveMethodologyContent> {
     const config = DURATION_CONFIG[durationMode];
-    const { allContent, exercises } = await getStudySetContent(studySetId);
+    const { allContent, exercises } = await getStudySetContent(studySetIds);
 
     const exerciseContext = exercises
         .filter(e => e.step_by_step_explanation && e.step_by_step_explanation.length > 0)
@@ -886,15 +912,16 @@ Idioma: Español
 // ============================================
 
 export async function getFlashcardsForReview(
-    studySetId: string,
+    studySetIds: string | string[],
     durationMode: DurationMode
 ): Promise<FlashcardReviewContent> {
     const config = DURATION_CONFIG[durationMode];
+    const ids = Array.isArray(studySetIds) ? studySetIds : [studySetIds];
 
     const { data: flashcards } = await supabase
         .from('flashcards')
         .select('id, question, answer, category')
-        .eq('study_set_id', studySetId)
+        .in('study_set_id', ids)
         .limit(config.maxFlashcards);
 
     // Group by topic
@@ -919,16 +946,17 @@ export async function getFlashcardsForReview(
 // ============================================
 
 export async function getExercisesForReview(
-    studySetId: string,
+    studySetIds: string | string[],
     durationMode: DurationMode,
     subjectType: SubjectType
 ): Promise<AdaptiveExerciseContent> {
     const config = DURATION_CONFIG[durationMode];
+    const ids = Array.isArray(studySetIds) ? studySetIds : [studySetIds];
 
     const { data: exercises } = await supabase
         .from('exercise_templates')
         .select('id, problem_statement, solution, step_by_step_explanation, topic, difficulty, exercise_type')
-        .eq('study_set_id', studySetId)
+        .in('study_set_id', ids)
         .order('difficulty', { ascending: true })
         .limit(config.maxExercises);
 
@@ -962,12 +990,12 @@ export async function getExercisesForReview(
 // ============================================
 
 export async function generateAdaptiveTips(
-    studySetId: string,
+    studySetIds: string | string[],
     durationMode: DurationMode,
     subjectType: SubjectType
 ): Promise<AdaptiveTipsContent> {
     const config = DURATION_CONFIG[durationMode];
-    const { allContent, flashcardContent } = await getStudySetContent(studySetId);
+    const { allContent, flashcardContent } = await getStudySetContent(studySetIds);
 
     const schema = {
         type: Type.OBJECT,
@@ -1112,7 +1140,7 @@ export async function getPhaseContent(
 
 export async function generatePhaseContent(
     sessionId: string,
-    studySetId: string,
+    studySetIds: string | string[],
     phase: PhaseNumber,
     durationMode: DurationMode,
     subjectType?: SubjectType
@@ -1139,27 +1167,27 @@ export async function generatePhaseContent(
     switch (phase) {
         case 1:
             phaseName = 'summary';
-            content = await generateAdaptiveSummary(studySetId, durationMode, subject);
+            content = await generateAdaptiveSummary(studySetIds, durationMode, subject);
             break;
         case 2:
             phaseName = 'phase2';
-            content = await generateAdaptivePhase2(studySetId, durationMode, subject);
+            content = await generateAdaptivePhase2(studySetIds, durationMode, subject);
             break;
         case 3:
             phaseName = 'methodologies';
-            content = await generateAdaptiveMethodologies(studySetId, durationMode, subject);
+            content = await generateAdaptiveMethodologies(studySetIds, durationMode, subject);
             break;
         case 4:
             phaseName = 'flashcards';
-            content = await getFlashcardsForReview(studySetId, durationMode);
+            content = await getFlashcardsForReview(studySetIds, durationMode);
             break;
         case 5:
             phaseName = 'exercises';
-            content = await getExercisesForReview(studySetId, durationMode, subject);
+            content = await getExercisesForReview(studySetIds, durationMode, subject);
             break;
         case 6:
             phaseName = 'tips';
-            content = await generateAdaptiveTips(studySetId, durationMode, subject);
+            content = await generateAdaptiveTips(studySetIds, durationMode, subject);
             break;
         default:
             throw new Error(`Invalid phase: ${phase}`);
