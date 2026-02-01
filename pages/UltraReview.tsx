@@ -21,8 +21,11 @@ import {
     AdaptiveExerciseContent,
     AdaptiveTipsContent,
     CompletionSummary,
+    UltraReviewConfig,
+    SubjectAnalysis,
     getOrCreateSession,
-    startFreshSession,
+    createSessionWithConfig,
+    analyzeSubjectType,
     updateSessionProgress,
     completeSession,
     generatePhaseContent,
@@ -102,9 +105,19 @@ const UltraReviewContent: React.FC = () => {
     const [generatingContent, setGeneratingContent] = useState(false);
     const [studySetName, setStudySetName] = useState('');
     const [showConfig, setShowConfig] = useState(true);
-    const [selectedDuration, setSelectedDuration] = useState<DurationMode>('normal');
     const [showCompletion, setShowCompletion] = useState(false);
     const [completionSummary, setCompletionSummary] = useState<CompletionSummary | null>(null);
+
+    // New Loading State
+    const [loadingStep, setLoadingStep] = useState<'idle' | 'analyzing' | 'creating' | 'generating'>('idle');
+    const [loadingMessage, setLoadingMessage] = useState('');
+
+    // Configuration State
+    const [config, setConfig] = useState<UltraReviewConfig>({
+        durationMode: 'normal',
+        selectedPhases: [1, 2, 3, 4, 5, 6],
+        focusMode: 'all'
+    });
 
     // Adaptive phases from session
     const [phases, setPhases] = useState<PhaseConfig[]>(DEFAULT_PHASES);
@@ -145,43 +158,29 @@ const UltraReviewContent: React.FC = () => {
         const checkExistingSession = async () => {
             if (!user || targetSetIds.length === 0) return;
 
-            const mode = searchParams.get('mode') as DurationMode;
-            if (mode) {
-                // Starting fresh with specified mode
-                setSelectedDuration(mode);
-                setShowConfig(false);
-                const newSession = await startFreshSession(user.id, targetSetIds, mode);
-                setSession(newSession);
-                setCurrentPhase(1);
-                setTimerActive(true);
-                // Set adaptive phases from session
-                if (newSession.generated_content?.phaseConfig) {
-                    setPhases(newSession.generated_content.phaseConfig);
-                }
-                loadPhaseContent(newSession.id, 1, mode);
-            } else {
-                // Check for existing in-progress session
-                const existing = await getOrCreateSession(user.id, targetSetIds);
+            // Check for existing in-progress session
+            const existing = await getOrCreateSession(user.id, targetSetIds);
 
-                if (existing && existing.status === 'in_progress') {
-                    setSession(existing);
-                    setCurrentPhase(existing.current_phase as PhaseNumber);
-                    setSelectedDuration(existing.duration_mode as DurationMode);
-                    setElapsedSeconds(existing.total_time_seconds || 0);
-                    setShowConfig(false);
-                    setTimerActive(true);
-                    // Set adaptive phases from existing session
-                    if (existing.generated_content?.phaseConfig) {
-                        setPhases(existing.generated_content.phaseConfig);
-                    }
-                    loadPhaseContent(existing.id, existing.current_phase as PhaseNumber, existing.duration_mode as DurationMode);
+            if (existing && existing.status === 'in_progress') {
+                setSession(existing);
+                setCurrentPhase(existing.current_phase as PhaseNumber);
+                // Respect saved duration mode
+                setConfig(prev => ({ ...prev, durationMode: existing.duration_mode as DurationMode }));
+
+                setElapsedSeconds(existing.total_time_seconds || 0);
+                setShowConfig(false);
+                setTimerActive(true);
+                // Set adaptive phases from existing session
+                if (existing.generated_content?.phaseConfig) {
+                    setPhases(existing.generated_content.phaseConfig);
                 }
+                loadPhaseContent(existing.id, existing.current_phase as PhaseNumber, existing.duration_mode as DurationMode);
             }
             setLoading(false);
         };
 
         checkExistingSession();
-    }, [user, JSON.stringify(targetSetIds), searchParams]);
+    }, [user, JSON.stringify(targetSetIds)]);
 
     // Timer effect
     useEffect(() => {
@@ -230,6 +229,7 @@ const UltraReviewContent: React.FC = () => {
             }
         } catch (error) {
             console.error('Error loading phase content:', error);
+            alert("Hubo un error generando el contenido. Intenta recargar.");
         } finally {
             setGeneratingContent(false);
         }
@@ -240,21 +240,44 @@ const UltraReviewContent: React.FC = () => {
         if (!user || targetSetIds.length === 0) return;
 
         setShowConfig(false);
-        setLoading(true);
+        setLoading(true); // Keep main loading true to show the progress screen
 
-        const newSession = await startFreshSession(user.id, targetSetIds, selectedDuration);
-        setSession(newSession);
-        setCurrentPhase(1);
-        setElapsedSeconds(0);
-        setTimerActive(true);
+        try {
+            // Updated Flow with Progress Tracking
+            setLoadingStep('analyzing');
+            setLoadingMessage('Analizando tus apuntes para entender el tipo de materia...');
 
-        // Set adaptive phases from session
-        if (newSession.generated_content?.phaseConfig) {
-            setPhases(newSession.generated_content.phaseConfig);
+            const subjectAnalysis = await analyzeSubjectType(targetSetIds);
+
+            setLoadingStep('creating');
+            setLoadingMessage(`Detectado: ${subjectAnalysis.type}. Configurando sesión personalizada...`);
+
+            const newSession = await createSessionWithConfig(user.id, targetSetIds, config, subjectAnalysis);
+            setSession(newSession);
+
+            // Generate first phase
+            setLoadingStep('generating');
+            setLoadingMessage('Generando el resumen inicial y plan de estudio...');
+
+            setCurrentPhase(1);
+            setElapsedSeconds(0);
+            setTimerActive(true);
+
+            // Set adaptive phases from session
+            if (newSession.generated_content?.phaseConfig) {
+                setPhases(newSession.generated_content.phaseConfig);
+            }
+
+            await loadPhaseContent(newSession.id, 1, config.durationMode);
+
+        } catch (error) {
+            console.error("Critical error starting session:", error);
+            setShowConfig(true); // Go back to config
+            alert("No pudimos iniciar la sesión. Por favor verifica tu conexión e intenta de nuevo.");
+        } finally {
+            setLoading(false);
+            setLoadingStep('idle');
         }
-
-        await loadPhaseContent(newSession.id, 1, selectedDuration);
-        setLoading(false);
     };
 
     const handleBack = () => {
@@ -316,13 +339,55 @@ const UltraReviewContent: React.FC = () => {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    // Render loading
+    // Render loading with detailed progress
     if (loading) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-                <div className="text-center text-white">
-                    <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-xl">Preparando Ultra Repaso...</p>
+                <div className="text-center text-white max-w-md px-8 w-full">
+                    <div className="relative w-24 h-24 mx-auto mb-8">
+                        <div className="absolute inset-0 border-4 border-white/10 rounded-full"></div>
+                        <div className="absolute inset-0 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                        <div className="absolute inset-0 flex items-center justify-center text-purple-300">
+                            <span className="material-symbols-outlined text-3xl animate-pulse">
+                                {loadingStep === 'analyzing' ? 'search' :
+                                    loadingStep === 'creating' ? 'architecture' :
+                                        loadingStep === 'generating' ? 'smart_toy' : 'hourglass_top'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <h2 className="text-2xl font-black mb-3">
+                        {loadingStep === 'analyzing' ? 'Analizando tu Contenido' :
+                            loadingStep === 'creating' ? 'Diseñando Estructura' :
+                                loadingStep === 'generating' ? 'Creando Materiales' : 'Cargando...'}
+                    </h2>
+
+                    <p className="text-white/60 mb-8 min-h-[3rem] text-lg font-medium">
+                        {loadingMessage || 'Por favor espera un momento...'}
+                    </p>
+
+                    {/* Progress Steps */}
+                    <div className="grid grid-cols-3 gap-2">
+                        {['analyzing', 'creating', 'generating'].map((step, i) => {
+                            const steps = ['analyzing', 'creating', 'generating'];
+                            const currentIndex = steps.indexOf(loadingStep);
+                            const stepIndex = i;
+                            const isActive = stepIndex === currentIndex;
+                            const isCompleted = stepIndex < currentIndex;
+
+                            return (
+                                <div key={step} className="flex flex-col items-center gap-2">
+                                    <div className={`h-1.5 w-full rounded-full transition-all duration-700 ${isCompleted ? 'bg-emerald-500' :
+                                            isActive ? 'bg-purple-500 animate-pulse' : 'bg-white/10'
+                                        }`}></div>
+                                    <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${isActive || isCompleted ? 'text-white/80' : 'text-white/20'
+                                        }`}>
+                                        {step === 'analyzing' ? 'Análisis' : step === 'creating' ? 'Diseño' : 'IA'}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
         );
@@ -332,61 +397,97 @@ const UltraReviewContent: React.FC = () => {
     if (showConfig) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
-                <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8">
-                    <div className="text-center mb-8">
-                        <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                            <span className="material-symbols-outlined text-white text-4xl">bolt</span>
+                <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 max-h-[90vh] overflow-y-auto">
+                    <div className="text-center mb-6">
+                        <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/30">
+                            <span className="material-symbols-outlined text-white text-3xl">bolt</span>
                         </div>
-                        <h1 className="text-3xl font-black text-slate-800">Ultra Repaso</h1>
-                        <p className="text-slate-500 mt-2">{studySetName}</p>
-                        <p className="text-sm text-slate-400 mt-1">Tu arma secreta para el día antes del examen</p>
+                        <h1 className="text-2xl font-black text-slate-800">Ultra Repaso</h1>
+                        <p className="text-slate-500 mt-1 font-medium">{studySetName}</p>
                     </div>
 
-                    <div className="space-y-4 mb-8">
-                        <p className="text-sm font-bold text-slate-600 mb-2">Elige la duración:</p>
+                    <div className="space-y-6">
+                        {/* Duration Selection */}
+                        <div>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Duración de la Sesión</p>
+                            <div className="grid grid-cols-1 gap-3">
+                                {[
+                                    { mode: 'express', label: 'Express', time: '~15 min', desc: 'Resumen y conceptos vitales', icon: 'speed' },
+                                    { mode: 'normal', label: 'Estándar', time: '~30 min', desc: 'Balance perfecto de teoría y práctica', icon: 'balance' },
+                                    { mode: 'complete', label: 'Profundo', time: '1h+', desc: 'Cobertura exhaustiva de todo', icon: 'all_inclusive' }
+                                ].map(option => (
+                                    <button
+                                        key={option.mode}
+                                        onClick={() => setConfig(prev => ({ ...prev, durationMode: option.mode as DurationMode }))}
+                                        className={`w-full p-3 rounded-xl border-2 transition-all flex items-center gap-3 relative overflow-hidden group ${config.durationMode === option.mode
+                                                ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-600/20'
+                                                : 'border-slate-100 hover:border-purple-200 hover:bg-slate-50'
+                                            }`}
+                                    >
+                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${config.durationMode === option.mode ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-purple-100 group-hover:text-purple-600'
+                                            }`}>
+                                            <span className="material-symbols-outlined text-xl">{option.icon}</span>
+                                        </div>
+                                        <div className="flex-1 text-left">
+                                            <div className="flex items-center justify-between">
+                                                <span className={`font-bold ${config.durationMode === option.mode ? 'text-purple-900' : 'text-slate-700'}`}>
+                                                    {option.label}
+                                                </span>
+                                                <span className={`text-xs font-bold ${config.durationMode === option.mode ? 'text-purple-600' : 'text-slate-400'}`}>
+                                                    {option.time}
+                                                </span>
+                                            </div>
+                                            <div className="text-xs text-slate-500 mt-0.5">{option.desc}</div>
+                                        </div>
+                                        {config.durationMode === option.mode && (
+                                            <div className="absolute right-0 top-0 bottom-0 w-1 bg-purple-600"></div>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
 
-                        {[
-                            { mode: 'express' as DurationMode, label: 'Express', time: '~15 min', desc: 'Lo esencial', icon: 'speed' },
-                            { mode: 'normal' as DurationMode, label: 'Normal', time: '~30 min', desc: 'Balanceado', icon: 'balance' },
-                            { mode: 'complete' as DurationMode, label: 'Completo', time: '1h+', desc: 'Todo el material', icon: 'all_inclusive' }
-                        ].map(option => (
-                            <button
-                                key={option.mode}
-                                onClick={() => setSelectedDuration(option.mode)}
-                                className={`w-full p-4 rounded-xl border-2 transition-all flex items-center gap-4 ${selectedDuration === option.mode
-                                    ? 'border-purple-500 bg-purple-50'
-                                    : 'border-slate-200 hover:border-purple-300'
-                                    }`}
-                            >
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selectedDuration === option.mode ? 'bg-purple-500 text-white' : 'bg-slate-100 text-slate-500'
-                                    }`}>
-                                    <span className="material-symbols-outlined">{option.icon}</span>
-                                </div>
-                                <div className="flex-1 text-left">
-                                    <div className="font-bold text-slate-800">{option.label}</div>
-                                    <div className="text-sm text-slate-500">{option.desc}</div>
-                                </div>
-                                <div className="text-right">
-                                    <div className="text-sm font-bold text-purple-600">{option.time}</div>
-                                </div>
-                            </button>
-                        ))}
+                        {/* Focus Mode Selection (Optional Feature) */}
+                        <div>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Enfoque Principal</p>
+                            <div className="flex bg-slate-100 p-1 rounded-xl">
+                                {[
+                                    { id: 'all', label: 'General' },
+                                    { id: 'exam_prep', label: 'Simulacro Examen' }
+                                ].map(mode => (
+                                    <button
+                                        key={mode.id}
+                                        onClick={() => setConfig(prev => ({ ...prev, focusMode: mode.id as any }))}
+                                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${config.focusMode === mode.id
+                                                ? 'bg-white text-slate-800 shadow-sm'
+                                                : 'text-slate-400 hover:text-slate-600'
+                                            }`}
+                                    >
+                                        {mode.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
-                    <button
-                        onClick={handleStartSession}
-                        className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-lg rounded-xl hover:from-purple-700 hover:to-pink-700 transition shadow-lg flex items-center justify-center gap-2"
-                    >
-                        <span className="material-symbols-outlined">play_arrow</span>
-                        Comenzar Ultra Repaso
-                    </button>
+                    <div className="mt-8 space-y-3">
+                        <button
+                            onClick={handleStartSession}
+                            disabled={loading}
+                            className={`w-full py-4 text-white font-bold text-lg rounded-2xl transition shadow-xl shadow-purple-500/20 flex items-center justify-center gap-3 ${loading ? 'bg-slate-400 cursor-not-allowed' : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:scale-[1.02] active:scale-[0.98]'
+                                }`}
+                        >
+                            <span className="material-symbols-outlined">rocket_launch</span>
+                            {loading ? 'Preparando...' : 'Comenzar Ultra Repaso'}
+                        </button>
 
-                    <button
-                        onClick={handleBack}
-                        className="w-full mt-4 py-3 text-slate-500 font-medium hover:text-slate-700 transition"
-                    >
-                        {isMultiSet ? 'Volver al Dashboard' : 'Volver al Set'}
-                    </button>
+                        <button
+                            onClick={handleBack}
+                            className="w-full py-3 text-slate-400 font-medium hover:text-slate-600 transition text-sm"
+                        >
+                            {isMultiSet ? 'Cancelar y volver al Dashboard' : 'Volver al material de estudio'}
+                        </button>
+                    </div>
                 </div>
             </div>
         );

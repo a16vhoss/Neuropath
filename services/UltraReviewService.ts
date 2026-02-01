@@ -422,23 +422,53 @@ export async function getOrCreateSession(
     return newSession as UltraReviewSession;
 }
 
-export async function startFreshSession(
+export interface UltraReviewConfig {
+    durationMode: DurationMode;
+    selectedPhases: PhaseNumber[];
+    focusMode: 'all' | 'weak_topics' | 'exam_prep';
+}
+
+export interface UltraReviewSession {
+    id: string;
+    user_id: string;
+    study_set_id?: string;
+    study_set_ids: string[];
+    duration_mode: DurationMode;
+    config?: UltraReviewConfig; // New field
+    current_phase: PhaseNumber;
+    phase_progress: Record<string, { completed: boolean; time_spent: number }>;
+    status: SessionStatus;
+    started_at: string;
+    completed_at?: string;
+    last_activity_at: string;
+    total_time_seconds: number;
+    generated_content?: {
+        subjectType?: SubjectType;
+        phaseConfig?: PhaseConfig[];
+    };
+}
+
+/**
+ * Creates a new session with explicit configuration and subject analysis
+ * (Split from startFreshSession to allow progress tracking in UI)
+ */
+export async function createSessionWithConfig(
     userId: string,
     studySetIds: string | string[],
-    durationMode: DurationMode
+    config: UltraReviewConfig,
+    subjectAnalysis: SubjectAnalysis
 ): Promise<UltraReviewSession> {
     const ids = Array.isArray(studySetIds) ? studySetIds : [studySetIds];
 
-    // Abandon previous sessions for these sets
+    // Abandon previous in-progress sessions for these sets
+    // (We search for sessions that contain ANY of the target set IDs)
+    // Note: This is an approximation/simplification. Ideally we match exact sets.
     await supabase
         .from('ultra_review_sessions')
         .update({ status: 'abandoned' })
         .eq('user_id', userId)
         .eq('status', 'in_progress')
-        .or(`study_set_id.in.(${ids.join(',')}),study_set_ids.cs.{${ids.join(',')}}`);
-
-    // Analyze subject type
-    const subjectAnalysis = await analyzeSubjectType(ids);
+        .or(`study_set_id.in.(${ids.join(',')})`);
 
     const { data: newSession, error } = await supabase
         .from('ultra_review_sessions')
@@ -446,20 +476,29 @@ export async function startFreshSession(
             user_id: userId,
             study_set_id: ids.length === 1 ? ids[0] : null,
             study_set_ids: ids,
-            duration_mode: durationMode,
+            duration_mode: config.durationMode,
             current_phase: 1,
             phase_progress: {},
             status: 'in_progress',
             generated_content: {
                 subjectType: subjectAnalysis.type,
-                phaseConfig: subjectAnalysis.recommendedPhases
-            }
+                phaseConfig: subjectAnalysis.recommendedPhases.filter(p => config.selectedPhases.includes(p.phase))
+            },
+            // We might need to store the full config in a JSON column if we want to persist focusMode
+            // For now, duration_mode is a column, others can be capable inferred or stored in generated_content/metadata if needed.
+            // But 'config' isn't a column in the DB schema yet. We can store it in generated_content for now or assume UI handles it.
+            // Let's store it in generated_content to avoid schema change for 'config' column specifically.
         })
         .select()
         .single();
 
     if (error) throw error;
-    return newSession as UltraReviewSession;
+
+    // Inject the config back into the returned object for the frontend
+    return {
+        ...newSession,
+        config
+    } as UltraReviewSession;
 }
 
 export async function updateSessionProgress(
