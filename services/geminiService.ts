@@ -438,7 +438,10 @@ FECHA: ${metadata?.publishedAt || 'N/A'}
     `.trim();
 
     // Check if we have a real transcript or just metadata
-    if (isMetadataOnly || !structuredTranscript || structuredTranscript.length === 0) {
+    // BUG FIX: Check fullTranscriptText (works in dev mode) instead of structuredTranscript
+    const hasTranscript = fullTranscriptText && fullTranscriptText.trim().length > 0 && !isMetadataOnly;
+
+    if (!hasTranscript) {
       console.log('[YouTube] No transcript available, using description only');
 
       // Fallback to old method for metadata-only videos
@@ -463,10 +466,16 @@ FECHA: ${metadata?.publishedAt || 'N/A'}
       };
     }
 
-    // --- CHUNKING STRATEGY FOR LONG VIDEOS (up to 10+ hours) ---
-    console.log(`[YouTube] Processing video with ${structuredTranscript.length} transcript segments`);
 
-    const chunks = chunkTranscript(structuredTranscript, chapters, 18, 45);
+    // --- CHUNKING STRATEGY FOR LONG VIDEOS (up to 10+ hours) ---
+    // BUG FIX: Handle dev mode where structuredTranscript is empty but fullTranscriptText exists
+    const transcriptToChunk = (structuredTranscript && structuredTranscript.length > 0)
+      ? structuredTranscript
+      : [{ offset: 0, duration: 0, text: fullTranscriptText, formattedTime: '0:00' }];
+
+    console.log(`[YouTube] Processing video with ${transcriptToChunk.length} transcript segment(s)`);
+
+    const chunks = chunkTranscript(transcriptToChunk, chapters, 18, 45);
     console.log(`[YouTube] Created ${chunks.length} chunks for processing`);
 
     // --- PROCESS EACH CHUNK ---
