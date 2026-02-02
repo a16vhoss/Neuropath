@@ -314,7 +314,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
             setEditDescription(data.description || '');
 
             // Fetch flashcard progress for mastery display
-            if (user && data.flashcards.length > 0) {
+            if (user && data.flashcards?.length > 0) {
                 const flashcardIds = data.flashcards.map((f: Flashcard) => f.id);
 
                 // Fetch progress (difficulty/mastery)
@@ -343,7 +343,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                     (srsData || []).forEach(d => srsMap.set(d.flashcard_id, d));
 
                     let readyCount = 0;
-                    data.flashcards.forEach((fc: Flashcard) => {
+                    data.flashcards?.forEach((fc: Flashcard) => {
                         const srs = srsMap.get(fc.id);
                         // Condition: No SRS (New) OR No scheduled date (New) OR Due Date <= Now
                         if (!srs || !srs.next_review_at || new Date(srs.next_review_at) <= now) {
@@ -1554,7 +1554,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                                     setGeneratingInfographic(true);
                                                     try {
                                                         // Include materials
-                                                        const materialContents = studySet?.materials
+                                                        const materialContents = (studySet?.materials || [])
                                                             .filter(m => (m.content_text || m.summary || '').trim().length > 10)
                                                             .map(m => ({
                                                                 title: m.name || 'Material sin título',
@@ -1867,7 +1867,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                 {canEdit && (
                                     <button
                                         onClick={handleAutoFlashcards}
-                                        disabled={uploading || studySet.materials.length === 0}
+                                        disabled={uploading || studySet.materials?.length === 0}
                                         className="flex items-center gap-2 bg-emerald-100 text-emerald-700 font-medium px-4 py-2 rounded-xl hover:bg-emerald-200 transition disabled:opacity-50"
                                         title="Generar flashcards de todos los materiales"
                                     >
@@ -1878,7 +1878,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                                 {canEdit && (
                                     <button
                                         onClick={handleAutoCategorize}
-                                        disabled={uploading || studySet.flashcards.length === 0}
+                                        disabled={uploading || studySet.flashcards?.length === 0}
                                         className="flex items-center gap-2 bg-indigo-100 text-indigo-700 font-medium px-4 py-2 rounded-xl hover:bg-indigo-200 transition disabled:opacity-50"
                                         title="Organizar automáticamente con IA"
                                     >
@@ -1898,7 +1898,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                             </div>
                         </div>
 
-                        {studySet.flashcards.length === 0 ? (
+                        {studySet.flashcards?.length === 0 ? (
                             <div className="bg-white rounded-2xl p-12 text-center border border-slate-100">
                                 <span className="material-symbols-outlined text-6xl text-slate-200">style</span>
                                 <p className="mt-4 text-slate-500">No hay flashcards aún</p>
@@ -1906,7 +1906,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                {studySet.flashcards.map((card, index) => {
+                                {studySet.flashcards?.map((card, index) => {
                                     const isAIGenerated = !!card.is_ai_generated;
                                     return (
                                         <div key={card.id} className={`bg-white rounded-xl p-4 border transition ${isAIGenerated ? 'border-emerald-100 border-l-4 border-l-emerald-500 shadow-sm shadow-emerald-50' : 'border-slate-100 hover:shadow-md'}`}>
