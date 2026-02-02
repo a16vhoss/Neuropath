@@ -394,9 +394,18 @@ export const generateStudySetFromContext = async (context: string, count: number
 };
 
 /**
- * Generate Flashcards from YouTube URL
+ * Generate Flashcards from YouTube URL (WITH DEEP CHUNKING)
+ * Handles videos of any length (5-10+ hours) by processing in segments.
+ * 
+ * @param url - YouTube video URL
+ * @param count - Target flashcard count (0 =  auto-scale based on content density)
+ * @param onProgress - Optional callback for progress updates
  */
-export const generateFlashcardsFromYouTubeURL = async (url: string, count: number = 10) => {
+export const generateFlashcardsFromYouTubeURL = async (
+  url: string,
+  count: number = 0,
+  onProgress?: (progress: { current: number; total: number; status: string }) => void
+) => {
   try {
     const result = await getYoutubeTranscript(url);
     if (!result) {
@@ -415,69 +424,171 @@ export const generateFlashcardsFromYouTubeURL = async (url: string, count: numbe
       isMetadataOnly
     } = result;
 
-    // --- DEEP ANALYSIS PROMPT CONSTRUCTION ---
-    let promptContext = "";
+    // Import chunking service dynamically
+    const { chunkTranscript, estimateFlashcardCount, deduplicateFlashcards } = await import('./videoChunkingService');
 
-    // 1. Metadata Header
-    promptContext += `
-      [METADATA DEL VIDEO]
-      TÍTULO: ${title}
-      CANAL: ${metadata?.channelTitle || 'Desconocido'}
-      DURACIÓN: ${metadata?.duration || 'Desconocida'}
-      TAGS: ${metadata?.tags?.join(', ') || 'N/A'}
-      FECHA: ${metadata?.publishedAt || 'N/A'}
-    `.trim() + "\n\n";
+    // --- METADATA HEADER (for all chunks) ---
+    const metadataHeader = `
+[METADATA DEL VIDEO]
+TÍTULO: ${title}
+CANAL: ${metadata?.channelTitle || 'Desconocido'}
+DURACIÓN: ${metadata?.duration || 'Desconocida'}
+TAGS: ${metadata?.tags?.join(', ') || 'N/A'}
+FECHA: ${metadata?.publishedAt || 'N/A'}
+    `.trim();
 
-    // 2. Chapters (if available)
-    if (chapters && chapters.length > 0) {
-      promptContext += `
-      [TABLA DE CONTENIDOS / CAPÍTULOS]
-      ${chapters.map(c => `- ${c.time} ${c.title}`).join('\n')}
-        `.trim() + "\n\n";
+    // Check if we have a real transcript or just metadata
+    if (isMetadataOnly || !structuredTranscript || structuredTranscript.length === 0) {
+      console.log('[YouTube] No transcript available, using description only');
+
+      // Fallback to old method for metadata-only videos
+      let promptContext = metadataHeader + "\n\n";
+
+      if (comments && comments.length > 0) {
+        promptContext += `\n[NOTAS DE LA COMUNIDAD]\n${comments.map((c: string) => `- ${c}`).join('\n')}\n\n`;
+      }
+
+      promptContext += `\n[CONTENIDO (Solo Descripción)]\n${description}\n`;
+
+      const flashcards = await generateStudySetFromContext(promptContext, count || 5);
+      const summary = await generateMaterialSummary(promptContext, 'video');
+
+      return {
+        flashcards,
+        summary: summary || description.slice(0, 1000),
+        videoUrl: url,
+        videoTitle: title,
+        channelName: metadata?.channelTitle || "YouTube",
+        content: promptContext
+      };
     }
 
-    // 3. Community Notes (Comments)
-    if (comments && comments.length > 0) {
-      promptContext += `
-      [NOTAS DE LA COMUNIDAD (Sabiduría Colectiva)]
-      (Usa estos comentarios para identificar puntos clave que la comunidad consideró valiosos o correcciones)
-      ${comments.map(c => `- ${c}`).join('\n')}
-        `.trim() + "\n\n";
+    // --- CHUNKING STRATEGY FOR LONG VIDEOS (up to 10+ hours) ---
+    console.log(`[YouTube] Processing video with ${structuredTranscript.length} transcript segments`);
+
+    const chunks = chunkTranscript(structuredTranscript, chapters, 18, 45);
+    console.log(`[YouTube] Created ${chunks.length} chunks for processing`);
+
+    // --- PROCESS EACH CHUNK ---
+    const allFlashcards: any[] = [];
+    const chunkSummaries: { timeRange: string; summary: string }[] = [];
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+
+      onProgress?.({
+        current: i + 1,
+        total: chunks.length,
+        status: `Analizando segmento ${i + 1}/${chunks.length} (${chunk.startTime} - ${chunk.endTime})...`
+      });
+
+      // Build context for this chunk
+      let chunkContext = metadataHeader + "\n\n";
+
+      if (chapters && chapters.length > 0 && i === 0) {
+        chunkContext += `[TABLA DE CONTENIDOS]\n${chapters.map((c: any) => `- ${c.time} ${c.title}`).join('\n')}\n\n`;
+      }
+
+      if (comments && comments.length > 0 && i === 0) {
+        chunkContext += `[NOTAS DE LA COMUNIDAD]\n${comments.slice(0, 10).map((c: string) => `- ${c}`).join('\n')}\n\n`;
+      }
+
+      chunkContext += `[TRANSCRIPCIÓN - SEGMENTO ${i + 1}/${chunks.length}]\n`;
+      chunkContext += `Tiempo: ${chunk.startTime} - ${chunk.endTime}\n\n`;
+      chunkContext += chunk.text;
+
+      // Estimate optimal flashcard count for this chunk
+      const targetCount = count > 0
+        ? Math.ceil(count / chunks.length) // Distribute fixed count across chunks
+        : estimateFlashcardCount(chunk.text); // Auto-scale based on density
+
+      console.log(`[Chunk ${i + 1}] Generating ${targetCount} flashcards from ${chunk.durationMinutes.toFixed(1)} min segment`);
+
+      // Generate flashcards for this chunk
+      const chunkFlashcards = await generateStudySetFromContext(chunkContext, targetCount);
+
+      // Add time range metadata to each flashcard
+      chunkFlashcards.forEach((fc: any) => {
+        fc.source_timestamp = `${chunk.startTime} - ${chunk.endTime}`;
+      });
+
+      allFlashcards.push(...chunkFlashcards);
+
+      // OPTIMIZATION: Reduce summary API calls based on video length
+      const summaryFrequency = chunks.length <= 15 ? 1 : chunks.length <= 30 ? 2 : 3;
+      const shouldGenerateSummary = (i % summaryFrequency === 0) || (i === chunks.length - 1);
+
+      if (shouldGenerateSummary) {
+        const chunkSummary = await generateContent(`
+Resume este segmento de video educativo (${chunk.startTime} - ${chunk.endTime}):
+
+${chunkContext.slice(0, 30000)}
+
+Incluye:
+- Conceptos principales explicados
+- Definiciones clave
+- Ejemplos o casos mencionados
+- Fórmulas, procedimientos o metodologías
+
+Extensión: 2-4 párrafos detallados.
+        `.trim());
+
+        chunkSummaries.push({
+          timeRange: `${chunk.startTime} - ${chunk.endTime}`,
+          summary: chunkSummary
+        });
+      }
     }
 
-    // 4. Content (Transcript or Description)
-    if (isMetadataOnly || !fullTranscriptText) {
-      promptContext += `
-      [CONTENIDO (Solo Descripción disponible)]
-      ${description}
-      (Nota: Los subtítulos no están disponibles, genera flashcards basadas fuertemente en esta descripción y en lo que puedas inferir de los metadatos y comentarios).
-      `.trim();
-    } else {
-      promptContext += `
-      [TRANSCRIPCIÓN COMPLETA CON TIEMPOS]
-      (Usa las marcas de tiempo [MM:SS] para entender la secuencia lógica y el ritmo de la explicación. inferir contexto visual cuando se diga "aquí", "esto", "en la gráfica" basándote en el tema).
-      ${fullTranscriptText}
-      `.trim();
-    }
+    // --- DEDUPLICATE FLASHCARDS ---
+    onProgress?.({
+      current: chunks.length,
+      total: chunks.length,
+      status: 'Consolidando flashcards y eliminando duplicados...'
+    });
 
-    console.log(`[Deep Analysis] Created context of length ${promptContext.length}`);
+    const uniqueFlashcards = deduplicateFlashcards(allFlashcards);
+    console.log(`[YouTube] Total flashcards: ${allFlashcards.length} → ${uniqueFlashcards.length} (after dedup)`);
 
-    const flashcards = await generateStudySetFromContext(promptContext, count);
+    // --- GENERATE COMPREHENSIVE MASTER SUMMARY ---
+    onProgress?.({
+      current: chunks.length,
+      total: chunks.length,
+      status: 'Generando resumen completo del video...'
+    });
 
-    // Generate comprehensive summary using the new engine
-    // Use the full context (including metadata/comments) for the summary, not just transcript
-    const summaryInput = fullTranscriptText || description;
-    const detailedSummary = await generateMaterialSummary(promptContext, 'video');
+    const masterSummary = await generateContent(`
+Crea un resumen maestro COMPLETO Y DETALLADO de este video educativo.
+
+TÍTULO: ${title}
+CANAL: ${metadata?.channelTitle}
+DURACIÓN: ${metadata?.duration}
+
+RESÚMENES POR SEGMENTOS:
+${chunkSummaries.map((s: any) => `\n[${s.timeRange}]\n${s.summary}`).join('\n\n')}
+
+ESTRUCTURA DEL RESUMEN MAESTRO:
+1. **Introducción**: ¿De qué trata el video? (1-2 párrafos)
+2. **Conceptos Principales**: Lista exhaustiva de todos los conceptos clave explicados
+3. **Contenido Cronológico**: Organiza el contenido por secciones de tiempo, resumiendo qué se explica en cada parte
+4. **Conclusiones y Puntos Clave**: Síntesis final de las ideas más importantes
+
+REQUISITOS:
+- SIN LÍMITE de extensión. Cubre TODO el contenido.
+- Incluye TODOS los conceptos mencionados en los segmentos.
+- Usa listas, subtítulos y estructura clara.
+- Idioma: Español.
+    `.trim(), { maxTokens: 8192 });
 
     const videoTitle = title || "Video de YouTube (" + (new URL(url).searchParams.get('v') || 'ID desconocido') + ")";
 
     return {
-      flashcards,
-      summary: detailedSummary || ((isMetadataOnly || !fullTranscriptText) ? description.slice(0, 1000) : fullTranscriptText.slice(0, 1000) + "..."),
+      flashcards: uniqueFlashcards,
+      summary: masterSummary || fullTranscriptText.slice(0, 2000) + "...",
       videoUrl: url,
       videoTitle,
       channelName: metadata?.channelTitle || "YouTube",
-      content: promptContext // Return full constructed context for vector indexing
+      content: fullTranscriptText || description // Full transcript for vector indexing
     };
 
   } catch (error) {
