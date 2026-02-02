@@ -33,9 +33,14 @@ export interface AnnotatedTranscript {
 }
 
 const formatTime = (seconds: number): string => {
-    const min = Math.floor(seconds / 60);
-    const sec = Math.floor(seconds % 60);
-    return `[${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}]`;
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+
+    if (h > 0) {
+        return `[${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}]`;
+    }
+    return `[${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}]`;
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -45,6 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Missing videoId parameter' });
     }
 
+    // Handle array or string videoId
     const id = Array.isArray(videoId) ? videoId[0] : videoId;
     console.log(`[YouTubeProxy] Processing: ${id}`);
 
@@ -60,9 +66,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         // LAYER 0: YouTube Data API v3 (Metadata + Comments)
         try {
+            // ... (Metadata extraction logic remains same, skipping for brevity in this replacement if possible, but replace needs context)
+            // Re-implementing snippet fetching for safety as I'm replacing a large block
             console.log('[YouTubeProxy] Attempting YouTube Data API v3...');
-
-            // 1. Get Video Details (Snippet, ContentDetails, Statistics)
             const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?id=${id}&key=${YOUTUBE_API_KEY}&part=snippet,contentDetails,statistics`;
             const apiRes = await fetch(detailsUrl);
 
@@ -78,43 +84,65 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         channelTitle: snippet.channelTitle,
                         publishedAt: snippet.publishedAt,
                         tags: snippet.tags || [],
-                        duration: item.contentDetails?.duration, // ISO 8601 format (PT15M33S)
+                        duration: item.contentDetails?.duration,
                         viewCount: item.statistics?.viewCount
                     };
                     console.log('[YouTubeProxy] API v3 Metadata Extracted Success');
                 }
-            } else {
-                console.warn('[YouTubeProxy] API v3 details failed:', apiRes.status);
             }
 
-            // 2. Get Top Comments ("Collective Wisdom")
+            // 2. Get Top Comments
             const commentsUrl = `https://www.googleapis.com/youtube/v3/commentThreads?videoId=${id}&key=${YOUTUBE_API_KEY}&part=snippet&order=relevance&maxResults=5`;
             const commentsRes = await fetch(commentsUrl);
-
             if (commentsRes.ok) {
                 const cData = await commentsRes.json();
                 comments = cData.items?.map((item: any) => {
                     const snippet = item.snippet.topLevelComment.snippet;
                     return `"${snippet.textDisplay}" (Likes: ${snippet.likeCount})`;
                 }) || [];
-                console.log(`[YouTubeProxy] Extracted ${comments.length} top comments`);
             }
-
         } catch (apiErr) {
             console.warn('[YouTubeProxy] API v3 Exception:', apiErr);
         }
 
-        // LAYER 1: Transcript Extraction
+        // LAYER 1: Transcript Extraction with Language Fallbacks
         try {
-            const items = await YoutubeTranscript.fetchTranscript(id);
-            transcriptItems = items.map(i => ({
+            console.log('[YouTubeProxy] Fetching transcript...');
+
+            // Helper to map items
+            const mapItems = (items: any[]) => items.map(i => ({
                 offset: i.offset,
                 duration: i.duration,
                 text: i.text,
                 formattedTime: formatTime(i.offset / 1000)
             }));
+
+            try {
+                // Attempt 1: Auto-detect (default)
+                const items = await YoutubeTranscript.fetchTranscript(id);
+                transcriptItems = mapItems(items);
+                console.log(`[YouTubeProxy] Transcript found (Auto): ${items.length} lines`);
+            } catch (err1) {
+                console.warn('[YouTubeProxy] Auto transcript failed, trying Spanish...');
+                try {
+                    // Attempt 2: Spanish explicit
+                    const items = await YoutubeTranscript.fetchTranscript(id, { lang: 'es' });
+                    transcriptItems = mapItems(items);
+                    console.log(`[YouTubeProxy] Transcript found (ES): ${items.length} lines`);
+                } catch (err2) {
+                    console.warn('[YouTubeProxy] Spanish transcript failed, trying English...');
+                    try {
+                        // Attempt 3: English explicit
+                        const items = await YoutubeTranscript.fetchTranscript(id, { lang: 'en' });
+                        transcriptItems = mapItems(items);
+                        console.log(`[YouTubeProxy] Transcript found (EN): ${items.length} lines`);
+                    } catch (err3) {
+                        console.warn('[YouTubeProxy] All transcript attempts failed:', err3);
+                    }
+                }
+            }
         } catch (libErr) {
-            console.warn('[YouTubeProxy] Transcript fetch failed:', libErr);
+            console.warn('[YouTubeProxy] Transcript fetch system error:', libErr);
         }
 
         // LAYER 2: Chapter Parsing from Description
