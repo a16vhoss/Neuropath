@@ -282,11 +282,11 @@ const UltraReviewContent: React.FC = () => {
 
     const handleBack = () => {
         if (isMultiSet) {
-            navigate('/student/dashboard');
+            navigate('/student');
         } else if (studySetId && studySetId !== 'undefined') {
             navigate(`/student/set/${studySetId}`);
         } else {
-            navigate('/student/dashboard');
+            navigate('/student');
         }
     };
 
