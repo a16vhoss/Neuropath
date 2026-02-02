@@ -7,12 +7,39 @@ const AuthPage: React.FC = () => {
     const navigate = useNavigate();
     const { signIn, signUp, loading, user, profile } = useAuth();
 
-    // Redirect if already logged in
+    const [connectionStatus, setConnectionStatus] = useState<'checking' | 'ok' | 'error'>('checking');
+    const [connectionErrorDetails, setConnectionErrorDetails] = useState('');
+
     useEffect(() => {
         if (user && profile) {
             navigate(profile.role === 'teacher' ? '/teacher' : '/student', { replace: true });
         }
     }, [user, profile, navigate]);
+
+    // Diagnostic check for Supabase connection
+    useEffect(() => {
+        const checkConnection = async () => {
+            try {
+                // Method 1: Simple fetch to seeing if domain resolves/reachable (expecting 404 but connection success)
+                const url = import.meta.env.VITE_SUPABASE_URL || 'https://szcsttpuckqpjndadqbk.supabase.co';
+                console.log('Testing connection to:', url);
+
+                try {
+                    await fetch(url + '/rest/v1/', { method: 'HEAD', headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6Y3N0dHB1Y2txcGpuZGFkcWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MjcxNzEsImV4cCI6MjA4NDEwMzE3MX0.jkySnMjg16zyejivMhhtxgdnPecs7W8nGbNYTxfeFOo' } });
+                    setConnectionStatus('ok');
+                } catch (fetchErr: any) {
+                    console.error('Fetch check failed:', fetchErr);
+                    setConnectionStatus('error');
+                    setConnectionErrorDetails(`Browser blocked connection to Supabase. Check AdBlocker/Firewall. (${fetchErr.message})`);
+                }
+            } catch (err: any) {
+                setConnectionStatus('error');
+                setConnectionErrorDetails(err.message);
+            }
+        };
+
+        checkConnection();
+    }, []);
 
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
@@ -58,7 +85,11 @@ const AuthPage: React.FC = () => {
             }
         } catch (err: any) {
             console.error('Auth error:', err);
-            setError(err.message || 'Error al procesar la solicitud');
+            let message = err.message || 'Error al procesar la solicitud';
+            if (message.includes('Failed to fetch')) {
+                message = 'Error de conexión. Verifica tu internet o si un AdBlocker está bloqueando Supabase.';
+            }
+            setError(message);
         } finally {
             setSubmitting(false);
         }
@@ -96,6 +127,15 @@ const AuthPage: React.FC = () => {
 
                 {/* Auth Card */}
                 <div className="bg-white rounded-3xl shadow-2xl p-8">
+                    {/* Connection Error Banner */}
+                    {connectionStatus === 'error' && (
+                        <div className="bg-rose-100 border-l-4 border-rose-500 text-rose-700 p-4 mb-6 rounded-r" role="alert">
+                            <p className="font-bold">Error de Conexión Detectado</p>
+                            <p className="text-sm">{connectionErrorDetails}</p>
+                            <p className="text-xs mt-2 italic">Intenta desactivar AdBlockers o VPNs.</p>
+                        </div>
+                    )}
+
                     {/* Tabs */}
                     <div className="flex bg-slate-100 p-1 rounded-xl mb-8">
                         <button

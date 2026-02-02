@@ -545,22 +545,30 @@ export async function completeSession(sessionId: string, totalTimeSeconds: numbe
 async function getStudySetContent(studySetIds: string | string[]) {
     const ids = Array.isArray(studySetIds) ? studySetIds : [studySetIds];
 
+    // First, get study set metadata
+    const { data: studySets } = await supabase
+        .from('study_sets')
+        .select('id, name, description, topics')
+        .in('id', ids);
+
+    const studySetMap = new Map(studySets?.map(s => [s.id, s]) || []);
+
     const [materials, notebooks, flashcards, exercises] = await Promise.all([
         supabase
             .from('study_set_materials')
-            .select('name, content_text, summary')
+            .select('study_set_id, name, content_text, summary')
             .in('study_set_id', ids),
         supabase
             .from('notebooks')
-            .select('title, content, last_saved_content')
+            .select('study_set_id, title, content, last_saved_content')
             .in('study_set_id', ids),
         supabase
             .from('flashcards')
-            .select('id, question, answer, category')
+            .select('study_set_id, id, question, answer, category')
             .in('study_set_id', ids),
         supabase
             .from('exercise_templates')
-            .select('id, problem_statement, solution, step_by_step_explanation, exercise_type, topic, difficulty')
+            .select('study_set_id, id, problem_statement, solution, step_by_step_explanation, exercise_type, topic, difficulty')
             .in('study_set_id', ids)
     ]);
 
@@ -581,37 +589,73 @@ async function getStudySetContent(studySetIds: string | string[]) {
             .trim();
     };
 
-    let allContent = '';
+    // Organize content by study set
+    const contentBySet = ids.map(setId => {
+        const studySet = studySetMap.get(setId);
+        const setMaterials = materials.data?.filter(m => m.study_set_id === setId) || [];
+        const setNotebooks = notebooks.data?.filter(n => n.study_set_id === setId) || [];
+        const setFlashcards = flashcards.data?.filter(f => f.study_set_id === setId) || [];
+        const setExercises = exercises.data?.filter(e => e.study_set_id === setId) || [];
 
-    if (materials.data) {
-        materials.data.forEach(m => {
-            allContent += `\n\n--- Material: ${m.name} ---\n`;
-            if (m.content_text) allContent += m.content_text;
-            if (m.summary) allContent += `\nResumen: ${m.summary}`;
+        let setContent = '';
+
+        setMaterials.forEach(m => {
+            setContent += `\\n\\n--- Material: ${m.name} ---\\n`;
+            if (m.content_text) setContent += m.content_text;
+            if (m.summary) setContent += `\\nResumen: ${m.summary}`;
         });
-    }
 
-    if (notebooks.data) {
-        notebooks.data.forEach(n => {
+        setNotebooks.forEach(n => {
             const text = extractTextFromHtml(n.content || n.last_saved_content || '');
             if (text) {
-                allContent += `\n\n--- Cuaderno: ${n.title} ---\n${text}`;
+                setContent += `\\n\\n--- Cuaderno: ${n.title} ---\\n${text}`;
             }
         });
-    }
 
-    let flashcardContent = '';
-    if (flashcards.data && flashcards.data.length > 0) {
-        flashcardContent = flashcards.data
-            .map(f => `P: ${f.question}\nR: ${f.answer}`)
-            .join('\n\n');
-    }
+        const setFlashcardContent = setFlashcards
+            .map(f => `P: ${f.question}\\nR: ${f.answer}`)
+            .join('\\n\\n');
+
+        return {
+            setId,
+            setName: studySet?.name || 'Set Desconocido',
+            setTopics: studySet?.topics || [],
+            setDescription: studySet?.description || '',
+            content: setContent,
+            flashcardContent: setFlashcardContent,
+            materialCount: setMaterials.length,
+            notebookCount: setNotebooks.length,
+            flashcardCount: setFlashcards.length,
+            exerciseCount: setExercises.length
+        };
+    });
+
+    // Build the combined content with CLEAR set separation and headers
+    let allContent = '';
+    let allFlashcardContent = '';
+
+    contentBySet.forEach((setData, index) => {
+        const separator = '='.repeat(80);
+        allContent += `\\n\\n${separator}\\nSET ${index + 1} DE ${contentBySet.length}: ${setData.setName.toUpperCase()}\\n`;
+        allContent += `TEMAS: ${setData.setTopics.join(', ') || 'N/A'}\\n`;
+        allContent += `DESCRIPCIÓN: ${setData.setDescription}\\n`;
+        allContent += `CONTENIDO: ${setData.materialCount} materiales, ${setData.notebookCount} cuadernos, ${setData.flashcardCount} flashcards\\n`;
+        allContent += `${separator}\\n`;
+        allContent += setData.content;
+
+        if (setData.flashcardContent) {
+            allFlashcardContent += `\\n\\n--- FLASHCARDS DE: ${setData.setName} ---\\n`;
+            allFlashcardContent += setData.flashcardContent;
+        }
+    });
 
     return {
-        allContent: allContent.slice(0, 100000),
+        allContent: allContent.slice(0, 150000), // Increased limit
         flashcards: flashcards.data || [],
         exercises: exercises.data || [],
-        flashcardContent
+        flashcardContent: allFlashcardContent,
+        contentBySet, // Return structured data for balanced processing
+        setCount: ids.length
     };
 }
 
@@ -625,7 +669,7 @@ export async function generateAdaptiveSummary(
     subjectType: SubjectType
 ): Promise<AdaptiveSummaryContent> {
     const config = DURATION_CONFIG[durationMode];
-    const { allContent, flashcardContent } = await getStudySetContent(studySetIds);
+    const { allContent, flashcardContent, contentBySet, setCount } = await getStudySetContent(studySetIds);
 
     const schema = {
         type: Type.OBJECT,
@@ -661,11 +705,29 @@ export async function generateAdaptiveSummary(
         general: 'Analiza el contenido y extrae los conceptos más importantes de forma estructurada.'
     };
 
+    // Build set summary for explicit coverage requirement
+    const setSummary = contentBySet?.map((set, idx) =>
+        `SET ${idx + 1}: "${set.setName}" (${set.flashcardCount} flashcards, ${set.materialCount + set.notebookCount} documentos)`
+    ).join('\n') || '';
+
+    const balancedCoverageInstruction = setCount > 1 ? `
+⚠️ CRÍTICO - BALANCE DE SETS:
+Tienes ${setCount} SETS DIFERENTES que cubrir. DEBES incluir contenido de TODOS Y CADA UNO de los sets:
+${setSummary}
+
+REGLA OBLIGATORIA: Distribuye las ${config.summaryMaxSections} secciones PROPORCIONALMENTE entre los ${setCount} sets.
+- Aproximadamente ${Math.ceil(config.summaryMaxSections / setCount)} secciones por set como MÍNIMO.
+- NO te enfoques solo en un set o dejes alguno sin cubrir.
+- Si un set tiene menos contenido, igualmente incluye sus conceptos clave.
+- Identifica cada sección con el nombre del set del que proviene.
+` : '';
+
     const prompt = `
 Eres el MEJOR profesor preparando a un estudiante para sacar 90+ en su examen de MAÑANA.
 Genera un resumen COMPLETO y PERFECTO que cubra TODA la teoría.
 
 ${subjectContext[subjectType]}
+${balancedCoverageInstruction}
 
 MATERIAL COMPLETO DEL ESTUDIANTE:
 ${allContent}
@@ -717,7 +779,7 @@ export async function generateAdaptivePhase2(
     subjectType: SubjectType
 ): Promise<AdaptivePhase2Content> {
     const config = DURATION_CONFIG[durationMode];
-    const { allContent, flashcardContent } = await getStudySetContent(studySetIds);
+    const { allContent, flashcardContent, contentBySet, setCount } = await getStudySetContent(studySetIds);
 
     const phase2Config: Record<SubjectType, { type: string; title: string; instruction: string }> = {
         mathematical: {
@@ -793,35 +855,42 @@ export async function generateAdaptivePhase2(
         required: ['type', 'title', 'categories']
     };
 
+    const balancedCoverageInstruction = setCount > 1 ? `
+⚠️ IMPORTANTE: Estás trabajando con ${setCount} SETS diferentes:
+${contentBySet?.map((s, i) => `  - SET ${i + 1}: ${s.setName}`).join('\\n')}
+Asegúrate de incluir elementos de TODOS los sets proporcionalmente.
+` : '';
+
     const prompt = `
 Genera un CHEAT SHEET PERFECTO para el día antes del examen.
 Tipo de materia: ${subjectType}
 
+${balancedCoverageInstruction}
 ${phaseConfig.instruction}
 
 MATERIAL:
-${allContent}
+        ${allContent}
 
 FLASHCARDS:
-${flashcardContent}
+        ${flashcardContent}
 
 INSTRUCCIONES:
-1. Agrupa por categorías/temas lógicos
+        1. Agrupa por categorías / temas lógicos
 2. Máximo ${config.maxPhase2Items} elementos en total
 3. Cada elemento debe tener:
-   - name: Nombre descriptivo
-   - content: El contenido principal (fórmula, fecha, código, regla, etc.)
-   - explanation: Explicación clara y concisa
-   - example: Un ejemplo de aplicación (cuando aplique)
-   - whenToUse: Cuándo usar esto (si aplica)
-   - commonMistake: Error común a evitar (si hay uno relevante)
+        - name: Nombre descriptivo
+    - content: El contenido principal(fórmula, fecha, código, regla, etc.)
+    - explanation: Explicación clara y concisa
+    - example: Un ejemplo de aplicación(cuando aplique)
+    - whenToUse: Cuándo usar esto(si aplica)
+    - commonMistake: Error común a evitar(si hay uno relevante)
 4. PRIORIZA lo que más probablemente pregunten en el examen
 5. Si no hay contenido de este tipo, genera los puntos clave más importantes
 
 Responde con type: "${phaseConfig.type}" y title: "${phaseConfig.title}"
 
 Idioma: Español
-`;
+        `;
 
     try {
         const result = await generateWithGemini(prompt, schema, 0.4);
@@ -917,25 +986,25 @@ Tipo de materia: ${subjectType}
 ${methConfig.instruction}
 
 MATERIAL DEL CURSO:
-${allContent.slice(0, 50000)}
+        ${allContent.slice(0, 50000)}
 
 EJERCICIOS DE EJEMPLO:
-${exerciseContext}
+        ${exerciseContext}
 
 INSTRUCCIONES:
-1. Identifica TODOS los tipos de problemas/preguntas que pueden aparecer
+        1. Identifica TODOS los tipos de problemas / preguntas que pueden aparecer
 2. Para cada tipo incluye:
-   - situationType: Nombre del tipo de problema
-   - description: Cuándo aplica esta metodología
-   - steps: Pasos EXACTOS y CLAROS (que se puedan seguir sin pensar)
-   - tips: Consejos para no equivocarse
-   - example: Un ejemplo breve
-   - commonErrors: Errores típicos y cómo evitarlos
+        - situationType: Nombre del tipo de problema
+    - description: Cuándo aplica esta metodología
+    - steps: Pasos EXACTOS y CLAROS(que se puedan seguir sin pensar)
+    - tips: Consejos para no equivocarse
+    - example: Un ejemplo breve
+    - commonErrors: Errores típicos y cómo evitarlos
 3. Máximo ${config.maxMethodologies} metodologías
 4. Los pasos deben ser lo suficientemente detallados para seguirlos mecánicamente
 
 Idioma: Español
-`;
+        `;
 
     try {
         const result = await generateWithGemini(prompt, schema, 0.5);
@@ -1034,7 +1103,7 @@ export async function generateAdaptiveTips(
     subjectType: SubjectType
 ): Promise<AdaptiveTipsContent> {
     const config = DURATION_CONFIG[durationMode];
-    const { allContent, flashcardContent } = await getStudySetContent(studySetIds);
+    const { allContent, flashcardContent, contentBySet, setCount } = await getStudySetContent(studySetIds);
 
     const schema = {
         type: Type.OBJECT,
@@ -1080,46 +1149,53 @@ export async function generateAdaptiveTips(
         general: 'Estrategias generales: leer todo antes de empezar, gestionar tiempo, revisar respuestas.'
     };
 
+    const balancedCoverageInstruction = setCount > 1 ? `
+⚠️ CRÍTICO: El estudiante estudió ${setCount} SETS diferentes:
+${contentBySet?.map((s, i) => `  ${i + 1}. ${s.setName}`).join('\\n')}
+Asegúrate de dar tips y errores comunes que cubran TODOS los sets, no solo uno.
+` : '';
+
     const prompt = `
 Genera TIPS PERFECTOS para que el estudiante NO cometa errores en su examen de mañana.
 Tipo de materia: ${subjectType}
 
+${balancedCoverageInstruction}
 Contexto específico: ${tipsContext[subjectType]}
 
 CONTENIDO DEL CURSO:
-${allContent.slice(0, 40000)}
+        ${allContent.slice(0, 40000)}
 
 FLASHCARDS:
-${flashcardContent.slice(0, 10000)}
+        ${flashcardContent.slice(0, 10000)}
 
 GENERA:
 
-1. ERRORES COMUNES (${config.maxMistakes} errores):
-   - mistake: El error específico que cometen los estudiantes
-   - correction: La forma correcta
-   - howToAvoid: Cómo asegurarse de no cometerlo
-   - frequency: "very-common", "common", u "occasional"
+        1. ERRORES COMUNES(${config.maxMistakes} errores):
+        - mistake: El error específico que cometen los estudiantes
+    - correction: La forma correcta
+    - howToAvoid: Cómo asegurarse de no cometerlo
+    - frequency: "very-common", "common", u "occasional"
 
-2. ESTRATEGIAS DE EXAMEN (5-8):
-   - strategy: La estrategia específica
-   - whenToUse: Cuándo aplicarla
+2. ESTRATEGIAS DE EXAMEN(5 - 8):
+        - strategy: La estrategia específica
+    - whenToUse: Cuándo aplicarla
 
-3. RECORDATORIOS DE ÚLTIMA HORA (8-12):
-   - Cosas específicas del contenido que suelen olvidarse
-   - Detalles cruciales
-   - "No olvides que..."
+3. RECORDATORIOS DE ÚLTIMA HORA(8 - 12):
+        - Cosas específicas del contenido que suelen olvidarse
+    - Detalles cruciales
+    - "No olvides que..."
 
-4. GESTIÓN DEL TIEMPO (4-6):
-   - Cómo distribuir el tiempo en el examen
-   - Qué hacer si te atascas
+4. GESTIÓN DEL TIEMPO(4 - 6):
+        - Cómo distribuir el tiempo en el examen
+    - Qué hacer si te atascas
 
-5. MENSAJES DE CONFIANZA (3-5):
-   - Recordatorios positivos para antes del examen
-   - Por qué el estudiante está preparado
+5. MENSAJES DE CONFIANZA(3 - 5):
+        - Recordatorios positivos para antes del examen
+    - Por qué el estudiante está preparado
 
-Sé MUY ESPECÍFICO al contenido del curso. No des consejos genéricos.
-Idioma: Español
-`;
+Sé MUY ESPECÍFICO al contenido del curso.No des consejos genéricos.
+        Idioma: Español
+        `;
 
     try {
         const result = await generateWithGemini(prompt, schema, 0.6);
@@ -1287,7 +1363,7 @@ export async function getCompletionSummary(sessionId: string): Promise<Completio
     const subjectType = session?.generated_content?.subjectType || 'general';
 
     return {
-        totalTime: `${minutes}:${seconds.toString().padStart(2, '0')}`,
+        totalTime: `${minutes}: ${seconds.toString().padStart(2, '0')}`,
         phasesCompleted: 6,
         conceptsReviewed,
         flashcardsReviewed,
