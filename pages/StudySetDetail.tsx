@@ -297,9 +297,11 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
     };
 
     useEffect(() => {
-        if (studySetId) {
+        if (studySetId && studySetId !== 'undefined') {
             loadStudySet();
             fetchNotebooks(); // Load notebooks for bot context
+        } else {
+            setLoading(false);
         }
     }, [studySetId]);
 

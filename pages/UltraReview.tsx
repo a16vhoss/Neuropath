@@ -283,7 +283,7 @@ const UltraReviewContent: React.FC = () => {
     const handleBack = () => {
         if (isMultiSet) {
             navigate('/student/dashboard');
-        } else if (studySetId) {
+        } else if (studySetId && studySetId !== 'undefined') {
             navigate(`/student/set/${studySetId}`);
         } else {
             navigate('/student/dashboard');
@@ -378,7 +378,7 @@ const UltraReviewContent: React.FC = () => {
                             return (
                                 <div key={step} className="flex flex-col items-center gap-2">
                                     <div className={`h-1.5 w-full rounded-full transition-all duration-700 ${isCompleted ? 'bg-emerald-500' :
-                                            isActive ? 'bg-purple-500 animate-pulse' : 'bg-white/10'
+                                        isActive ? 'bg-purple-500 animate-pulse' : 'bg-white/10'
                                         }`}></div>
                                     <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${isActive || isCompleted ? 'text-white/80' : 'text-white/20'
                                         }`}>
@@ -420,8 +420,8 @@ const UltraReviewContent: React.FC = () => {
                                         key={option.mode}
                                         onClick={() => setConfig(prev => ({ ...prev, durationMode: option.mode as DurationMode }))}
                                         className={`w-full p-3 rounded-xl border-2 transition-all flex items-center gap-3 relative overflow-hidden group ${config.durationMode === option.mode
-                                                ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-600/20'
-                                                : 'border-slate-100 hover:border-purple-200 hover:bg-slate-50'
+                                            ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-600/20'
+                                            : 'border-slate-100 hover:border-purple-200 hover:bg-slate-50'
                                             }`}
                                     >
                                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${config.durationMode === option.mode ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-purple-100 group-hover:text-purple-600'
@@ -459,8 +459,8 @@ const UltraReviewContent: React.FC = () => {
                                         key={mode.id}
                                         onClick={() => setConfig(prev => ({ ...prev, focusMode: mode.id as any }))}
                                         className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${config.focusMode === mode.id
-                                                ? 'bg-white text-slate-800 shadow-sm'
-                                                : 'text-slate-400 hover:text-slate-600'
+                                            ? 'bg-white text-slate-800 shadow-sm'
+                                            : 'text-slate-400 hover:text-slate-600'
                                             }`}
                                     >
                                         {mode.label}
