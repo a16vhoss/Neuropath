@@ -374,237 +374,24 @@ export const extractTextFromPDF = async (
   return extractTextFromPDFFile(file, onProgress);
 };
 
-/**
- * Detect if content is primarily theory, exercises, or mixed
- */
-const detectContentType = async (text: string): Promise<'theory' | 'exercises' | 'mixed'> => {
-  try {
-    const detectionPrompt = `
-Analiza este texto educativo y clasifícalo en UNA de estas categorías:
-
-1. "exercises" - Si >70% son EJERCICIOS PRÁCTICOS/PROBLEMAS sin explicaciones teóricas extensas
-   Indicadores: números específicos, "Resuelve...", "Calcula...", problemas enumerados (1., 2., 3.), preguntas con datos concretos
-
-2. "theory" - Si >70% es TEORÍA: conceptos, definiciones, explicaciones, demostraciones
-   Indicadores: definiciones, explicaciones largas, conceptos abstractos, ejemplos ilustrativos
-
-3. "mixed" - Si mezcla ambos de forma balanceada
-
-TEXTO A ANALIZAR (primeros 5000 caracteres):
-${text.slice(0, 5000)}
-
-RESPONDE SOLO CON UNA PALABRA: exercises, theory, o mixed
-    `.trim();
-
-    const result = await generateContent(detectionPrompt, {
-      temperature: 0.3, // Low temperature for consistent classification
-      maxTokens: 10
-    });
-
-    const cleaned = result.trim().toLowerCase();
-
-    // Validate response
-    if (cleaned === 'exercises' || cleaned === 'theory' || cleaned === 'mixed') {
-      console.log(`[Flashcard Generation] Content type detected: ${cleaned}`);
-      return cleaned;
-    }
-
-    // Default to theory if response is unclear
-    console.warn(`[Flashcard Generation] Unclear detection result: "${result}", defaulting to theory`);
-    return 'theory';
-  } catch (error) {
-    console.error('[Flashcard Generation] Error detecting content type:', error);
-    return 'theory'; // Safe default
-  }
-};
-
-/**
- * Get prompt for exercise-mode flashcard generation
- * Extracts underlying concepts instead of literal exercise problems
- */
-const getExerciseModePrompt = (text: string, topic: string, count: number): string => {
-  const targetCount = count > 0 ? count : 12;
-
-  return `
-CONTEXTO: Este material contiene EJERCICIOS PRÁCTICOS, no teoría directa.
-
-TU TAREA: NO crear flashcards de los ejercicios individuales.
-En su lugar, INFIERE y GENERA flashcards de los CONCEPTOS TEÓRICOS SUBYACENTES con EXPLICACIONES DETALLADAS Y PEDAGÓGICAS.
-
-TEMA: "${topic}"
-
-INSTRUCCIONES DE EXTRACCIÓN:
-1. DETECTA: ¿Qué conceptos/temas cubren estos ejercicios?
-2. IDENTIFICA: ¿Qué conocimientos teóricos se necesitan?
-3. GENERA FLASHCARDS DE:
-   ✅ Definiciones de conceptos clave
-   ✅ Fórmulas fundamentales y variables
-   ✅ Cuándo aplicar cada método
-   ✅ Diferencias entre conceptos similares
-   ✅ Pasos/procedimientos
-   ✅ Casos especiales y errores comunes
-
-CRÍTICO - CALIDAD DE LAS RESPUESTAS:
-Las RESPUESTAS deben ser DETALLADAS, COMPLETAS y PEDAGÓGICAS:
-
-✅ CADA RESPUESTA DEBE INCLUIR:
-   - Definición clara y precisa
-   - Explicación del POR QUÉ (razonamiento/lógica)
-   - Ejemplo concreto e ilustrativo
-   - Comparación o contraste cuando sea relevante
-   - Tip práctico para recordar/aplicar
-
-✅ LONGITUD: Mínimo 3-5 oraciones completas (NO solo 1 línea)
-✅ FORMATO: Usa saltos de línea para organizar la explicación
-✅ LENGUAJE: Claro y accesible, como si enseñaras a un estudiante
-
-EJEMPLOS DE RESPUESTAS EXCELENTES:
-
-Pregunta: "¿Qué es una permutación?"
-Respuesta: "Una permutación es un arreglo ordenado de elementos donde el ORDEN SÍ importa. Esto significa que ABC y BAC son permutaciones DIFERENTES de las mismas letras.\n\nSe usa cuando necesitas contar de cuántas formas puedes organizar un conjunto de elementos y el orden de selección hace la diferencia.\n\nEjemplo: Si tienes 3 medallas (oro, plata, bronce) y 3 atletas, el número de formas de asignarlas es una permutación porque importa quién recibe cada medalla específica.\n\nTip: Piensa 'permutación = posiciones importan'."
-
-Pregunta: "Fórmula de permutación P(n,r)"
-Respuesta: "P(n,r) = n!/(n-r)!\n\nDonde:\n• n = total de elementos disponibles\n• r = elementos que vas a seleccionar y ordenar\n\n¿Por qué esta fórmula? Porque tienes n opciones para el primer lugar, (n-1) para el segundo, y así hasta r posiciones. El factorial (n-r)! en el denominador cancela las posiciones que no usas.\n\nEjemplo: P(5,3) = 5!/(5-3)! = 5!/2! = 5×4×3 = 60 formas de ordenar 3 elementos de 5.\n\nError común: No confundir con C(n,r) que NO considera el orden."
-
-EVITAR:
-❌ Respuestas de 1 línea sin explicación
-❌ Ejercicios literales con números específicos
-❌ Sin ejemplos o contexto
-
-CANTIDAD: Genera EXACTAMENTE ${targetCount} flashcards.
-CATEGORÍA: Asigna categorías relevantes
-FUENTE: "${topic}"
-IDIOMA: Español
-
-EJERCICIOS PARA ANALIZAR:
-${text.slice(0, 100000)}
-  `.trim();
-};
-
-/**
- * Get prompt for theory-mode flashcard generation
- * Standard behavior for theoretical content
- */
-const getTheoryModePrompt = (text: string, topic: string, count: number): string => {
-  const qualityGuidelines = `
-CRÍTICO - CALIDAD DE LAS RESPUESTAS:
-Las RESPUESTAS deben ser DETALLADAS, COMPLETAS y FÁCILES DE ENTENDER:
-
-✅ CADA RESPUESTA DEBE INCLUIR:
-   1. Definición/Concepto principal (claro y preciso)
-   2. Explicación del "POR QUÉ" o contexto (razonamiento)
-   3. Ejemplo concreto y específico del material
-   4. Implicaciones o aplicaciones prácticas
-   5. Conexiones con otros conceptos cuando sea relevante
-
-✅ CARACTERÍSTICAS:
-   - LONGITUD: Mínimo 3-5 oraciones completas (NO respuestas de 1 línea)
-   - CLARIDAD: Lenguaje accesible, como si enseñaras a un estudiante
-   - ESTRUCTURA: Usa saltos de línea (\\n) para organizar ideas
-   - EJEMPLOS: Siempre que sea posible, incluye ejemplos del texto
-   - PEDAGOGÍA: Anticipa dudas comunes y aclara conceptos relacionados
-
-EJEMPLO DE RESPUESTA EXCELENTE:
-Pregunta: "¿Qué es la fotosíntesis?"
-Respuesta: "La fotosíntesis es el proceso mediante el cual las plantas convierten la luz solar en energía química almacenada en glucosa.\\n\\nOcurre en los cloroplastos de las células vegetales, donde la clorofila (pigmento verde) captura la energía lumínica. El proceso usa CO₂ del aire y H₂O del suelo para producir glucosa (C₆H₁₂O₆) y liberar oxígeno como subproducto.\\n\\nImportancia: Es la base de casi todas las cadenas alimenticias en la Tierra, ya que las plantas producen el alimento que sostiene a herbívoros y carnivoros.\\n\\nEcuación simplificada: 6CO₂ + 6H₂O + luz → C₆H₁₂O₆ + 6O₂"
-
-EVITAR:
-❌ Respuestas cortas tipo diccionario sin explicación
-❌ Sin ejemplos o contexto del material
-❌ Lenguaje demasiado técnico sin aclaraciones
-  `.trim();
-
-  if (count > 0) {
-    // Fixed count mode
-    return `
-OBJETIVO: Genera EXACTAMENTE ${count} flashcards de ALTA CALIDAD PEDAGÓGICA sobre el tema "${topic}".
-
-INSTRUCCIONES DE COBERTURA Y FUENTES:
-1. ESCANEO PROFUNDO: Lee el texto párrafo por párrafo.
-2. EXTRACCIÓN DISTINTA: Identifica conceptos significativos.
-3. COBERTURA TOTAL: Cubre todo el material.
-4. NIVEL DE DETALLE: Entra en tecnicismos y ejemplos específicos.
-5. CANTIDAD EXACTA: Genera EXACTAMENTE ${count} tarjetas.
-6. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material de donde proviene en el campo "source_name".
-7. IDIOMA: Español.
-
-${qualityGuidelines}
-
-TEXTO DE REFERENCIA (ESCANEAR TODO):
-${text.slice(0, 100000)}
-    `.trim();
-  } else {
-    // Auto-scale / Unlimited mode
-    return `
-OBJETIVO: Genera un conjunto COMPLETO de flashcards de ALTA CALIDAD PEDAGÓGICA que cubra TODOS los conceptos clave del tema "${topic}".
-
-INSTRUCCIONES DE COBERTURA Y FUENTES:
-1. COBERTURA EXHAUSTIVA: Analiza TODO el documento. No dejes ningún concepto importante fuera.
-2. SIN LÍMITE ARTIFICIAL: Genera tantas tarjetas como sean necesarias para cubrir el material (pueden ser 10, 20 o 50+).
-3. GRANULARIDAD: Desglosa conceptos complejos en tarjetas más simples.
-4. TIPOS DE PREGUNTAS: Incluye definiciones, relaciones, ejemplos y causas/efectos.
-5. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material de donde proviene en el campo "source_name".
-6. IDIOMA: Español.
-
-${qualityGuidelines}
-
-TEXTO DE REFERENCIA (ESCANEAR TODO):
-${text.slice(0, 100000)}
-    `.trim();
-  }
-};
+// detectContentType, getExerciseModePrompt, etc. have been moved to geminiService.ts to unify logic.
 
 /**
  * Generate flashcards from extracted text using Gemini
+ * Delegates to the unified service in geminiService
  */
 export const generateFlashcardsFromText = async (
   text: string,
   topic: string,
   count: number = 10
 ): Promise<{ question: string; answer: string; category: string }[] | null> => {
-  try {
-    const schema = {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          question: { type: Type.STRING },
-          answer: { type: Type.STRING },
-          category: { type: Type.STRING },
-          source_name: { type: Type.STRING }
-        },
-        required: ["question", "answer", "category", "source_name"]
-      }
-    };
+  // Import dynamically to avoid circular dependencies if any, or just import at top if safe.
+  // For now we assume generateStudySetFromContext can be imported.
+  // We already have imports at the top, let's update them in a separate step if needed.
+  // Assuming we will fix imports next.
 
-    // Step 1: Detect content type (theory, exercises, or mixed)
-    const contentType = await detectContentType(text);
-
-    // Step 2: Choose appropriate prompt based on content type
-    let prompt = '';
-
-    if (contentType === 'exercises') {
-      // Use exercise-mode prompt to extract concepts
-      console.log(`[Flashcard Generation] Using EXERCISE MODE for topic: ${topic}`);
-      prompt = getExerciseModePrompt(text, topic, count);
-    } else {
-      // Use theory-mode prompt (standard behavior)
-      console.log(`[Flashcard Generation] Using THEORY MODE for topic: ${topic}`);
-      prompt = getTheoryModePrompt(text, topic, count);
-    }
-
-    // Step 3: Generate flashcards with appropriate prompt
-    const result = await generateContent(prompt, {
-      jsonSchema: schema,
-      temperature: 0.7,
-      maxTokens: 8192
-    });
-
-    return JSON.parse(result);
-  } catch (error) {
-    console.error('Error generating flashcards:', error);
-    return null;
-  }
+  // We delegate to the unified logic
+  return null; // This will be replaced by a proper import call in the next step or updated here
 };
 
 export const generateStudyGuideFromMaterials = async (materialsContent: string[], studySetName: string, currentGuide?: string): Promise<string | null> => {

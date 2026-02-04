@@ -21,8 +21,8 @@ import {
 import MergeSetModal from '../components/MergeSetModal';
 import ExercisesTab from '../components/ExercisesTab';
 import { processUploadedContent } from '../services/ExerciseService';
-import { generateFlashcardsFromText, processFileContent, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary, generateInfographicFromMaterials, generatePresentationFromMaterials } from '../services/pdfProcessingService';
-import { generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL, autoCategorizeFlashcards } from '../services/geminiService';
+import { extractTextFromPDFFile, processFileContent, generateStudyGuideFromMaterials, generateMaterialSummary, generateStudySummary, generateInfographicFromMaterials, generatePresentationFromMaterials } from '../services/pdfProcessingService';
+import { generateStudySetFromContext, generateFlashcardsFromYouTubeURL, generateFlashcardsFromWebURL, autoCategorizeFlashcards } from '../services/geminiService';
 import { storeDocumentEmbeddings } from '../services/embeddingService';
 import CumulativeReportsCard from '../components/CumulativeReportsCard';
 import VisualProgressionMap from '../components/VisualProgressionMap';
@@ -609,11 +609,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
 
             console.log(`Generating auto-flashcards from ${allContent.length} characters...`);
 
-            const newFlashcards = await generateFlashcardsFromText(
-                allContent,
-                studySet.name,
-                0
-            );
+            const newFlashcards = await generateStudySetFromContext(allContent);
 
             if (newFlashcards && newFlashcards.length > 0) {
                 await addFlashcardsBatch(newFlashcards.map(fc => ({
@@ -699,7 +695,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
 
             setUploadProgress('Generando flashcards con IA...');
             console.log('Generating flashcards with AI...');
-            const flashcards = await generateFlashcardsFromText(extractedText, studySet.name, 0);
+            const flashcards = await generateStudySetFromContext(extractedText);
 
             setUploadProgress('Generando resumen del material...');
             const summary = await generateMaterialSummary(extractedText, 'pdf');
@@ -824,7 +820,7 @@ const StudySetDetail: React.FC<StudySetDetailProps> = ({ studySetId: propId, emb
             setUploadProgress('Procesando texto...');
             setShowTextModal(false);
 
-            const flashcards = await generateFlashcardsFromText(textContent, studySet.name, 0);
+            const flashcards = await generateStudySetFromContext(textContent);
             const summary = await generateMaterialSummary(textContent, 'text');
 
             if (flashcards && flashcards.length > 0) {

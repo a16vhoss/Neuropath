@@ -297,9 +297,108 @@ export const generatePromptedFlashcards = async (userPrompt: string, materialCon
 };
 
 /**
+ * Detect if content is primarily theory, exercises, or mixed
+ */
+const detectContentType = async (text: string): Promise<'theory' | 'exercises' | 'mixed'> => {
+  try {
+    const detectionPrompt = `
+Analiza este texto educativo y clasifícalo en UNA de estas categorías:
+
+1. "exercises" - Si >70% son EJERCICIOS PRÁCTICOS/PROBLEMAS sin explicaciones teóricas extensas
+   Indicadores: números específicos, "Resuelve...", "Calcula...", problemas enumerados (1., 2., 3.), preguntas con datos concretos
+
+2. "theory" - Si >70% es TEORÍA: conceptos, definiciones, explicaciones, demostraciones
+   Indicadores: definiciones, explicaciones largas, conceptos abstractos, ejemplos ilustrativos
+
+3. "mixed" - Si mezcla ambos de forma balanceada
+
+TEXTO A ANALIZAR (primeros 5000 caracteres):
+${text.slice(0, 5000)}
+
+RESPONDE SOLO CON UNA PALABRA: exercises, theory, o mixed
+    `.trim();
+
+    const result = await generateContent(detectionPrompt, {
+      temperature: 0.1, // Low temperature for consistent classification
+      maxTokens: 10
+    });
+
+    const cleaned = result.trim().toLowerCase();
+    if (cleaned === 'exercises' || cleaned === 'theory' || cleaned === 'mixed') {
+      console.log(`[Flashcard Generation] Content type detected: ${cleaned}`);
+      return cleaned;
+    }
+    return 'theory';
+  } catch (error) {
+    console.error('[Flashcard Generation] Error detecting content type:', error);
+    return 'theory';
+  }
+};
+
+/**
+ * Get prompt for exercise-mode flashcard generation (DEDUCTION MODE)
+ */
+const getExerciseModePrompt = (text: string, count: number): string => {
+  const targetCount = count > 0 ? count : 12;
+
+  return `
+CONTEXTO: Este material contiene EJERCICIOS PRÁCTICOS y PROBLEMAS.
+TU MISIÓN: IGNORAR LOS PROBLEMAS ESPECÍFICOS Y DEDUCIR LA TEORÍA DETRÁS.
+
+🚫 POISON RULES (LO QUE ESTÁ PROHIBIDO):
+- NUNCA generes una flashcard de un problema específico (Ej: "Resuelve 2+2" -> ❌).
+- NUNCA uses números o datos del ejercicio en la pregunta/respuesta.
+- NUNCA hagas preguntas de "Calcula el resultado de...".
+
+✅ GOLDEN RULES (LO QUE DEBES HACER):
+- DEDUCE el concepto teórico: Si ves "Calcula la integral de x^2", tu flashcard debe ser "¿Qué es una integral?" o "¿Pasos para integrar una potencia?".
+- EXPLICA COMO TUTOR AMIGABLE: Tono "Explícame como si tuviera 12 años". Simple, directo, sin palabras rimbombantes.
+- ENFÓCATE EN EL "CÓMO" y el "QUÉ": Definiciones, Procedimientos generales, Conceptos.
+
+EJEMPLO DE TRANSFORMACIÓN:
+Input: "Problema 1: Un tren viaja a 50km/h durante 2 horas..."
+Flashcard Generada:
+Q: "¿Qué es la velocidad?"
+A: "Es qué tan rápido se mueve algo en una dirección. Se calcula dividiendo la distancia entre el tiempo."
+(Nota cómo se ignoraron los números del tren)
+
+OBJETIVO: Genera EXACTAMENTE ${targetCount} flashcards.
+IDIOMA: Español.
+TEXTO: "${text.slice(0, 50000)}"
+  `.trim();
+};
+
+/**
+ * Get prompt for theory-mode flaschard generation (SIMPLE TUTOR MODE)
+ */
+const getTheoryModePrompt = (text: string, count: number): string => {
+  const targetCount = count > 0 ? count : 12;
+
+  return `
+OBJETIVO: Genera EXACTAMENTE ${targetCount} flashcards sobre este texto.
+
+TONO: "TUTOR AMIGABLE Y SIMPLE" (Explícame como si tuviera 12 años).
+- Respuestas cortas y punchy (3-4 oraciones máximo).
+- Evita jerga académica innecesaria.
+- Si es muy técnico, simplifícalo con una analogía.
+
+🚫 PROHIBIDO:
+- Copiar y pegar párrafos gigantes.
+- Preguntas de problemas matemáticos específicos.
+
+✅ ESTRUCTURA IDEAL:
+Q: Concepto o Pregunta Clave
+A: Definición simple + Por qué es importante + Ejemplo de la vida real (si aplica).
+
+IDIOMA: Español.
+TEXTO: "${text.slice(0, 50000)}"
+  `.trim();
+};
+
+/**
  * Generate Study Set (Flashcards) from Context text
  */
-export const generateStudySetFromContext = async (context: string, count: number = 10) => {
+export const generateStudySetFromContext = async (context: string, count: number = 0) => {
   if (!context || context.length < 10) return [];
 
   try {
@@ -323,64 +422,22 @@ export const generateStudySetFromContext = async (context: string, count: number
       required: ["flashcards"]
     };
 
-    // Instructions for handling exercises vs theory
-    const exerciseHandlingRules = `
-        REGLA CRÍTICA SOBRE EJERCICIOS:
-        - NUNCA crees flashcards del tipo "Problema específico → Respuesta específica"
-        - Ejemplo INCORRECTO: "Resuelve 2x + 5 = 15" → "x = 5" (NO HAGAS ESTO)
-        - Ejemplo INCORRECTO: "Calcula el área de un triángulo de base 8 y altura 5" → "20 cm²" (NO HAGAS ESTO)
+    // Step 1: Detect content type
+    const contentType = await detectContentType(context);
 
-        En su lugar, cuando detectes ejercicios o problemas, crea FLASHCARDS DE METODOLOGÍA:
-        - Ejemplo CORRECTO: "¿Cómo resolver una ecuación lineal de primer grado?" → "1. Agrupar términos con la variable de un lado, 2. Agrupar constantes del otro lado, 3. Despejar la variable dividiendo"
-        - Ejemplo CORRECTO: "¿Cuál es el procedimiento para calcular el área de un triángulo?" → "1. Identificar la base y la altura, 2. Aplicar la fórmula A = (base × altura) / 2, 3. Expresar el resultado en unidades cuadradas"
-
-        SÍ PUEDES crear flashcards de:
-        - FÓRMULAS: "Fórmula del área del triángulo" → "A = (b × h) / 2"
-        - DEFINICIONES: "¿Qué es una ecuación lineal?" → "Una ecuación donde la variable tiene exponente 1"
-        - CONCEPTOS TEÓRICOS: Cualquier explicación, definición o concepto
-        - METODOLOGÍAS: Pasos para resolver TIPOS de problemas (no problemas específicos)
-    `;
-
+    // Step 2: Select Prompt
     let prompt = '';
-
-    if (count > 0) {
-      prompt = `
-        OBJETIVO: Genera EXACTAMENTE ${count} flashcards de alta calidad basadas en el texto proporcionado.
-
-        ${exerciseHandlingRules}
-
-        INSTRUCCIONES DE COBERTURA Y FUENTES:
-        1. ESCANEO DETALLADO: Escanea el texto secuencialmente.
-        2. GRANULARIDAD: Extrae conceptos, definiciones, fórmulas y metodologías.
-        3. COBERTURA GLOBAL: Distribuye las preguntas en todo el texto.
-        4. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material del que proviene en "source_name".
-        5. CANTIDAD EXACTA: Genera EXACTAMENTE ${count} flashcards.
-        6. IDIOMA: Español.
-
-        TEXTO: "${context.slice(0, 100000)}"
-      `;
+    if (contentType === 'exercises') {
+      console.log('[Gemini] Using EXERCISE DEDUCTION prompt');
+      prompt = getExerciseModePrompt(context, count);
     } else {
-      // Auto-scale mode
-      prompt = `
-        OBJETIVO: Genera un conjunto COMPLETO de flashcards que cubra TODOS los conceptos clave del texto proporcionado.
-
-        ${exerciseHandlingRules}
-
-        INSTRUCCIONES DE COBERTURA Y FUENTES:
-        1. COBERTURA EXHAUSTIVA: Analiza TODO el contenido. No dejes ningún concepto importante fuera.
-        2. SIN LÍMITE ARTIFICIAL: Genera tantas tarjetas como sean necesarias para cubrir el material completamente (pueden ser 10, 20 o más).
-        3. GRANULARIDAD: Desglosa conceptos complejos en tarjetas más simples.
-        4. TIPOS DE PREGUNTAS: Incluye definiciones, fórmulas, metodologías y relaciones conceptuales.
-        5. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material del que proviene en "source_name".
-        6. IDIOMA: Español.
-
-        TEXTO: "${context.slice(0, 100000)}"
-      `;
+      console.log('[Gemini] Using SIMPLE THEORY prompt');
+      prompt = getTheoryModePrompt(context, count);
     }
 
     const result = await generateContent(prompt, {
       jsonSchema: schema,
-      temperature: 0.7,
+      temperature: 0.5, // Reduced temperature for better adherence to "Simple" tone
       maxTokens: 8192
     });
 
