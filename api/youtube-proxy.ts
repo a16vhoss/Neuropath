@@ -256,17 +256,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                                             };
                                                         });
 
-                                                        console.log(`[YouTubeProxy] ✅ Transcript found via YouTube Official (${lang}): ${transcriptItems.length} lines`);
-                                                        break;
+                                                        console.log(`[YouTubeProxy] ✅ Transcript found via YouTube Official (${lang} ${kind || 'manual'}): ${transcriptItems.length} lines`);
+                                                        break; // Exit kind loop - found transcript!
                                                     } else {
                                                         console.warn(`[YouTubeProxy] Timedtext ${lang} returned empty content`);
                                                     }
                                                 }
                                             } catch (langErr: any) {
-                                                console.warn(`[YouTubeProxy] YouTube timedtext ${lang} failed:`, langErr?.message || langErr);
-                                                continue;
+                                                console.warn(`[YouTubeProxy] YouTube timedtext ${lang} (${kind || 'manual'}) failed:`, langErr?.message || langErr);
                                             }
                                         }
+
+                                        // Exit language loop if we found transcripts
+                                        if (transcriptItems.length > 0) break;
 
                                         if (transcriptItems.length === 0) {
                                             console.error('[YouTubeProxy] ❌ All YouTube timedtext attempts failed');
