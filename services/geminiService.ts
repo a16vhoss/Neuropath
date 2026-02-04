@@ -355,11 +355,15 @@ TU MISIÓN: IGNORAR LOS PROBLEMAS ESPECÍFICOS Y DEDUCIR LA TEORÍA DETRÁS.
 - EXPLICA COMO TUTOR AMIGABLE: Tono "Explícame como si tuviera 12 años". Simple, directo, sin palabras rimbombantes.
 - ENFÓCATE EN EL "CÓMO" y el "QUÉ": Definiciones, Procedimientos generales, Conceptos.
 
+✨ ENRIQUECIMIENTO (NUEVO):
+- MINI-EJEMPLO: Incluye un ejemplo cortito y simple (inventado si es necesario) para ilustrar.
+- APLICACIÓN: Explica brevemente CÓMO o CUÁNDO se usa este concepto en un ejercicio real.
+
 EJEMPLO DE TRANSFORMACIÓN:
 Input: "Problema 1: Un tren viaja a 50km/h durante 2 horas..."
 Flashcard Generada:
 Q: "¿Qué es la velocidad?"
-A: "Es qué tan rápido se mueve algo en una dirección. Se calcula dividiendo la distancia entre el tiempo."
+A: "Es qué tan rápido se mueve algo en una dirección. Se calcula dividiendo la distancia entre el tiempo.\n\n💡 Ejemplo: Si corres 10 metros en 2 segundos, tu velocidad es 5 m/s.\n🚀 Aplicación: Úsala para saber cuánto tardarás en llegar a un lugar si sabes la distancia."
 (Nota cómo se ignoraron los números del tren)
 
 OBJETIVO: Genera EXACTAMENTE ${targetCount} flashcards.
@@ -388,7 +392,7 @@ TONO: "TUTOR AMIGABLE Y SIMPLE" (Explícame como si tuviera 12 años).
 
 ✅ ESTRUCTURA IDEAL:
 Q: Concepto o Pregunta Clave
-A: Definición simple + Por qué es importante + Ejemplo de la vida real (si aplica).
+A: Definición simple + Por qué es importante.\n\n💡 Ejemplo: [Un ejemplo corto]\n🚀 Cómo se usa: [Breve tip de aplicación]
 
 IDIOMA: Español.
 TEXTO: "${text.slice(0, 50000)}"
