@@ -185,6 +185,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         } catch (invidiousErr) {
                             console.warn('[YouTubeProxy] Invidious fallback failed:', invidiousErr);
                         }
+
+                        // Attempt 5: YouTube Official Timedtext API (last resort)
+                        if (transcriptItems.length === 0) {
+                            console.warn('[YouTubeProxy] Trying YouTube official timedtext API...');
+                            try {
+                                const languages = ['es', 'en', 'es-419', 'en-US'];
+
+                                for (const lang of languages) {
+                                    try {
+                                        const timedtextUrl = `https://www.youtube.com/api/timedtext?v=${id}&lang=${lang}`;
+                                        const response = await fetch(timedtextUrl, {
+                                            signal: AbortSignal.timeout(10000),
+                                            headers: { 'User-Agent': 'Mozilla/5.0' }
+                                        });
+
+                                        if (response.ok) {
+                                            const xmlText = await response.text();
+
+                                            // Parse XML format: <text start="0.0" dur="2.5">Hello world</text>
+                                            const textMatches = xmlText.matchAll(/<text start="([^"]+)" dur="([^"]+)"[^>]*>([^<]+)<\/text>/g);
+                                            const items = Array.from(textMatches);
+
+                                            if (items.length > 0) {
+                                                transcriptItems = items.map(match => {
+                                                    const start = parseFloat(match[1]);
+                                                    const duration = parseFloat(match[2]);
+                                                    const text = match[3]
+                                                        .replace(/&amp;/g, '&')
+                                                        .replace(/&lt;/g, '<')
+                                                        .replace(/&gt;/g, '>')
+                                                        .replace(/&quot;/g, '"')
+                                                        .replace(/&#39;/g, "'");
+
+                                                    return {
+                                                        offset: Math.floor(start * 1000),
+                                                        duration: Math.floor(duration * 1000),
+                                                        text: text.trim(),
+                                                        formattedTime: formatTime(start)
+                                                    };
+                                                });
+
+                                                console.log(`[YouTubeProxy] ✅ Transcript found via YouTube Official (${lang}): ${transcriptItems.length} lines`);
+                                                break;
+                                            }
+                                        }
+                                    } catch (langErr) {
+                                        console.warn(`[YouTubeProxy] YouTube timedtext ${lang} failed:`, langErr);
+                                        continue;
+                                    }
+                                }
+                            } catch (ytErr) {
+                                console.warn('[YouTubeProxy] YouTube official API fallback failed:', ytErr);
+                            }
+                        }
                     }
                 }
             }
