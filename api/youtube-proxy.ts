@@ -190,7 +190,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         if (transcriptItems.length === 0) {
                             console.warn('[YouTubeProxy] Trying YouTube official timedtext API...');
                             try {
-                                const languages = ['es', 'en', 'es-419', 'en-US'];
+                                const languages = ['es', 'en'];
 
                                 for (const lang of languages) {
                                     try {
@@ -202,6 +202,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                                         if (response.ok) {
                                             const xmlText = await response.text();
+                                            console.log(`[YouTubeProxy] Timedtext ${lang} received ${xmlText.length} bytes`);
 
                                             // Parse XML format: <text start="0.0" dur="2.5">Hello world</text>
                                             const textMatches = xmlText.matchAll(/<text start="([^"]+)" dur="([^"]+)"[^>]*>([^<]+)<\/text>/g);
@@ -228,15 +229,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
                                                 console.log(`[YouTubeProxy] ✅ Transcript found via YouTube Official (${lang}): ${transcriptItems.length} lines`);
                                                 break;
+                                            } else {
+                                                console.warn(`[YouTubeProxy] Timedtext ${lang} returned empty content`);
                                             }
                                         }
-                                    } catch (langErr) {
-                                        console.warn(`[YouTubeProxy] YouTube timedtext ${lang} failed:`, langErr);
+                                    } catch (langErr: any) {
+                                        console.warn(`[YouTubeProxy] YouTube timedtext ${lang} failed:`, langErr?.message || langErr);
                                         continue;
                                     }
                                 }
-                            } catch (ytErr) {
-                                console.warn('[YouTubeProxy] YouTube official API fallback failed:', ytErr);
+
+                                if (transcriptItems.length === 0) {
+                                    console.error('[YouTubeProxy] ❌ All YouTube timedtext attempts failed');
+                                }
+                            } catch (ytErr: any) {
+                                console.warn('[YouTubeProxy] YouTube official API fallback failed:', ytErr?.message || ytErr);
                             }
                         }
                     }
