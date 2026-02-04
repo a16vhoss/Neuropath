@@ -137,7 +137,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         transcriptItems = mapItems(items);
                         console.log(`[YouTubeProxy] Transcript found (EN): ${items.length} lines`);
                     } catch (err3) {
-                        console.warn('[YouTubeProxy] All transcript attempts failed:', err3);
+                        console.warn('[YouTubeProxy] All direct attempts failed, trying Invidious...');
+                        // Attempt 4: Invidious API as last resort (public API, no key needed)
+                        try {
+                            const invidiousInstances = [
+                                'https://invidious.snopyta.org',
+                                'https://invidious.fdn.fr',
+                                'https://inv.riverside.rocks'
+                            ];
+
+                            for (const instance of invidiousInstances) {
+                                try {
+                                    const captionsUrl = `${instance}/api/v1/captions/${id}?lang=es`;
+                                    const captionsRes = await fetch(captionsUrl, { signal: AbortSignal.timeout(5000) });
+
+                                    if (captionsRes.ok) {
+                                        const captionsData = await captionsRes.json();
+                                        if (captionsData.captions && captionsData.captions.length > 0) {
+                                            // Get the WebVTT content
+                                            const caption = captionsData.captions[0];
+                                            const bodyUrl = caption.url;
+                                            const bodyRes = await fetch(bodyUrl, { signal: AbortSignal.timeout(10000) });
+                                            const bodyText = await bodyRes.text();
+
+                                            // Parse WebVTT format (skip headers, timestamps, etc.)
+                                            const lines = bodyText.split('\n')
+                                                .filter(l => l.trim() && !l.includes('-->') && !l.match(/^\d+$/) && !l.startsWith('WEBVTT'));
+
+                                            transcriptItems = lines.map((text, idx) => ({
+                                                offset: idx * 3000, // ~3s per line
+                                                duration: 3000,
+                                                text: text.trim(),
+                                                formattedTime: formatTime(idx * 3)
+                                            }));
+
+                                            if (transcriptItems.length > 0) {
+                                                console.log(`[YouTubeProxy] ✅ Transcript found via Invidious (${instance}): ${transcriptItems.length} lines`);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                } catch (invErr) {
+                                    console.warn(`[YouTubeProxy] Invidious ${instance} failed:`, invErr);
+                                    continue;
+                                }
+                            }
+                        } catch (invidiousErr) {
+                            console.warn('[YouTubeProxy] Invidious fallback failed:', invidiousErr);
+                        }
                     }
                 }
             }
