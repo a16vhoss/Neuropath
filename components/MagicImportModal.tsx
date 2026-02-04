@@ -5,6 +5,7 @@ import { generateStudySetFromContext, generateFlashcardsFromYouTubeURL } from '.
 import { useAuth } from '../contexts/AuthContext';
 import { createStudySet, addFlashcardsBatch, addMaterialToStudySet, createClassStudySet, supabase } from '../services/supabaseClient';
 import { createAssignment } from '../services/ClassroomService';
+import { processUploadedContent } from '../services/ExerciseService';
 
 interface MagicImportModalProps {
     onClose: () => void;
@@ -95,7 +96,7 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess,
 
             // 3. Save to Supabase
             const saveTimeout = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Tiempo de espera agotado al guardar. Verifica tu conexión.")), 15000)
+                setTimeout(() => reject(new Error("Tiempo de espera agotado al guardar. Verifica tu conexión.")), 60000)
             );
 
             const saveContent = async () => {
@@ -275,6 +276,39 @@ const MagicImportModal: React.FC<MagicImportModalProps> = ({ onClose, onSuccess,
                 }));
 
                 await addFlashcardsBatch(flashcardsToInsert);
+
+                // EXERCISE GENERATION
+                if (newSet?.id && materialIdForFlashcards) {
+                    setStatus('Generando ejercicios prácticos con IA...');
+                    try {
+                        let contentForExercises = '';
+                        let materialNameForExercises = name;
+
+                        if (activeTab === 'youtube') {
+                            const ytAnalysis = (window as any).__youtubeAnalysis;
+                            if (ytAnalysis?.summary) {
+                                contentForExercises = `VIDEO SUMMARY:\n${ytAnalysis.summary}`;
+                                materialNameForExercises = ytAnalysis.videoTitle || name;
+                            }
+                        } else {
+                            contentForExercises = processedContent;
+                            if (activeTab === 'pdf' && selectedFile) {
+                                materialNameForExercises = selectedFile.name;
+                            }
+                        }
+
+                        if (contentForExercises) {
+                            await processUploadedContent(
+                                newSet.id,
+                                materialIdForFlashcards,
+                                contentForExercises,
+                                materialNameForExercises
+                            );
+                        }
+                    } catch (excErr) {
+                        console.error("Error generating exercises automatically:", excErr);
+                    }
+                }
 
                 return newSet;
             };
