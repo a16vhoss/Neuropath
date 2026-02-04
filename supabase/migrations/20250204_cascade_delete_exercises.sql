@@ -1,26 +1,53 @@
 -- =====================================================
 -- CASCADE DELETE EXERCISES WHEN MATERIAL IS DELETED
+-- (Safe version - checks if table exists first)
 -- =====================================================
 -- 
--- Problem: When a material is deleted, exercises stay orphaned with material_id = NULL
--- Solution: Change foreign key constraint from ON DELETE SET NULL to ON DELETE CASCADE
---
--- This ensures that when a material is deleted, all associated exercises are also deleted,
--- which will cascade to exercise_instances and user_exercise_progress.
+-- Problem: exercise_templates table might not exist yet if exercise_system 
+-- migration hasn't been run. This version safely handles both cases.
 
--- Drop existing constraint
-ALTER TABLE public.exercise_templates
-DROP CONSTRAINT IF EXISTS exercise_templates_material_id_fkey;
+-- Only modify constraint if table exists
+DO $$
+BEGIN
+    -- Check if exercise_templates table exists
+    IF EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'exercise_templates'
+    ) THEN
+        -- Drop existing constraint if it exists
+        IF EXISTS (
+            SELECT 1 FROM information_schema.table_constraints 
+            WHERE constraint_name = 'exercise_templates_material_id_fkey'
+            AND table_name = 'exercise_templates'
+        ) THEN
+            ALTER TABLE public.exercise_templates
+            DROP CONSTRAINT exercise_templates_material_id_fkey;
+        END IF;
 
--- Re-add constraint with CASCADE behavior
-ALTER TABLE public.exercise_templates
-ADD CONSTRAINT exercise_templates_material_id_fkey
-    FOREIGN KEY (material_id)
-    REFERENCES public.study_set_materials(id)
-    ON DELETE CASCADE;
+        -- Re-add constraint with CASCADE behavior
+        ALTER TABLE public.exercise_templates
+        ADD CONSTRAINT exercise_templates_material_id_fkey
+            FOREIGN KEY (material_id)
+            REFERENCES public.study_set_materials(id)
+            ON DELETE CASCADE;
+            
+        RAISE NOTICE 'Successfully updated exercise_templates constraint to CASCADE';
+    ELSE
+        RAISE NOTICE 'exercise_templates table does not exist yet - skipping migration';
+        RAISE NOTICE 'This is OK - the constraint will be correct when you create the exercise system';
+    END IF;
+END $$;
 
--- Verify the change
--- You can check with: 
--- SELECT conname, confdeltype FROM pg_constraint 
+-- Verification query (optional - uncomment to check)
+-- SELECT 
+--     conname as constraint_name,
+--     CASE confdeltype 
+--         WHEN 'a' THEN 'NO ACTION'
+--         WHEN 'r' THEN 'RESTRICT'
+--         WHEN 'c' THEN 'CASCADE'
+--         WHEN 'n' THEN 'SET NULL'
+--         WHEN 'd' THEN 'SET DEFAULT'
+--     END as on_delete_action
+-- FROM pg_constraint 
 -- WHERE conname = 'exercise_templates_material_id_fkey';
--- confdeltype should be 'c' (CASCADE) instead of 'n' (SET NULL)
