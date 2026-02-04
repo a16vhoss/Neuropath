@@ -423,52 +423,60 @@ RESPONDE SOLO CON UNA PALABRA: exercises, theory, o mixed
  * Extracts underlying concepts instead of literal exercise problems
  */
 const getExerciseModePrompt = (text: string, topic: string, count: number): string => {
-  const targetCount = count > 0 ? count : 12; // Default to 12 for auto-scale
+  const targetCount = count > 0 ? count : 12;
 
   return `
 CONTEXTO: Este material contiene EJERCICIOS PRÁCTICOS, no teoría directa.
 
 TU TAREA: NO crear flashcards de los ejercicios individuales.
-En su lugar, INFIERE y GENERA flashcards de los CONCEPTOS TEÓRICOS SUBYACENTES.
+En su lugar, INFIERE y GENERA flashcards de los CONCEPTOS TEÓRICOS SUBYACENTES con EXPLICACIONES DETALLADAS Y PEDAGÓGICAS.
 
 TEMA: "${topic}"
 
 INSTRUCCIONES DE EXTRACCIÓN:
-1. DETECTA: ¿Qué conceptos/temas cubren estos ejercicios? (Ej: Permutación, Combinación, Límites, Derivadas, etc.)
-2. IDENTIFICA: ¿Qué conocimientos teóricos se necesitan para resolver estos tipos de ejercicios?
+1. DETECTA: ¿Qué conceptos/temas cubren estos ejercicios?
+2. IDENTIFICA: ¿Qué conocimientos teóricos se necesitan?
 3. GENERA FLASHCARDS DE:
-   ✅ Definiciones de conceptos clave del tema
-   ✅ Fórmulas fundamentales y qué significa cada variable
-   ✅ Cuándo aplicar cada método/fórmula
-   ✅ Diferencias entre conceptos similares (Ej: Permutación vs Combinación)
-   ✅ Pasos/procedimientos para resolver este tipo de problemas
-   ✅ Condiciones de aplicación ("¿Cuándo usar X?")
-   ✅ Errores comunes o casos especiales
+   ✅ Definiciones de conceptos clave
+   ✅ Fórmulas fundamentales y variables
+   ✅ Cuándo aplicar cada método
+   ✅ Diferencias entre conceptos similares
+   ✅ Pasos/procedimientos
+   ✅ Casos especiales y errores comunes
 
-EJEMPLOS DE FLASHCARDS CORRECTAS (para ejercicios de Permutación/Combinación):
-✅ Pregunta: "¿Qué es una permutación?"
-   Respuesta: "Arreglo ordenado de elementos donde el ORDEN SÍ importa. Ejemplo: ABC ≠ BAC"
+CRÍTICO - CALIDAD DE LAS RESPUESTAS:
+Las RESPUESTAS deben ser DETALLADAS, COMPLETAS y PEDAGÓGICAS:
 
-✅ Pregunta: "Fórmula de permutación P(n,r)"
-   Respuesta: "P(n,r) = n!/(n-r)! donde n = total de elementos, r = elementos a seleccionar"
+✅ CADA RESPUESTA DEBE INCLUIR:
+   - Definición clara y precisa
+   - Explicación del POR QUÉ (razonamiento/lógica)
+   - Ejemplo concreto e ilustrativo
+   - Comparación o contraste cuando sea relevante
+   - Tip práctico para recordar/aplicar
 
-✅ Pregunta: "¿Cuándo usar combinación en vez de permutación?"
-   Respuesta: "Cuando el ORDEN NO importa. Ej: seleccionar 3 personas de 10 (no importa el orden de selección)"
+✅ LONGITUD: Mínimo 3-5 oraciones completas (NO solo 1 línea)
+✅ FORMATO: Usa saltos de línea para organizar la explicación
+✅ LENGUAJE: Claro y accesible, como si enseñaras a un estudiante
 
-✅ Pregunta: "Diferencia entre 5! y P(5,3)"
-   Respuesta: "5! = permutación de TODOS los 5 elementos. P(5,3) = permutación de solo 3 de los 5"
+EJEMPLOS DE RESPUESTAS EXCELENTES:
 
-EJEMPLOS DE FLASHCARDS PROHIBIDAS:
-❌ "¿En una carrera con 8 corredores compiten, de cuántas maneras diferentes pueden llegar a las posiciones 1°, 2° y 3°?"
-❌ "Una pizzería ofrece 10 ingredientes diferentes. Quieres pedir una pizza con exactamente 3 ingredientes..."
-❌ NO copies ejercicios literales con números específicos
+Pregunta: "¿Qué es una permutación?"
+Respuesta: "Una permutación es un arreglo ordenado de elementos donde el ORDEN SÍ importa. Esto significa que ABC y BAC son permutaciones DIFERENTES de las mismas letras.\n\nSe usa cuando necesitas contar de cuántas formas puedes organizar un conjunto de elementos y el orden de selección hace la diferencia.\n\nEjemplo: Si tienes 3 medallas (oro, plata, bronce) y 3 atletas, el número de formas de asignarlas es una permutación porque importa quién recibe cada medalla específica.\n\nTip: Piensa 'permutación = posiciones importan'."
 
-CANTIDAD: Genera EXACTAMENTE ${targetCount} flashcards de conceptos/teoría.
-CATEGORÍA: Asigna categorías relevantes al tema (Ej: "Fórmulas", "Conceptos", "Procedimientos", "Diferencias")
-FUENTE: En "source_name" pon "${topic}"
+Pregunta: "Fórmula de permutación P(n,r)"
+Respuesta: "P(n,r) = n!/(n-r)!\n\nDonde:\n• n = total de elementos disponibles\n• r = elementos que vas a seleccionar y ordenar\n\n¿Por qué esta fórmula? Porque tienes n opciones para el primer lugar, (n-1) para el segundo, y así hasta r posiciones. El factorial (n-r)! en el denominador cancela las posiciones que no usas.\n\nEjemplo: P(5,3) = 5!/(5-3)! = 5!/2! = 5×4×3 = 60 formas de ordenar 3 elementos de 5.\n\nError común: No confundir con C(n,r) que NO considera el orden."
+
+EVITAR:
+❌ Respuestas de 1 línea sin explicación
+❌ Ejercicios literales con números específicos
+❌ Sin ejemplos o contexto
+
+CANTIDAD: Genera EXACTAMENTE ${targetCount} flashcards.
+CATEGORÍA: Asigna categorías relevantes
+FUENTE: "${topic}"
 IDIOMA: Español
 
-EJERCICIOS PARA ANALIZAR (extraer conceptos):
+EJERCICIOS PARA ANALIZAR:
 ${text.slice(0, 100000)}
   `.trim();
 };
@@ -478,10 +486,38 @@ ${text.slice(0, 100000)}
  * Standard behavior for theoretical content
  */
 const getTheoryModePrompt = (text: string, topic: string, count: number): string => {
+  const qualityGuidelines = `
+CRÍTICO - CALIDAD DE LAS RESPUESTAS:
+Las RESPUESTAS deben ser DETALLADAS, COMPLETAS y FÁCILES DE ENTENDER:
+
+✅ CADA RESPUESTA DEBE INCLUIR:
+   1. Definición/Concepto principal (claro y preciso)
+   2. Explicación del "POR QUÉ" o contexto (razonamiento)
+   3. Ejemplo concreto y específico del material
+   4. Implicaciones o aplicaciones prácticas
+   5. Conexiones con otros conceptos cuando sea relevante
+
+✅ CARACTERÍSTICAS:
+   - LONGITUD: Mínimo 3-5 oraciones completas (NO respuestas de 1 línea)
+   - CLARIDAD: Lenguaje accesible, como si enseñaras a un estudiante
+   - ESTRUCTURA: Usa saltos de línea (\\n) para organizar ideas
+   - EJEMPLOS: Siempre que sea posible, incluye ejemplos del texto
+   - PEDAGOGÍA: Anticipa dudas comunes y aclara conceptos relacionados
+
+EJEMPLO DE RESPUESTA EXCELENTE:
+Pregunta: "¿Qué es la fotosíntesis?"
+Respuesta: "La fotosíntesis es el proceso mediante el cual las plantas convierten la luz solar en energía química almacenada en glucosa.\\n\\nOcurre en los cloroplastos de las células vegetales, donde la clorofila (pigmento verde) captura la energía lumínica. El proceso usa CO₂ del aire y H₂O del suelo para producir glucosa (C₆H₁₂O₆) y liberar oxígeno como subproducto.\\n\\nImportancia: Es la base de casi todas las cadenas alimenticias en la Tierra, ya que las plantas producen el alimento que sostiene a herbívoros y carnivoros.\\n\\nEcuación simplificada: 6CO₂ + 6H₂O + luz → C₆H₁₂O₆ + 6O₂"
+
+EVITAR:
+❌ Respuestas cortas tipo diccionario sin explicación
+❌ Sin ejemplos o contexto del material
+❌ Lenguaje demasiado técnico sin aclaraciones
+  `.trim();
+
   if (count > 0) {
     // Fixed count mode
     return `
-OBJETIVO: Genera EXACTAMENTE ${count} flashcards de alta calidad sobre el tema "${topic}".
+OBJETIVO: Genera EXACTAMENTE ${count} flashcards de ALTA CALIDAD PEDAGÓGICA sobre el tema "${topic}".
 
 INSTRUCCIONES DE COBERTURA Y FUENTES:
 1. ESCANEO PROFUNDO: Lee el texto párrafo por párrafo.
@@ -492,13 +528,15 @@ INSTRUCCIONES DE COBERTURA Y FUENTES:
 6. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material de donde proviene en el campo "source_name".
 7. IDIOMA: Español.
 
+${qualityGuidelines}
+
 TEXTO DE REFERENCIA (ESCANEAR TODO):
 ${text.slice(0, 100000)}
     `.trim();
   } else {
     // Auto-scale / Unlimited mode
     return `
-OBJETIVO: Genera un conjunto COMPLETO de flashcards que cubra TODOS los conceptos clave del tema "${topic}" en el texto proporcionado.
+OBJETIVO: Genera un conjunto COMPLETO de flashcards de ALTA CALIDAD PEDAGÓGICA que cubra TODOS los conceptos clave del tema "${topic}".
 
 INSTRUCCIONES DE COBERTURA Y FUENTES:
 1. COBERTURA EXHAUSTIVA: Analiza TODO el documento. No dejes ningún concepto importante fuera.
@@ -507,6 +545,8 @@ INSTRUCCIONES DE COBERTURA Y FUENTES:
 4. TIPOS DE PREGUNTAS: Incluye definiciones, relaciones, ejemplos y causas/efectos.
 5. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material de donde proviene en el campo "source_name".
 6. IDIOMA: Español.
+
+${qualityGuidelines}
 
 TEXTO DE REFERENCIA (ESCANEAR TODO):
 ${text.slice(0, 100000)}
