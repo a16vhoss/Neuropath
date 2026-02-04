@@ -41,6 +41,14 @@ export const getYoutubeTranscript = async (url: string): Promise<YoutubeRichCont
             const response = await fetch(`/api/youtube-proxy?videoId=${videoId}`);
             const result = await response.json();
 
+            console.log('[YouTubeService] Proxy response stats:', {
+                success: result.success,
+                hasData: !!result.data,
+                transcriptSegments: result.data?.transcript?.length || 0,
+                fullTextLength: result.data?.fullTranscriptText?.length || 0,
+                isMetadataOnly: result.data?.isMetadataOnly
+            });
+
             if (result.success && result.data) {
                 return result.data as YoutubeRichContent;
             } else {
