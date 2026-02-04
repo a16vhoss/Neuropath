@@ -190,103 +190,125 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         if (transcriptItems.length === 0) {
                             console.warn('[YouTubeProxy] Trying YouTube official timedtext API...');
                             try {
-                                const languages = ['es', 'en'];
+                                // First, get the list of available captions
+                                const captionListUrl = `https://video.google.com/timedtext?type=list&v=${id}`;
+                                console.log('[YouTubeProxy] Fetching caption track list...');
 
-                                for (const lang of languages) {
-                                    try {
-                                        const timedtextUrl = `https://www.youtube.com/api/timedtext?v=${id}&lang=${lang}`;
-                                        const response = await fetch(timedtextUrl, {
-                                            signal: AbortSignal.timeout(10000),
-                                            headers: { 'User-Agent': 'Mozilla/5.0' }
-                                        });
+                                const listResponse = await fetch(captionListUrl, {
+                                    signal: AbortSignal.timeout(3000),
+                                    headers: { 'User-Agent': 'Mozilla/5.0' }
+                                });
 
-                                        if (response.ok) {
-                                            const xmlText = await response.text();
-                                            console.log(`[YouTubeProxy] Timedtext ${lang} received ${xmlText.length} bytes`);
+                                if (listResponse.ok) {
+                                    const listXml = await listResponse.text();
+                                    console.log(`[YouTubeProxy] Caption list received: ${listXml.length} bytes`);
 
-                                            // Parse XML format: <text start="0.0" dur="2.5">Hello world</text>
-                                            const textMatches = xmlText.matchAll(/<text start="([^"]+)" dur="([^"]+)"[^>]*>([^<]+)<\/text>/g);
-                                            const items = Array.from(textMatches);
+                                    // Parse available tracks: <track lang_code="es" ... />
+                                    const trackMatches = listXml.matchAll(/<track[^>]+lang_code="([^"]+)"[^>]*>/g);
+                                    const availableLangs = Array.from(trackMatches).map(m => m[1]);
 
-                                            if (items.length > 0) {
-                                                transcriptItems = items.map(match => {
-                                                    const start = parseFloat(match[1]);
-                                                    const duration = parseFloat(match[2]);
-                                                    const text = match[3]
-                                                        .replace(/&amp;/g, '&')
-                                                        .replace(/&lt;/g, '<')
-                                                        .replace(/&gt;/g, '>')
-                                                        .replace(/&quot;/g, '"')
-                                                        .replace(/&#39;/g, "'");
+                                    console.log(`[YouTubeProxy] Available caption languages: ${availableLangs.join(', ')}`);
 
-                                                    return {
-                                                        offset: Math.floor(start * 1000),
-                                                        duration: Math.floor(duration * 1000),
-                                                        text: text.trim(),
-                                                        formattedTime: formatTime(start)
-                                                    };
-                                                });
+                                    // Try Spanish and English variants
+                                    const languages = availableLangs.length > 0
+                                        ? availableLangs.filter(lang => lang.startsWith('es') || lang.startsWith('en'))
+                                        : ['es', 'en'];
 
-                                                console.log(`[YouTubeProxy] ✅ Transcript found via YouTube Official (${lang}): ${transcriptItems.length} lines`);
-                                                break;
-                                            } else {
-                                                console.warn(`[YouTubeProxy] Timedtext ${lang} returned empty content`);
+                                    for (const lang of languages) {
+                                        try {
+                                            const timedtextUrl = `https://www.youtube.com/api/timedtext?v=${id}&lang=${lang}`;
+                                            const response = await fetch(timedtextUrl, {
+                                                signal: AbortSignal.timeout(10000),
+                                                headers: { 'User-Agent': 'Mozilla/5.0' }
+                                            });
+
+                                            if (response.ok) {
+                                                const xmlText = await response.text();
+                                                console.log(`[YouTubeProxy] Timedtext ${lang} received ${xmlText.length} bytes`);
+
+                                                // Parse XML format: <text start="0.0" dur="2.5">Hello world</text>
+                                                const textMatches = xmlText.matchAll(/<text start="([^"]+)" dur="([^"]+)"[^>]*>([^<]+)<\/text>/g);
+                                                const items = Array.from(textMatches);
+
+                                                if (items.length > 0) {
+                                                    transcriptItems = items.map(match => {
+                                                        const start = parseFloat(match[1]);
+                                                        const duration = parseFloat(match[2]);
+                                                        const text = match[3]
+                                                            .replace(/&amp;/g, '&')
+                                                            .replace(/&lt;/g, '<')
+                                                            .replace(/&gt;/g, '>')
+                                                            .replace(/&quot;/g, '"')
+                                                            .replace(/&#39;/g, "'");
+
+                                                        return {
+                                                            offset: Math.floor(start * 1000),
+                                                            duration: Math.floor(duration * 1000),
+                                                            text: text.trim(),
+                                                            formattedTime: formatTime(start)
+                                                        };
+                                                    });
+
+                                                    console.log(`[YouTubeProxy] ✅ Transcript found via YouTube Official (${lang}): ${transcriptItems.length} lines`);
+                                                    break;
+                                                } else {
+                                                    console.warn(`[YouTubeProxy] Timedtext ${lang} returned empty content`);
+                                                }
                                             }
+                                        } catch (langErr: any) {
+                                            console.warn(`[YouTubeProxy] YouTube timedtext ${lang} failed:`, langErr?.message || langErr);
+                                            continue;
                                         }
-                                    } catch (langErr: any) {
-                                        console.warn(`[YouTubeProxy] YouTube timedtext ${lang} failed:`, langErr?.message || langErr);
-                                        continue;
                                     }
-                                }
 
-                                if (transcriptItems.length === 0) {
-                                    console.error('[YouTubeProxy] ❌ All YouTube timedtext attempts failed');
+                                    if (transcriptItems.length === 0) {
+                                        console.error('[YouTubeProxy] ❌ All YouTube timedtext attempts failed');
+                                    }
+                                } catch (ytErr: any) {
+                                    console.warn('[YouTubeProxy] YouTube official API fallback failed:', ytErr?.message || ytErr);
                                 }
-                            } catch (ytErr: any) {
-                                console.warn('[YouTubeProxy] YouTube official API fallback failed:', ytErr?.message || ytErr);
                             }
-                        }
+                    }
                     }
                 }
+            } catch (libErr) {
+                console.warn('[YouTubeProxy] Transcript fetch system error:', libErr);
             }
-        } catch (libErr) {
-            console.warn('[YouTubeProxy] Transcript fetch system error:', libErr);
+
+            // LAYER 2: Chapter Parsing from Description
+            const chapters: { time: string; title: string }[] = [];
+            if (videoData.description) {
+                // Regex to find timestamps like 00:00 or 1:05:20
+                const timestampRegex = /(\d{1,2}:\d{2}(?::\d{2})?)\s+([^\n]+)/g;
+                let match;
+                while ((match = timestampRegex.exec(videoData.description)) !== null) {
+                    chapters.push({ time: match[1], title: match[2].trim() });
+                }
+            }
+
+            isMetadataOnly = transcriptItems.length === 0;
+
+            // Construct Full Text for AI (Transcript with timestamps)
+            const fullTranscriptText = transcriptItems.length > 0
+                ? transcriptItems.map(i => `${i.formattedTime} ${i.text}`).join('\n')
+                : "";
+
+            return res.status(200).json({
+                success: true,
+                data: {
+                    transcript: transcriptItems,
+                    fullTranscriptText,
+                    title: videoData.title || 'Video de YouTube',
+                    description: videoData.description || '',
+                    metadata: videoData.metadata,
+                    comments,
+                    chapters,
+                    isMetadataOnly
+                }
+            } as YouTubeResult);
+
+        } catch (error: any) {
+            console.error('[YouTubeProxy] Final Error:', error.message);
+            res.status(500).json({ success: false, error: 'Error procesando video de YouTube.' });
         }
-
-        // LAYER 2: Chapter Parsing from Description
-        const chapters: { time: string; title: string }[] = [];
-        if (videoData.description) {
-            // Regex to find timestamps like 00:00 or 1:05:20
-            const timestampRegex = /(\d{1,2}:\d{2}(?::\d{2})?)\s+([^\n]+)/g;
-            let match;
-            while ((match = timestampRegex.exec(videoData.description)) !== null) {
-                chapters.push({ time: match[1], title: match[2].trim() });
-            }
-        }
-
-        isMetadataOnly = transcriptItems.length === 0;
-
-        // Construct Full Text for AI (Transcript with timestamps)
-        const fullTranscriptText = transcriptItems.length > 0
-            ? transcriptItems.map(i => `${i.formattedTime} ${i.text}`).join('\n')
-            : "";
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                transcript: transcriptItems,
-                fullTranscriptText,
-                title: videoData.title || 'Video de YouTube',
-                description: videoData.description || '',
-                metadata: videoData.metadata,
-                comments,
-                chapters,
-                isMetadataOnly
-            }
-        } as YouTubeResult);
-
-    } catch (error: any) {
-        console.error('[YouTubeProxy] Final Error:', error.message);
-        res.status(500).json({ success: false, error: 'Error procesando video de YouTube.' });
     }
-}
