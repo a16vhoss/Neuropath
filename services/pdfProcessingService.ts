@@ -375,6 +375,146 @@ export const extractTextFromPDF = async (
 };
 
 /**
+ * Detect if content is primarily theory, exercises, or mixed
+ */
+const detectContentType = async (text: string): Promise<'theory' | 'exercises' | 'mixed'> => {
+  try {
+    const detectionPrompt = `
+Analiza este texto educativo y clasifícalo en UNA de estas categorías:
+
+1. "exercises" - Si >70% son EJERCICIOS PRÁCTICOS/PROBLEMAS sin explicaciones teóricas extensas
+   Indicadores: números específicos, "Resuelve...", "Calcula...", problemas enumerados (1., 2., 3.), preguntas con datos concretos
+
+2. "theory" - Si >70% es TEORÍA: conceptos, definiciones, explicaciones, demostraciones
+   Indicadores: definiciones, explicaciones largas, conceptos abstractos, ejemplos ilustrativos
+
+3. "mixed" - Si mezcla ambos de forma balanceada
+
+TEXTO A ANALIZAR (primeros 5000 caracteres):
+${text.slice(0, 5000)}
+
+RESPONDE SOLO CON UNA PALABRA: exercises, theory, o mixed
+    `.trim();
+
+    const result = await generateContent(detectionPrompt, {
+      temperature: 0.3, // Low temperature for consistent classification
+      maxTokens: 10
+    });
+
+    const cleaned = result.trim().toLowerCase();
+
+    // Validate response
+    if (cleaned === 'exercises' || cleaned === 'theory' || cleaned === 'mixed') {
+      console.log(`[Flashcard Generation] Content type detected: ${cleaned}`);
+      return cleaned;
+    }
+
+    // Default to theory if response is unclear
+    console.warn(`[Flashcard Generation] Unclear detection result: "${result}", defaulting to theory`);
+    return 'theory';
+  } catch (error) {
+    console.error('[Flashcard Generation] Error detecting content type:', error);
+    return 'theory'; // Safe default
+  }
+};
+
+/**
+ * Get prompt for exercise-mode flashcard generation
+ * Extracts underlying concepts instead of literal exercise problems
+ */
+const getExerciseModePrompt = (text: string, topic: string, count: number): string => {
+  const targetCount = count > 0 ? count : 12; // Default to 12 for auto-scale
+
+  return `
+CONTEXTO: Este material contiene EJERCICIOS PRÁCTICOS, no teoría directa.
+
+TU TAREA: NO crear flashcards de los ejercicios individuales.
+En su lugar, INFIERE y GENERA flashcards de los CONCEPTOS TEÓRICOS SUBYACENTES.
+
+TEMA: "${topic}"
+
+INSTRUCCIONES DE EXTRACCIÓN:
+1. DETECTA: ¿Qué conceptos/temas cubren estos ejercicios? (Ej: Permutación, Combinación, Límites, Derivadas, etc.)
+2. IDENTIFICA: ¿Qué conocimientos teóricos se necesitan para resolver estos tipos de ejercicios?
+3. GENERA FLASHCARDS DE:
+   ✅ Definiciones de conceptos clave del tema
+   ✅ Fórmulas fundamentales y qué significa cada variable
+   ✅ Cuándo aplicar cada método/fórmula
+   ✅ Diferencias entre conceptos similares (Ej: Permutación vs Combinación)
+   ✅ Pasos/procedimientos para resolver este tipo de problemas
+   ✅ Condiciones de aplicación ("¿Cuándo usar X?")
+   ✅ Errores comunes o casos especiales
+
+EJEMPLOS DE FLASHCARDS CORRECTAS (para ejercicios de Permutación/Combinación):
+✅ Pregunta: "¿Qué es una permutación?"
+   Respuesta: "Arreglo ordenado de elementos donde el ORDEN SÍ importa. Ejemplo: ABC ≠ BAC"
+
+✅ Pregunta: "Fórmula de permutación P(n,r)"
+   Respuesta: "P(n,r) = n!/(n-r)! donde n = total de elementos, r = elementos a seleccionar"
+
+✅ Pregunta: "¿Cuándo usar combinación en vez de permutación?"
+   Respuesta: "Cuando el ORDEN NO importa. Ej: seleccionar 3 personas de 10 (no importa el orden de selección)"
+
+✅ Pregunta: "Diferencia entre 5! y P(5,3)"
+   Respuesta: "5! = permutación de TODOS los 5 elementos. P(5,3) = permutación de solo 3 de los 5"
+
+EJEMPLOS DE FLASHCARDS PROHIBIDAS:
+❌ "¿En una carrera con 8 corredores compiten, de cuántas maneras diferentes pueden llegar a las posiciones 1°, 2° y 3°?"
+❌ "Una pizzería ofrece 10 ingredientes diferentes. Quieres pedir una pizza con exactamente 3 ingredientes..."
+❌ NO copies ejercicios literales con números específicos
+
+CANTIDAD: Genera EXACTAMENTE ${targetCount} flashcards de conceptos/teoría.
+CATEGORÍA: Asigna categorías relevantes al tema (Ej: "Fórmulas", "Conceptos", "Procedimientos", "Diferencias")
+FUENTE: En "source_name" pon "${topic}"
+IDIOMA: Español
+
+EJERCICIOS PARA ANALIZAR (extraer conceptos):
+${text.slice(0, 100000)}
+  `.trim();
+};
+
+/**
+ * Get prompt for theory-mode flashcard generation
+ * Standard behavior for theoretical content
+ */
+const getTheoryModePrompt = (text: string, topic: string, count: number): string => {
+  if (count > 0) {
+    // Fixed count mode
+    return `
+OBJETIVO: Genera EXACTAMENTE ${count} flashcards de alta calidad sobre el tema "${topic}".
+
+INSTRUCCIONES DE COBERTURA Y FUENTES:
+1. ESCANEO PROFUNDO: Lee el texto párrafo por párrafo.
+2. EXTRACCIÓN DISTINTA: Identifica conceptos significativos.
+3. COBERTURA TOTAL: Cubre todo el material.
+4. NIVEL DE DETALLE: Entra en tecnicismos y ejemplos específicos.
+5. CANTIDAD EXACTA: Genera EXACTAMENTE ${count} tarjetas.
+6. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material de donde proviene en el campo "source_name".
+7. IDIOMA: Español.
+
+TEXTO DE REFERENCIA (ESCANEAR TODO):
+${text.slice(0, 100000)}
+    `.trim();
+  } else {
+    // Auto-scale / Unlimited mode
+    return `
+OBJETIVO: Genera un conjunto COMPLETO de flashcards que cubra TODOS los conceptos clave del tema "${topic}" en el texto proporcionado.
+
+INSTRUCCIONES DE COBERTURA Y FUENTES:
+1. COBERTURA EXHAUSTIVA: Analiza TODO el documento. No dejes ningún concepto importante fuera.
+2. SIN LÍMITE ARTIFICIAL: Genera tantas tarjetas como sean necesarias para cubrir el material (pueden ser 10, 20 o 50+).
+3. GRANULARIDAD: Desglosa conceptos complejos en tarjetas más simples.
+4. TIPOS DE PREGUNTAS: Incluye definiciones, relaciones, ejemplos y causas/efectos.
+5. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material de donde proviene en el campo "source_name".
+6. IDIOMA: Español.
+
+TEXTO DE REFERENCIA (ESCANEAR TODO):
+${text.slice(0, 100000)}
+    `.trim();
+  }
+};
+
+/**
  * Generate flashcards from extracted text using Gemini
  */
 export const generateFlashcardsFromText = async (
@@ -397,43 +537,23 @@ export const generateFlashcardsFromText = async (
       }
     };
 
+    // Step 1: Detect content type (theory, exercises, or mixed)
+    const contentType = await detectContentType(text);
+
+    // Step 2: Choose appropriate prompt based on content type
     let prompt = '';
 
-    if (count > 0) {
-      // Fixed count mode
-      prompt = `
-        OBJETIVO: Genera EXACTAMENTE ${count} flashcards de alta calidad sobre el tema "${topic}".
-
-        INSTRUCCIONES DE COBERTURA Y FUENTES:
-        1. ESCANEO PROFUNDO: Lee el texto párrafo por párrafo.
-        2. EXTRACCIÓN DISTINTA: Identifica conceptos significativos.
-        3. COBERTURA TOTAL: Cubre todo el material.
-        4. NIVEL DE DETALLE: Entra en tecnicismos y ejemplos específicos.
-        5. CANTIDAD EXACTA: Genera EXACTAMENTE ${count} tarjetas.
-        6. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material de donde proviene en el campo "source_name".
-        7. IDIOMA: Español.
-
-        TEXTO DE REFERENCIA (ESCANEAR TODO):
-        ${text.slice(0, 100000)}
-      `;
+    if (contentType === 'exercises') {
+      // Use exercise-mode prompt to extract concepts
+      console.log(`[Flashcard Generation] Using EXERCISE MODE for topic: ${topic}`);
+      prompt = getExerciseModePrompt(text, topic, count);
     } else {
-      // Auto-scale / Unlimited mode
-      prompt = `
-        OBJETIVO: Genera un conjunto COMPLETO de flashcards que cubra TODOS los conceptos clave del tema "${topic}" en el texto proporcionado.
-
-        INSTRUCCIONES DE COBERTURA Y FUENTES:
-        1. COBERTURA EXHAUSTIVA: Analiza TODO el documento. No dejes ningún concepto importante fuera.
-        2. SIN LÍMITE ARTIFICIAL: Genera tantas tarjetas como sean necesarias para cubrir el material (pueden ser 10, 20 o 50+).
-        3. GRANULARIDAD: Desglosa conceptos complejos en tarjetas más simples.
-        4. TIPOS DE PREGUNTAS: Incluye definiciones, relaciones, ejemplos y causas/efectos.
-        5. IDENTIFICACIÓN DE FUENTE: Para cada tarjeta, indica el nombre del material de donde proviene en el campo "source_name".
-        6. IDIOMA: Español.
-
-        TEXTO DE REFERENCIA (ESCANEAR TODO):
-        ${text.slice(0, 100000)}
-      `;
+      // Use theory-mode prompt (standard behavior)
+      console.log(`[Flashcard Generation] Using THEORY MODE for topic: ${topic}`);
+      prompt = getTheoryModePrompt(text, topic, count);
     }
 
+    // Step 3: Generate flashcards with appropriate prompt
     const result = await generateContent(prompt, {
       jsonSchema: schema,
       temperature: 0.7,
