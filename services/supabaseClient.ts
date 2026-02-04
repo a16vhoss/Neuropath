@@ -843,6 +843,18 @@ export const deleteMaterialFromStudySet = async (materialId: string) => {
         // Continue anyway to delete the material
     }
 
+    // Delete all exercises (exercise_templates) associated with this material
+    // Note: This will cascade to exercise_instances and user_exercise_progress
+    const { error: exercisesError } = await supabase
+        .from('exercise_templates')
+        .delete()
+        .eq('material_id', materialId);
+
+    if (exercisesError) {
+        console.error('Error deleting exercises for material:', exercisesError);
+        // Continue anyway to delete the material
+    }
+
     // Then delete the material itself
     const { error } = await supabase
         .from('study_set_materials')
