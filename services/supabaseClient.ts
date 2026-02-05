@@ -511,9 +511,7 @@ export const getClassStudySets = async (classId: string) => {
         .select(`
             *,
             study_set_materials (
-                material: materials (
-                    flashcards_generated
-                )
+                flashcards_generated
             )
         `)
         .eq('class_id', classId)
@@ -526,7 +524,7 @@ export const getClassStudySets = async (classId: string) => {
         ...set,
         // Calculate count summing flashcards_generated of each material
         count: set.study_set_materials?.reduce((acc: number, curr: any) =>
-            acc + (curr.material?.flashcards_generated || 0), 0) || 0
+            acc + (curr.flashcards_generated || 0), 0) || 0
     }));
 };
 
