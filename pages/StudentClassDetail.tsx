@@ -57,12 +57,15 @@ const StudentClassDetail: React.FC = () => {
     // [NEW STATE]
     const [showStudyModal, setShowStudyModal] = useState(false);
     const [classStudySets, setClassStudySets] = useState<any[]>([]);
+    const [isStudyLoading, setIsStudyLoading] = useState(false);
 
     useEffect(() => {
         if (classId && user) {
             loadClassData();
         }
     }, [classId, user]);
+
+    // ... (keep loadClassData implementation unchanged)
 
     const loadClassData = async () => {
         if (!classId || !user) return;
@@ -146,29 +149,25 @@ const StudentClassDetail: React.FC = () => {
 
     // [NEW HANDLER]
     const handleStudyClick = async () => {
-        console.log('Study button clicked');
-        if (!classId) {
-            console.error('No classId found');
-            return;
-        }
+        if (!classId) return;
+        setIsStudyLoading(true);
         try {
-            console.log('Fetching study sets for class:', classId);
             const sets = await getClassStudySets(classId);
-            console.log('Study sets fetched:', sets);
 
             const formattedSets = sets.map((s: any) => ({
                 id: s.id,
                 name: s.name,
                 type: 'class' as const,
-                count: s.count || 0 // Correct property from service
+                count: s.count || 0
             }));
 
-            console.log('Formatted sets:', formattedSets);
             setClassStudySets(formattedSets);
             setShowStudyModal(true);
-            console.log('Modal state set to true');
         } catch (err) {
             console.error('Error loading study sets:', err);
+            alert('Error al cargar la zona de estudio. Por favor intenta de nuevo.');
+        } finally {
+            setIsStudyLoading(false);
         }
     };
 
@@ -210,12 +209,16 @@ const StudentClassDetail: React.FC = () => {
                         </div>
                     ))}
                     <div className="border-t border-slate-100 my-4"></div>
-                    <div
+                    <button
                         onClick={handleStudyClick}
-                        className="text-white bg-gradient-to-r from-violet-600 to-indigo-600 p-3 rounded-lg flex items-center gap-3 font-bold hover:shadow-lg cursor-pointer transition-all"
+                        disabled={isStudyLoading}
+                        className="w-full text-white bg-gradient-to-r from-violet-600 to-indigo-600 p-3 rounded-lg flex items-center gap-3 font-bold hover:shadow-lg cursor-pointer transition-all disabled:opacity-70"
                     >
-                        <span className="material-symbols-outlined">school</span> Zona de Estudio
-                    </div>
+                        <span className={`material-symbols-outlined ${isStudyLoading ? 'animate-spin' : ''}`}>
+                            {isStudyLoading ? 'refresh' : 'school'}
+                        </span>
+                        {isStudyLoading ? 'Cargando...' : 'Zona de Estudio'}
+                    </button>
                 </nav>
             </aside>
 
