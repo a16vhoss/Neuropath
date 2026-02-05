@@ -211,7 +211,7 @@ const StudentClassDetail: React.FC = () => {
                     ))}
                     <div className="border-t border-slate-100 my-4"></div>
                     <div
-                        onClick={() => navigate(`/student/study/${classId}`)}
+                        onClick={handleStudyClick}
                         className="text-white bg-gradient-to-r from-violet-600 to-indigo-600 p-3 rounded-lg flex items-center gap-3 font-bold hover:shadow-lg cursor-pointer transition-all"
                     >
                         <span className="material-symbols-outlined">school</span> Zona de Estudio
