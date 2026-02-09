@@ -42,6 +42,7 @@ const AuthPage: React.FC = () => {
     }, []);
 
     const [isLogin, setIsLogin] = useState(true);
+    const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -57,13 +58,18 @@ const AuthPage: React.FC = () => {
         setSuccess('');
         setSubmitting(true);
 
-        if (!isLogin && password !== confirmPassword) {
+        const cleanEmail = email.trim().toLowerCase();
+        const cleanPassword = password.trim();
+        const cleanConfirmPassword = confirmPassword.trim();
+        const cleanFullName = fullName.trim();
+
+        if (!isLogin && cleanPassword !== cleanConfirmPassword) {
             setError('Las contraseñas no coinciden');
             setSubmitting(false);
             return;
         }
 
-        if (!isLogin && password.length < 6) {
+        if (!isLogin && cleanPassword.length < 6) {
             setError('La contraseña debe tener al menos 6 caracteres');
             setSubmitting(false);
             return;
@@ -76,10 +82,10 @@ const AuthPage: React.FC = () => {
             );
 
             if (isLogin) {
-                await Promise.race([signIn(email, password), timeoutPromise]);
+                await Promise.race([signIn(cleanEmail, cleanPassword), timeoutPromise]);
                 // Navigation is handled by useEffect when user/profile changes
             } else {
-                await Promise.race([signUp(email, password, fullName, role), timeoutPromise]);
+                await Promise.race([signUp(cleanEmail, cleanPassword, cleanFullName, role), timeoutPromise]);
                 setSuccess('¡Cuenta creada! Ya puedes iniciar sesión.');
                 setIsLogin(true);
             }
@@ -184,15 +190,26 @@ const AuthPage: React.FC = () => {
 
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-2">Contraseña</label>
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="••••••••"
-                                required
-                                minLength={6}
-                                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                            />
+                            <div className="relative">
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    required
+                                    minLength={6}
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none pr-12"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                                >
+                                    <span className="material-symbols-outlined select-none">
+                                        {showPassword ? 'visibility' : 'visibility_off'}
+                                    </span>
+                                </button>
+                            </div>
                         </div>
 
                         {!isLogin && (
