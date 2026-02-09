@@ -481,17 +481,16 @@ const StudentClassDetail: React.FC = () => {
                 initialMode="adaptive"
                 onStartSession={(sets, mode) => {
                     let url: string;
-                    const idsToPass = sets.length > 0 && sets.length < classStudySets.length ? sets : [];
+                    // For ultra_review, always pass set IDs (required by UltraReview component)
+                    const allSetIds = classStudySets.map(s => s.id);
+                    const idsToPass = sets.length > 0 ? sets : allSetIds;
 
                     if (mode === 'ultra_review') {
-                        url = `/student/ultra-review?mode=${mode}`;
-                        if (idsToPass.length > 0) {
-                            url += `&sets=${idsToPass.join(',')}`;
-                        }
+                        url = `/student/ultra-review?mode=${mode}&sets=${idsToPass.join(',')}`;
                     } else {
                         url = `/student/adaptive-study?mode=${mode}`;
-                        if (idsToPass.length > 0) {
-                            url += `&sets=${idsToPass.join(',')}`;
+                        if (sets.length > 0 && sets.length < classStudySets.length) {
+                            url += `&sets=${sets.join(',')}`;
                         }
                     }
                     navigate(url);
