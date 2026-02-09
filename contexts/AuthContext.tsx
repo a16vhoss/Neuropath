@@ -12,6 +12,8 @@ interface Profile {
     level: number;
     streak_days: number;
     last_study_date?: string;
+    institution?: string;
+    department?: string;
 }
 
 interface AuthContextType {

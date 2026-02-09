@@ -97,7 +97,7 @@ const QuizSession: React.FC = () => {
 
     const finishQuiz = async (finalResults: any[]) => {
         setSessionComplete(true);
-        const duration = Math.round((Date.now() / 1000) - (startTime / 1000)); // Ensure proper unit
+        const duration = Math.round(Date.now() / 1000 - startTime);
         if (user) {
             await saveQuizSession(user.id, studySetIds, questions, finalResults, duration);
             confetti({ particleCount: 200, spread: 100, origin: { y: 0.6 } });

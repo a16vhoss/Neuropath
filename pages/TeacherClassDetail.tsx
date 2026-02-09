@@ -1450,7 +1450,6 @@ const TeacherClassDetail: React.FC = () => {
             {/* Upload Modal (Magic Import) */}
             {showUploadModal && (
                 <MagicImportModal
-                    isOpen={showUploadModal}
                     onClose={() => setShowUploadModal(false)}
                     onSuccess={(newSet: any) => {
                         loadClassData();

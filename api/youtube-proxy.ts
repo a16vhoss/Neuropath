@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { YoutubeTranscript } from 'youtube-transcript';
 
-// In production, set this in Vercel Environment Variables as YOUTUBE_API_KEY
-const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || 'AIzaSyCHeNTXiq_u9JfwEYVBZbGTks6XHOkVPh4';
+// Set YOUTUBE_API_KEY in Vercel Environment Variables
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || '';
 
 export interface YouTubeResult {
     success: boolean;

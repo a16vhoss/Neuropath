@@ -65,6 +65,7 @@ const NODE_COLORS = {
 interface CustomNodeData {
   label: string;
   nodeType: 'root' | 'concept' | 'subconcept' | 'detail';
+  [key: string]: unknown;
 }
 
 const CustomMindMapNode = ({ data }: { data: CustomNodeData }) => {

@@ -21,11 +21,11 @@ const AuthPage: React.FC = () => {
         const checkConnection = async () => {
             try {
                 // Method 1: Simple fetch to seeing if domain resolves/reachable (expecting 404 but connection success)
-                const url = import.meta.env.VITE_SUPABASE_URL || 'https://szcsttpuckqpjndadqbk.supabase.co';
+                const url = import.meta.env.VITE_SUPABASE_URL;
                 console.log('Testing connection to:', url);
 
                 try {
-                    await fetch(url + '/rest/v1/', { method: 'HEAD', headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6Y3N0dHB1Y2txcGpuZGFkcWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MjcxNzEsImV4cCI6MjA4NDEwMzE3MX0.jkySnMjg16zyejivMhhtxgdnPecs7W8nGbNYTxfeFOo' } });
+                    await fetch(url + '/rest/v1/', { method: 'HEAD', headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY } });
                     setConnectionStatus('ok');
                 } catch (fetchErr: any) {
                     console.error('Fetch check failed:', fetchErr);

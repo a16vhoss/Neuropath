@@ -512,8 +512,7 @@ const AdaptiveStudySession: React.FC = () => {
                         </div>
                         <div className="flex-1 overflow-y-auto p-4">
                             <AITutorChat
-                                context={`Pregunta: ${currentCard.question}\nRespuesta: ${currentCard.answer}`}
-                                onClose={() => setShowTutor(false)}
+                                currentContext={`Pregunta: ${currentCard.question}\nRespuesta: ${currentCard.answer}`}
                             />
                         </div>
                     </div>

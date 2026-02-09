@@ -35,6 +35,7 @@ interface MindMapNodeData {
   hasChildren?: boolean;
   onExpand?: (id: string, expanded: boolean) => void;
   level?: number;
+  [key: string]: unknown;
 }
 
 const MindMapNode = ({ data, id }: { data: MindMapNodeData; id: string }) => {
@@ -62,7 +63,7 @@ const MindMapNode = ({ data, id }: { data: MindMapNodeData; id: string }) => {
       <div
         className={`
           relative px-4 py-3 rounded-xl shadow-lg border transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl
-          ${data.isRoot ? colors.bg + ' ' + colors.text : colors.bg + ' ' + colors.text + ' ' + colors.border}
+          ${data.isRoot ? colors.bg + ' ' + colors.text : colors.bg + ' ' + colors.text + ' ' + ('border' in colors ? colors.border : '')}
           ${glassClasses}
           ${pulseClass}
           ${data.isRoot ? 'min-w-[200px]' : 'min-w-[150px] max-w-[250px]'}

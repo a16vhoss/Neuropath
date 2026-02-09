@@ -5,6 +5,7 @@ interface FolderItemProps {
     onOpen: (folder: any) => void;
     onRename: (folder: any, newName: string) => void;
     onDelete: (folder: any) => void;
+    canManage?: boolean;
     selectionMode?: boolean;
     isSelected?: boolean;
     onSelect?: (folder: any) => void;

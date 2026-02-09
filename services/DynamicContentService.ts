@@ -171,8 +171,7 @@ ${sourceMaterial.slice(0, 8000)}
 `;
 
     try {
-        // Use existing Gemini service (generateStudySetFromContext takes content and type)
-        const flashcards = await generateStudySetFromContext(enhancedPrompt, 'text');
+        const flashcards = await generateStudySetFromContext(enhancedPrompt, count);
 
         if (!flashcards || flashcards.length === 0) {
             return [];

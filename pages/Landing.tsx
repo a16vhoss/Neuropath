@@ -1,19 +1,13 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserRole } from '../types';
 
-interface LandingProps {
-  onLogin: (role: UserRole) => void;
-}
-
-const Landing: React.FC<LandingProps> = ({ onLogin }) => {
+const Landing: React.FC = () => {
   const navigate = useNavigate();
   const [activeFeatureTab, setActiveFeatureTab] = useState<'profesores' | 'ia' | 'estudiantes'>('estudiantes');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
-  const handleDemo = (role: UserRole) => {
-    // onLogin(role); // Disabled demo login
+  const handleDemo = () => {
     navigate('/auth');
   };
 
@@ -188,9 +182,9 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
             {/* Quick Demo Cards */}
             <div className="grid md:grid-cols-3 gap-6 mt-8">
               {[
-                { icon: 'person', label: 'Demo Profesor', desc: 'Sube material y ve analíticas', action: () => handleDemo(UserRole.TEACHER) },
-                { icon: 'school', label: 'Demo Estudiante', desc: 'Prueba flashcards y quizzes', action: () => handleDemo(UserRole.STUDENT) },
-                { icon: 'smart_toy', label: 'Tutor IA', desc: 'Pregunta y aprende', action: () => handleDemo(UserRole.STUDENT) }
+                { icon: 'person', label: 'Demo Profesor', desc: 'Sube material y ve analíticas', action: () => handleDemo() },
+                { icon: 'school', label: 'Demo Estudiante', desc: 'Prueba flashcards y quizzes', action: () => handleDemo() },
+                { icon: 'smart_toy', label: 'Tutor IA', desc: 'Pregunta y aprende', action: () => handleDemo() }
               ].map((demo, i) => (
                 <button
                   key={i}

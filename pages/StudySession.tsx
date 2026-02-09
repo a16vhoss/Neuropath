@@ -1017,7 +1017,7 @@ const StudySession: React.FC = () => {
       {/* Quiz Config Modal */}
       {showQuizConfig && user && studySetId && (
         <QuizConfigModal
-          studySetId={studySetId}
+          studySetIds={studySetId ? [studySetId] : []}
           userId={user.id}
           onStart={generateCustomQuiz}
           onCancel={() => {

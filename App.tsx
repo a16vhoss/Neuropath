@@ -13,8 +13,6 @@ import StudentClassDetail from './pages/StudentClassDetail';
 import ClassItemDetail from './pages/ClassItemDetail';
 import StudentAchievements from './pages/StudentAchievements';
 import StudySetDetail from './pages/StudySetDetail';
-import StudyBattles from './pages/StudyBattles';
-import BattleArena from './pages/BattleArena';
 import StudySession from './pages/StudySession';
 import AdaptiveStudySession from './pages/AdaptiveStudySession';
 import UltraReview from './pages/UltraReview';
@@ -23,8 +21,6 @@ import CreateAssignment from './pages/CreateAssignment';
 import TeacherSettings from './pages/TeacherSettings';
 import ExerciseSession from './pages/ExerciseSession';
 import QuizSession from './pages/QuizSession';
-import { UserRole } from './types';
-
 // Protected Route component
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRole?: 'student' | 'teacher' }> = ({
   children,
@@ -80,18 +76,12 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const AppRoutes: React.FC = () => {
-  const [userRole, setUserRole] = useState<UserRole>(UserRole.STUDENT);
   const { user, profile } = useAuth();
-
-  // Handler for demo login from landing page
-  const handleDemoLogin = (role: UserRole) => {
-    setUserRole(role);
-  };
 
   return (
     <Routes>
       {/* Public Routes */}
-      <Route path="/" element={<Landing onLogin={handleDemoLogin} />} />
+      <Route path="/" element={<Landing />} />
       <Route path="/auth" element={<AuthPage />} />
 
       {/* Student Routes */}
