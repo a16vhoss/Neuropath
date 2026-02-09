@@ -480,9 +480,19 @@ const StudentClassDetail: React.FC = () => {
                 availableSets={classStudySets}
                 initialMode="adaptive"
                 onStartSession={(sets, mode) => {
-                    let url = `/student/adaptive-study?mode=${mode}`;
-                    if (sets.length > 0 && sets.length < classStudySets.length) {
-                        url += `&sets=${sets.join(',')}`;
+                    let url: string;
+                    const idsToPass = sets.length > 0 && sets.length < classStudySets.length ? sets : [];
+
+                    if (mode === 'ultra_review') {
+                        url = `/student/ultra-review?mode=${mode}`;
+                        if (idsToPass.length > 0) {
+                            url += `&sets=${idsToPass.join(',')}`;
+                        }
+                    } else {
+                        url = `/student/adaptive-study?mode=${mode}`;
+                        if (idsToPass.length > 0) {
+                            url += `&sets=${idsToPass.join(',')}`;
+                        }
                     }
                     navigate(url);
                 }}
